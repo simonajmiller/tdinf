@@ -1,13 +1,75 @@
 import numpy as np
 from scipy.stats import gaussian_kde
-import lal
 import pycbc.psd
 from gwpy.timeseries import TimeSeries
 from gwpy.signal import filter_design
 
+"""
+Functions to calculate matched-filter SNR; 
+See Eqs. (50) through (53) of  https://arxiv.org/pdf/2107.05609.pdf
+"""
+
+def inner_product(x, y, rho): 
+    prod = x @ sl.solve_toeplitz(rho, y)
+    return prod
+
+def calc_mf_SNR(d, s, rho): 
+    snr = inner_product(s, d, rho) / np.sqrt(inner_product(s, s, rho))
+    return snr
+
+def calc_network_mf_SNR(snr_list): 
+    snrs_sq = [snr**2 for snr in snr_list]
+    network_snr = np.sqrt(sum(snrs_sq))
+    return network_snr
+
 
 """
-Functions to whiten and bandpass the data
+Vector math 
+"""
+
+def get_mag(v): 
+    
+    """
+    Get the magnitude of a vector v
+    
+    Parameters
+    ----------
+    v : `numpy.array`
+        vector with components v[0], v[1], v[2], etc.
+    
+    Returns
+    -------
+    mag_v : float
+        magnitude of v 
+    """
+    
+    v_squared = [x*x for x in v]
+    mag_v = np.sqrt(sum(v_squared))
+    return mag_v
+
+
+def unit_vector(v):
+    
+    """
+    Get the unit of a vector v
+    
+    Parameters
+    ----------
+    v : `numpy.array`
+        vector with components v[0], v[1], v[2], etc.
+    
+    Returns
+    -------
+    unit_v : `numpy.array`
+        v divided by its magnitude
+    """
+    unit_v =  v / get_mag(v)
+    return unit_v
+
+
+
+"""
+Other miscellaneous functions
 """
 
 def get_pycbc_PSD(filename, f_low, delta_f, sampling_freq=1024): 
@@ -36,46 +98,6 @@ def get_pycbc_PSD(filename, f_low, delta_f, sampling_freq=1024):
     length = int(sampling_freq / delta_f)
     psd = pycbc.psd.from_txt(filename, length, delta_f, f_low, is_asd_file=False)
     return psd
-
-
-def whitenData(h_td, psd, freqs):
-    
-    """
-    Whiten a timeseries with a given power spectral density
-    
-    Parameters
-    ----------
-    h_td : `numpy.array`
-        un-whitened strain data in the time domain
-    psd : `numpy.array`
-        power spectral density used to whiten the data at frequencies freqs
-    freqs : `numpy.array`
-        frequencies corresponding to the psd
-    
-    Returns
-    -------
-    wh_td : `numpy.array`
-        whitened time domain data at the same timestamps as the input
-    """
-    
-    # Get segment length and sampling rate 
-    dt = 0.5 / round(freqs.max())
-    df = freqs[1] - freqs[0]
-    seglen = 1 / df
-    sampling_rate = 1 / dt 
-    N = int(seglen * sampling_rate) - 1
-    
-    # Into fourier domain
-    h_fd = np.fft.rfft(h_td, n=N) / N
-    
-    # Divide out ASD 
-    wh_fd = h_fd/np.sqrt(psd * seglen / 4)
-    
-    # Back into time domain
-    wh_td = 0.5*np.fft.irfft(wh_fd) / dt
-    wh_td = wh_td[:len(h_td)]
-    
-    return wh_td
 
 
 def bandpass(h, times, fmin, fmax):
@@ -110,31 +132,6 @@ def bandpass(h, times, fmin, fmax):
     h_bp = h_timeseries.filter(bp_filter, filtfilt=True)
     
     return h_bp
-
-
-
-"""
-Functions to calculate matched-filter SNR; 
-See Eqs. (50) through (53) of  https://arxiv.org/pdf/2107.05609.pdf
-"""
-
-def inner_product(x, y, rho): 
-    prod = x @ sl.solve_toeplitz(rho, y)
-    return prod
-
-def calc_mf_SNR(d, s, rho): 
-    snr = inner_product(s, d, rho) / np.sqrt(inner_product(s, s, rho))
-    return snr
-
-def calc_network_mf_SNR(snr_list): 
-    snrs_sq = [snr**2 for snr in snr_list]
-    network_snr = np.sqrt(sum(snrs_sq))
-    return network_snr
-
-
-"""
-Other miscellaneous functions
-"""
 
 def reflected_kde(samples, lower_bound, upper_bound, npoints=500, bw=None): 
     
@@ -176,24 +173,3 @@ def reflected_kde(samples, lower_bound, upper_bound, npoints=500, bw=None):
                   gaussian_kde(2*upper_bound-samples, bw_method=bw)(grid) 
     
     return grid, kde_on_grid
-
-
-def get_mag(v): 
-    
-    """
-    Get the magnitude of a vector v
-    
-    Parameters
-    ----------
-    v : `numpy.array`
-        vector with components v[0], v[1], v[2], etc.
-    
-    Returns
-    -------
-    mag_v : float
-        magnitude of v 
-    """
-    
-    v_squared = [x*x for x in v]
-    mag_v = np.sqrt(sum(v_squared))
-    return mag_v
