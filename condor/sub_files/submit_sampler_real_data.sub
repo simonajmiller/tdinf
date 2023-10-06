@@ -1,0 +1,21 @@
+Root = /home/simona.miller/time-domain-gw-inference/
+Savename = $(Date)_GW190521_realData_$(RunMode)_$(Cycles)cycles
+
+Nproc = 32
+
+executable = $(Root)/scripts/run_sampler.py
+universe = vanilla
+arguments = "-o $(Savename).h5 -m $(RunMode) -t $(Cycles) --ncpu $(Nproc) --nsteps 50000 --nwalkers 512 --vary-time --vary-skypos --resume"
+
+request_cpus = $(Nproc)
+request_memory = 4 GB
+request_disk = 5000
+accounting_group = ligo.dev.o4.cbc.testgr.tiger
+
+log = $(Root)/condor/logs/$(Savename).log
+output = $(Root)/condor/logs/$(Savename).out
+error = $(Root)/condor/logs/$(Savename).err
+
+getenv = True
+
+queue
