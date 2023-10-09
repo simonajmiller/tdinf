@@ -133,8 +133,7 @@ if Ncycles==0:
     tcut_geocent = tpeak_geocent
 else:  
     tcut_geocent = utils.get_Tcut_from_Ncycles(Ncycles, parameters=injected_parameters, time_dict=raw_time_dict, 
-                                               tpeak_dict=tpeak_dict, ap_dict=ap_dict, skypos=skypos, f_ref=f_ref, 
-                                               f_low=f_low)
+                                               tpeak_dict=tpeak_dict, ap_dict=ap_dict, skypos=skypos, f_ref=f_ref, f_low=f_low)
     
 print('\nCutoff time:')
 tcut_dict, _ = utils.get_tgps_and_ap_dicts(tcut_geocent, ifos, skypos['ra'] , skypos['dec'], skypos['psi'])
