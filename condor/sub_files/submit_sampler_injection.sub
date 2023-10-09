@@ -1,5 +1,7 @@
 Root = /home/simona.miller/time-domain-gw-inference/
-Savename = $(Date)_GW190521_realData_$(RunMode)_$(Cycles)cycles
+Savename = $(Date)_injection_$(Injection)_$(RunMode)_$(Cycles)cycles
+
+InjectionPath = $(Root)/data/input/injection_params/$(Injection).json
 
 Nproc = 64
 Nsteps = 50000
@@ -7,7 +9,7 @@ Nwalkers = 512
 
 executable = $(Root)/scripts/run_sampler.sh
 universe = vanilla
-arguments = $(Savename) $(RunMode) $(Cycles) $(Nproc) $(Nsteps) $(Nwalkers) $(Injection)
+arguments = $(Savename) $(RunMode) $(Cycles) $(Nproc) $(Nsteps) $(Nwalkers) $(InjectionPath)
 
 request_cpus = $(Nproc)
 request_memory = 4 GB
