@@ -42,12 +42,14 @@ p.add_argument('--ncpu', type=int, default=4)
 p.add_argument('--approx', default='NRSur7dq4')
 p.add_argument('--downsample', type=int, default=8)
 p.add_argument('--flow', type=float, default=11)
+p.add_argument('--fref', type=float, default=11)
 p.add_argument('--ifos', nargs='+', default=['H1', 'L1', 'V1'])
 p.add_argument('--data-path', default=data_dir+'input/GW190521_data/{}-{}_GWOSC_16KHZ_R2-1242442952-32.hdf5')
 p.add_argument('--psd-path', default=data_dir+'input/GW190521_data/glitch_median_PSD_{}.dat')
 
-# Option to do an injection instead of use real data
-p.add_argument('--injected-parameters', default=None) # file path to injected parameters
+# Option to do an injection instead of use real data;
+# if "REALDATA", do not do an injection, else file path to injected parameters
+p.add_argument('--injected-parameters', default="REALDATA")
 
 # Do we want to run with only the prior?
 p.add_argument('--only-prior', action='store_true')
@@ -72,45 +74,57 @@ Load or generate data
 """
 
 ifos = args.ifos
+psd_path = args.psd_path
 
 # If real data ...
-if args.injected_parameters is None: 
+if args.injected_parameters == "REALDATA": 
     
-    # Load data 
+    # Load data
     raw_time_dict, raw_data_dict = utils.load_raw_data(ifos=ifos,path=args.data_path)
-    pe_out = utils.get_pe(raw_time_dict, verbose=False, psd_path=args.psd_path)
+    pe_out = utils.get_pe(raw_time_dict, verbose=False, psd_path=psd_path)
     tpeak_geocent, pe_samples, log_prob, pe_psds, skypos = pe_out
     
     # "Injected parameters" = max(P) draw from the samples associated with this data
     injected_parameters = pe_samples[np.argmax(log_prob)]
+    
+    ## tpeak = placement of waveform
+    print('\nWaveform placement time:')
+    tpeak_dict, ap_dict = utils.get_tgps_and_ap_dicts(tpeak_geocent, ifos, skypos['ra'] , skypos['dec'], skypos['psi'])  
 
-# Else, generate an injection 
-else:     
+# Else, generate an injection (currently, only set up for no noise case)
+else:    
     
-    ## TO DO : ADD ABILITY TO DO INJECTIONS
+    # Load in injected parameters 
+    injected_parameters = utils.parse_injected_parameters(args.injected_parameters)
     
-    ## psuedocode: injected_parameters = parse_injected_parameters(args.injected_parameters)
+    # Triggertime and sky position 
+    tpeak_geocent = injected_parameters['geocent_time']
+    skypos = {k:injected_parameters[k] for k in ['ra', 'dec', 'psi']}
     
-    ## Generate ... 
-    ##  - raw_time_dict and raw_data_dict
-    ##  - tpeak_geocent 
-    ##  - pe_psds
-    ##  - skypos 
+    ## tpeak = placement of waveform
+    print('\nWaveform placement time:')
+    tpeak_dict, ap_dict = utils.get_tgps_and_ap_dicts(tpeak_geocent, ifos, skypos['ra'] , skypos['dec'], skypos['psi'])  
     
-    sys.exit() ### Not set up for this yet
+    # PSDs 
+    pe_psds = {}
+    for ifo in ifos: 
+        pe_psds[ifo] = genfromtxt(psd_path.format(ifo), dtype=float)
+        
+    # Times
+    raw_time_dict = utils.load_raw_data(ifos=ifos,path=args.data_path)[0]
     
-## tpeak = placement of waveform
-print('\nWaveform placement time:')
-tpeak_dict, ap_dict = utils.get_tgps_and_ap_dicts(tpeak_geocent, ifos, skypos['ra'] , skypos['dec'], skypos['psi'])    
-
+    # Injection
+    raw_data_dict = utils.injectWaveform(parameters=injected_parameters, time_dict=raw_time_dict, 
+                                               tpeak_dict=tpeak_dict, ap_dict=ap_dict, skypos=skypos, f_ref=args.fref)
+              
 ## tcut = cutoff time in waveform
 Ncycles = args.Tcut_cycles # find truncation time in # number of cycles from peak
 # if 0, cut = peak
 if Ncycles==0:
     tcut_geocent = tpeak_geocent
 else:  
-    tcut_geocent = utils.get_Tcut_from_Ncycles(Ncycles, parameters=injected_parameters, raw_time_dict=raw_time_dict, 
-                                               tpeak_dict=tpeak_dict, ap_dict=ap_dict, skypos=skypos)
+    tcut_geocent = utils.get_Tcut_from_Ncycles(Ncycles, parameters=injected_parameters, time_dict=raw_time_dict, 
+                                               tpeak_dict=tpeak_dict, ap_dict=ap_dict, skypos=skypos, f_ref=args.fref)
     
 print('\nCutoff time:')
 tcut_dict, _ = utils.get_tgps_and_ap_dicts(tcut_geocent, ifos, skypos['ra'] , skypos['dec'], skypos['psi'])
@@ -118,6 +132,7 @@ tcut_dict, _ = utils.get_tgps_and_ap_dicts(tcut_geocent, ifos, skypos['ra'] , sk
 # If we are varying skyposition 
 if args.vary_skypos: 
     ap_dict = None # don't want fixed antenna patterns
+    
 # If we are varying over time of coalescence 
 if args.vary_time:
     tpeak_dict = None # don't want fixed time of arrival at detectors
@@ -344,13 +359,14 @@ samples_dict['ln_prior'] = samples_lnprior
 df = pd.DataFrame(samples_dict)
 df = df[[k for k,v in df.items() if v.min() != v.max()]]
 
-# Add info about tpeak, tcut, and skypos
+# Add info about tpeak, tcut, and injected parameters
 if not args.vary_time:
     tpeak_dict['geocenter'] = tpeak_geocent
     df.attrs['t_peak'] = tpeak_dict
 tcut_dict['geocenter'] = tcut_geocent
 df.attrs['t_cut'] = tcut_dict
 df.attrs['skypos'] = skypos
+df.attrs['injected_parameters'] = injected_parameters
 
 # Save
 dat_path = backend_path.replace('h5', 'dat')

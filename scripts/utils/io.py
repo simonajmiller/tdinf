@@ -2,7 +2,9 @@ from pylab import *
 import lal
 import h5py
 from . import reconstructwf as rwf
+from .spins_and_masses import transform_spins
 import scipy.signal as sig
+import json
 
 data_dir = '/home/simona.miller/time-domain-gw-inference/data/'
 
@@ -275,27 +277,48 @@ def condition(raw_time_dict, raw_data_dict, t_dict, ds_factor=16, f_low=11,
 
 
 
-def get_Tcut_from_Ncycles(Ncycles, **kwargs): 
+def parse_injected_parameters(filepath):
+    
+    """
+    Function to load in the parameters for an injection
+    """
+    # Make sure we're passed a json file
+    assert filepath[-4:] == 'json', 'File type not supported'
+    
+    # Load file 
+    with open(filepath,'r') as jf:
+        inj_file = json.load(jf)
+    
+    # 15D gravitational-wave parameter space
+    params = ['mass_1', 'mass_2', 'a_1', 'a_2', 'tilt_1', 'tilt_2', 'phi_12', 'phi_jl', 
+              'theta_jn', 'luminosity_distance', 'ra', 'dec', 'psi', 'phase', 'geocent_time']
+    
+    # Format correctly
+    injected_parameters = {p:inj_file[p] for p in params}
+    
+    return injected_parameters
+
+
+def injectWaveform(**kwargs): 
     
     # Unpack inputs
     p = kwargs.pop('parameters')
-    raw_time_dict = kwargs.pop('raw_time_dict')
+    time_dict = kwargs.pop('time_dict')
     tpeak_dict = kwargs.pop('tpeak_dict')
     ap_dict = kwargs.pop('ap_dict')
     skypos = kwargs.pop('skypos')
     approx = kwargs.pop('approx', 'NRSur7dq4')
     f_low = kwargs.pop('f_low', 11)
     f_ref = kwargs.pop('f_ref', 11)
+    ifos = kwargs.pop('ifos', ['H1', 'L1', 'V1'])
     
     # Get dt 
-    times = raw_time_dict['H1']
-    dt = times[1] - times[0]
+    dt = time_dict['H1'][1] - time_dict['H1'][0]
     
     # Change spin convention
     iota, s1x, s1y, s1z, s2x, s2y, s2z = transform_spins(p['theta_jn'], p['phi_jl'], p['tilt_1'], p['tilt_2'],
                                           p['phi_12'], p['a_1'], p['a_2'], p['mass_1'], p['mass_2'],
                                           f_ref, p['phase'])
-
 
     # Get strain
     hp, hc = rwf.generate_lal_hphc(approx, 
@@ -309,18 +332,39 @@ def get_Tcut_from_Ncycles(Ncycles, **kwargs):
                                    inclination=iota,
                                    phi_ref=p['phase']
                                   )
+    
+    # Project into each detector 
+    h_ifos = {}
+    for ifo in ifos:
 
-    # Time align in H1
-    h = rwf.generate_lal_waveform(hplus=hp, hcross=hc, times=times, triggertime=tpeak_dict['H1'])
+        # Time align 
+        h = rwf.generate_lal_waveform(hplus=hp, hcross=hc, times=time_dict[ifo], triggertime=tpeak_dict[ifo])
 
-    # Project onto H1
-    Fp, Fc = ap_dict['H1']
-    h_H1 = Fp*h.real - Fc*h.imag
+        # Project onto H1
+        Fp, Fc = ap_dict[ifo]
+        h_ifo = Fp*h.real - Fc*h.imag
+        
+        h_ifos[ifo] = h_ifo
+        
+    return h_ifos
+    
+    
+
+def get_Tcut_from_Ncycles(Ncycles, **kwargs): 
+    
+    """
+    Calculate the cutoff time given the cutoff cycle and the parameters of the 
+    waveform to base the cutoff time from
+    """
+    
+    # Get waveform in H1
+    h_H1 = injectWaveform(**kwargs)['H1']
     
     # Get indices of extrema 
     idxs, _ = sig.find_peaks(np.abs(h_H1), height=0)
     
     # Get times of extrema 
+    times = kwargs['time_dict']['H1']
     t_cycles_H1 = times[idxs]
     
     # Get the cycle we care about
@@ -333,6 +377,7 @@ def get_Tcut_from_Ncycles(Ncycles, **kwargs):
     tcut_H1 = t_cycles_H1[icut]
     
     # Get geocenter time
+    skypos = kwargs['skypos']
     dt_H = lal.TimeDelayFromEarthCenter(lal.cached_detector_by_prefix['H1'].location, 
                                         skypos['ra'], skypos['dec'], lal.LIGOTimeGPS(tcut_H1))
     tcut_geo = tcut_H1-dt_H

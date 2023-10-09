@@ -4,9 +4,12 @@ import lal
 import lalsimulation
 import os
 os.environ["LAL_DATA_PATH"] = os.path.join(os.environ['HOME'], 'lalsuite-extra/data/lalsimulation')
-import sys
 import scipy.signal as sig
-from spins_and_masses import transform_spins
+import sys
+try:
+    from spins_and_masses import transform_spins
+except:
+    from .spins_and_masses import transform_spins
 
 lalsim = lalsimulation
 

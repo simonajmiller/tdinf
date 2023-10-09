@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.stats import gaussian_kde
-import pycbc.psd
+#import pycbc.psd
 from gwpy.timeseries import TimeSeries
 from gwpy.signal import filter_design
 
@@ -72,32 +72,32 @@ def unit_vector(v):
 Other miscellaneous functions
 """
 
-def get_pycbc_PSD(filename, f_low, delta_f, sampling_freq=1024): 
+# def get_pycbc_PSD(filename, f_low, delta_f, sampling_freq=1024): 
     
-    """
-    Load in power spectral density from a file
+#     """
+#     Load in power spectral density from a file
     
-    Parameters
-    ----------
-    filename : string
-        path to the text file containing the psd
-    f_low : float
-        the lower frequency of the psd
-    delta_f : float
-        the frequency spacing of the psd
-    sampling_freq : float (optional)
-        the sampling frequency of the data the psd is for; defaults to 1024 Hz
+#     Parameters
+#     ----------
+#     filename : string
+#         path to the text file containing the psd
+#     f_low : float
+#         the lower frequency of the psd
+#     delta_f : float
+#         the frequency spacing of the psd
+#     sampling_freq : float (optional)
+#         the sampling frequency of the data the psd is for; defaults to 1024 Hz
         
-    Returns
-    -------
-    psd : pycbc.types.frequencyseries.FrequencySeries
-        the power spectral density as a pycbc frequency series 
-    """
+#     Returns
+#     -------
+#     psd : pycbc.types.frequencyseries.FrequencySeries
+#         the power spectral density as a pycbc frequency series 
+#     """
     
-    # The PSD will be interpolated to the requested frequency spacing
-    length = int(sampling_freq / delta_f)
-    psd = pycbc.psd.from_txt(filename, length, delta_f, f_low, is_asd_file=False)
-    return psd
+#     # The PSD will be interpolated to the requested frequency spacing
+#     length = int(sampling_freq / delta_f)
+#     psd = pycbc.psd.from_txt(filename, length, delta_f, f_low, is_asd_file=False)
+#     return psd
 
 
 def bandpass(h, times, fmin, fmax):

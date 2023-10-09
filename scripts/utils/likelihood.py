@@ -1,10 +1,15 @@
 from pylab import *
 from scipy.linalg import solve_toeplitz
-import reconstructwf as rwf
 import lal
 import lalsimulation as lalsim
-import io
-from spins_and_masses import m1m2_from_mtotq
+try: 
+    import reconstructwf as rwf
+    import io
+    from spins_and_masses import m1m2_from_mtotq
+except: 
+    from . import reconstructwf as rwf
+    from . import io
+    from .spins_and_masses import m1m2_from_mtotq
 
 def logit(x, xmin=0, xmax=1):
     return log(x - xmin) - log(xmax - x)
