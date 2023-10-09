@@ -7,7 +7,7 @@ Nwalkers = 512
 
 executable = $(Root)/scripts/run_sampler.sh
 universe = vanilla
-arguments = $(Savename) $(RunMode) $(Cycles) $(Nproc) $(Nsteps) $(Nwalkers) $(Injection)
+arguments = $(Savename) $(RunMode) $(Cycles) $(Nproc) $(Nsteps) $(Nwalkers) $(Injection) $(Fref)
 
 request_cpus = $(Nproc)
 request_memory = 4 GB

@@ -12,6 +12,7 @@ nproc=$4
 nsteps=$5
 nwalkers=$6
 injection=$7
+fref=$8
 
 python /home/simona.miller/time-domain-gw-inference/scripts/run_sampler.py \
         -o $savename.h5 \
@@ -21,6 +22,7 @@ python /home/simona.miller/time-domain-gw-inference/scripts/run_sampler.py \
         --nsteps $nsteps \
         --nwalkers $nwalkers \
         --injected-parameters $injection \
+        --fref $fref \
         --resume
 
 conda deactivate
