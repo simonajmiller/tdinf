@@ -67,14 +67,18 @@ args = p.parse_args()
 run_mode = args.mode 
 assert run_mode in ['full', 'pre', 'post'], f"mode must be 'full', 'pre', or 'post'. given mode = '{run_mode}'."
 
+# Unpack some basic parameters
+ifos = args.ifos
+psd_path = args.psd_path
+f_ref = args.fref
+f_low = args.flow
+ds_factor = args.downsample
+
 print('') # for printing aesthetics lol
     
 """
 Load or generate data
 """
-
-ifos = args.ifos
-psd_path = args.psd_path
 
 # If real data ...
 if args.injected_parameters == "REALDATA": 
@@ -97,6 +101,10 @@ else:
     # Load in injected parameters 
     injected_parameters = utils.parse_injected_parameters(args.injected_parameters)
     
+    # Check that the reference freqs line up 
+    err_msg = f"Injection fref={injected_parameters['f_ref']} does not equal sampler fref={f_ref}"
+    assert injected_parameters['f_ref'] == f_ref, err_msg
+    
     # Triggertime and sky position 
     tpeak_geocent = injected_parameters['geocent_time']
     skypos = {k:injected_parameters[k] for k in ['ra', 'dec', 'psi']}
@@ -115,7 +123,8 @@ else:
     
     # Injection
     raw_data_dict = utils.injectWaveform(parameters=injected_parameters, time_dict=raw_time_dict, 
-                                               tpeak_dict=tpeak_dict, ap_dict=ap_dict, skypos=skypos, f_ref=args.fref)
+                                         tpeak_dict=tpeak_dict, ap_dict=ap_dict, skypos=skypos, 
+                                         f_ref=f_ref, f_low=f_low)
               
 ## tcut = cutoff time in waveform
 Ncycles = args.Tcut_cycles # find truncation time in # number of cycles from peak
@@ -124,7 +133,7 @@ if Ncycles==0:
     tcut_geocent = tpeak_geocent
 else:  
     tcut_geocent = utils.get_Tcut_from_Ncycles(Ncycles, parameters=injected_parameters, time_dict=raw_time_dict, 
-                                               tpeak_dict=tpeak_dict, ap_dict=ap_dict, skypos=skypos, f_ref=args.fref)
+                                               tpeak_dict=tpeak_dict, ap_dict=ap_dict, skypos=skypos, f_ref=f_ref)
     
 print('\nCutoff time:')
 tcut_dict, _ = utils.get_tgps_and_ap_dicts(tcut_geocent, ifos, skypos['ra'] , skypos['dec'], skypos['psi'])
@@ -141,9 +150,6 @@ if args.vary_time:
 """
 Condition data
 """
-
-ds_factor = args.downsample
-f_low = args.flow
 
 # icut = index corresponding to cutoff time
 time_dict, data_dict, icut_dict = utils.condition(raw_time_dict, raw_data_dict, tcut_dict, ds_factor, f_low) 
@@ -221,18 +227,19 @@ Arguments for the posterior function
 """
 
 kwargs = {
-    'mtot_lim': [200, 350],
-    'q_lim': [0.17, 1],
-    'chi_lim': [0, 0.99],
-    'dist_lim': [1000, 10000],
-    'approx': args.approx,
-    'fmin': f_low,
-    'only_prior': args.only_prior,
-    'delta_t':dt,
-    'ra':skypos['ra'],   # default right ascension if not varied
-    'dec':skypos['dec'], # default declination if not varied
-    'psi':skypos['psi'], # default polarization if not varied
-    'tgps_geocent':tpeak_geocent # default waveform placement time if not varied
+    'mtot_lim' : [200, 350],
+    'q_lim' : [0.17, 1],
+    'chi_lim' : [0, 0.99],
+    'dist_lim' : [1000, 10000],
+    'approx' : args.approx,
+    'f_ref' : f_ref,
+    'f_low' : f_low,
+    'only_prior' : args.only_prior,
+    'delta_t' : dt,
+    'ra' : skypos['ra'],   # default right ascension if not varied
+    'dec' : skypos['dec'], # default declination if not varied
+    'psi' : skypos['psi'], # default polarization if not varied
+    'tgps_geocent' : tpeak_geocent # default waveform placement time if not varied
 }
 kwargs.update({k: globals()[k] for k in ['rho_dict', 'time_dict', 'data_dict',
                                          'ap_dict', 'tpeak_dict']})

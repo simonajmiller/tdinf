@@ -35,8 +35,8 @@ def get_peak_times(*args, **kwargs):
     tlen = len(times)
     
     # Frequency parameters
-    fp = {k: kwargs[k] if k in kwargs else p[k] for k in ['f_ref', 'flow', 'lal_amporder']}
-    f_start = fp['flow']*2/(fp['lal_amporder'] + 2.)
+    fp = {k: kwargs[k] if k in kwargs else p[k] for k in ['f_ref', 'f_low', 'lal_amporder']}
+    f_start = fp['f_low']*2/(fp['lal_amporder'] + 2.)
     
     # Change spin convention
     iota, s1x, s1y, s1z, s2x, s2y, s2z = transform_spins(p['theta_jn'], p['phi_jl'], p['tilt_1'], p['tilt_2'],

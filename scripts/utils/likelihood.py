@@ -95,7 +95,7 @@ def samp_to_phys_angles(x, **kwargs):
         m1, m2 = m1m2_from_mtotq(mtot, q)    
         ys.append(lalsim.SimInspiralTransformPrecessingWvf2PE(
             iota, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, m1, m2,
-            kwargs['fmin'], phi_ref
+            kwargs['f_low'], phi_ref
         ))
     # quantities to return
     theta_jn, phi_jl, tilt1, tilt2, phi12, chi1, chi2 = np.array(ys, ndmin=2).T
@@ -170,7 +170,7 @@ def get_lnprior(x, **kws):
 '''
 Posterior function
 '''
-def get_lnprob(x, fmin=11, return_wf=False, return_params=False, 
+def get_lnprob(x, f_low=11, f_ref=11, return_wf=False, return_params=False, 
                only_prior=False, approx='NRSur7dq4',
                rho_dict=None, time_dict=None, delta_t=None, data_dict=None,
                ap_dict=None, tpeak_dict=None, **kwargs):
@@ -193,7 +193,7 @@ def get_lnprob(x, fmin=11, return_wf=False, return_params=False,
 
         hp, hc = rwf.generate_lal_hphc(approx, m1, m2, chi1, chi2,
                                        dist_mpc=dist_mpc, dt=delta_t,
-                                       f_low=fmin, f_ref=fmin,
+                                       f_low=f_low, f_ref=f_ref,
                                        inclination=iota, phi_ref=phi_ref) 
         
         # Which interferometers are we sampling over?

@@ -54,7 +54,7 @@ def load_raw_data(path=data_dir+'input/GW190521_data/{}-{}_GWOSC_16KHZ_R2-124244
 
 
 def get_pe(raw_time_dict, path=data_dir+'input/GW190521_data/GW190521_posterior_samples.h5', 
-           psd_path=None, verbose=True):
+           psd_path=None, verbose=True, f_ref=11, f_low=11):
     
     """
     Load in parameter estimation (pe) samples from LVC GW190521 analysis, and calculate
@@ -122,10 +122,9 @@ def get_pe(raw_time_dict, path=data_dir+'input/GW190521_data/GW190521_posterior_
     
     # Set truncation time
     amporder = 1
-    flow = 11
-    fstart = flow * 2./(amporder+2)
+    fstart = f_low * 2./(amporder+2)
     peak_times = rwf.get_peak_times(parameters=pe_samples[imax], times=raw_time_dict[ifos[0]], 
-                                    f_ref=11, flow=flow, lal_amporder=1)
+                                    f_ref=f_ref, f_low=fstart, lal_amporder=1)
     
     # Get peak time of the signal in LIGO Hanford
     tpeak_H = peak_times['H1']
@@ -291,7 +290,8 @@ def parse_injected_parameters(filepath):
     
     # 15D gravitational-wave parameter space
     params = ['mass_1', 'mass_2', 'a_1', 'a_2', 'tilt_1', 'tilt_2', 'phi_12', 'phi_jl', 
-              'theta_jn', 'luminosity_distance', 'ra', 'dec', 'psi', 'phase', 'geocent_time']
+              'theta_jn', 'luminosity_distance', 'ra', 'dec', 'psi', 'phase', 'geocent_time', 
+              'f_ref']
     
     # Format correctly
     injected_parameters = {p:inj_file[p] for p in params}
@@ -308,8 +308,8 @@ def injectWaveform(**kwargs):
     ap_dict = kwargs.pop('ap_dict')
     skypos = kwargs.pop('skypos')
     approx = kwargs.pop('approx', 'NRSur7dq4')
-    f_low = kwargs.pop('f_low', 11)
-    f_ref = kwargs.pop('f_ref', 11)
+    f_low = kwargs.pop('f_low')
+    f_ref = kwargs.pop('f_ref')
     ifos = kwargs.pop('ifos', ['H1', 'L1', 'V1'])
     
     # Get dt 
