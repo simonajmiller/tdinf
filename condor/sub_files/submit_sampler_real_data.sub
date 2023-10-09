@@ -1,4 +1,4 @@
-Root = /home/simona.miller/time-domain-gw-inference/
+Root = /home/simona.miller/time-domain-gw-inference
 Savename = $(Date)_GW190521_realData_$(RunMode)_$(Cycles)cycles
 
 Nproc = 64

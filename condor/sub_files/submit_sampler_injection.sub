@@ -1,4 +1,4 @@
-Root = /home/simona.miller/time-domain-gw-inference/
+Root = /home/simona.miller/time-domain-gw-inference
 Savename = $(Date)_injection_$(Injection)_$(RunMode)_$(Cycles)cycles
 
 InjectionPath = $(Root)/data/input/injection_params/$(Injection).json
