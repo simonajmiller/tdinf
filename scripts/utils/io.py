@@ -2,7 +2,7 @@ from pylab import *
 import lal
 import h5py
 from . import reconstructwf as rwf
-from .spins_and_masses import transform_spins
+from .spins_and_masses import *
 import scipy.signal as sig
 import json
 
@@ -383,4 +383,77 @@ def get_Tcut_from_Ncycles(Ncycles, **kwargs):
     tcut_geo = tcut_H1-dt_H
     
     return tcut_geo
+
+
+
+def load_posterior_samples(date, run, start_cut, end_cut, 
+        pe_output_dir='/home/simona.miller/time-domain-gw-inference/data/output/'): 
+    
+    """
+    Function to load in posterior samples from one of our runs
+    """
+    
+    # Template for loading 
+    path_template = pe_output_dir + f'{date}_{run}_' + '{0}_{1}cycles'
+    
+    # Arange all the time slices to load
+    dx = 0.5
+    cuts_float = np.arange(start_cut, end_cut+0.5, 0.5)
+    cuts = [int(c) for c in cuts_float if c.is_interger() else c]
+        
+    modes = ['pre', 'post']
+    
+    # Dict for file paths 
+    paths = {}
+
+    # Cycle through the runs to get all the file paths
+    for cut in cuts:
+        for mode in modes: 
+
+            # Format the file name
+            fname = path_template.format(mode, cut)
+            
+            # Add to paths fict
+            key = f'{mode} {cut} cycles'
+            paths[key] = fname
+
+
+    # Samples from full duration (no time cut) 
+    paths['full'] = path_template.format('full', '0')
+
+    # Prior samples
+    paths['prior'] = pe_output_dir+'gw190521_tests/092123_test_prior.h5'
+
+    # Parse samples
+    td_samples = {}
+    for k, p in paths.items():
+        
+        # Check that the file exists 
+        if os.path.exists(p):
+            
+            # Load
+            samps = np.genfromtxt(p, names=True, dtype=float)
+            
+            # Calculate component masses
+            m1s, m2s = m1m2_from_mtotq(samps['mtot'], samps['q'])
+            
+            # Calculate chi-eff
+            chieffs = chi_effective(m1s, samps['chi1'], samps['tilt1'], m2s, samps['chi2'], samps['tilt2'])
+            
+            # Calculate chi-p
+            chips = chi_precessing(m1s, samps['chi1'], samps['tilt1'], m2s, samps['chi2'], samps['tilt2'])
+            
+            # Add to the dict 
+            samps['m1'] = m1s
+            samps['m2'] = m2s
+            samps['chieff'] = chieffs
+            samps['chip'] = chips
+            
+            #  Add to over-all dict
+            td_samples[k] = samps_dict
+            
+        else:
+            print(f'could not find {p}')
+                            
+    return td_samples
     

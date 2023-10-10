@@ -45,7 +45,7 @@ p.add_argument('--flow', type=float, default=11)
 p.add_argument('--fref', type=float, default=11)
 p.add_argument('--ifos', nargs='+', default=['H1', 'L1', 'V1'])
 p.add_argument('--data-path', default=data_dir+'input/GW190521_data/{}-{}_GWOSC_16KHZ_R2-1242442952-32.hdf5')
-p.add_argument('--psd-path', default=data_dir+'input/GW190521_data/glitch_median_PSD_{}.dat')
+p.add_argument('--psd-path', default=data_dir+'input/GW190521_data/glitch_median_PSD_{}.dat') ## for LI 
 
 # Option to do an injection instead of use real data;
 # if "REALDATA", do not do an injection, else file path to injected parameters
