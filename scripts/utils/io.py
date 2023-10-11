@@ -444,11 +444,12 @@ def load_posterior_samples(date, run, start_cut, end_cut,
             # Calculate chi-p
             chips = chi_precessing(m1s, samps['chi1'], samps['tilt1'], m2s, samps['chi2'], samps['tilt2'])
             
-            # Add to the dict 
-            samps['m1'] = m1s
-            samps['m2'] = m2s
-            samps['chieff'] = chieffs
-            samps['chip'] = chips
+            # Make into dict 
+            samps_dict = {k:samps[k] for k in samps.dtype.names}
+            samps_dict['m1'] = m1s
+            samps_dict['m2'] = m2s
+            samps_dict['chieff'] = chieffs
+            samps_dict['chip'] = chips
             
             #  Add to over-all dict
             td_samples[k] = samps_dict
