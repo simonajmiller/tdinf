@@ -103,11 +103,11 @@ def samp_to_phys_angles(x, **kwargs):
     return mtot, q, chi1, chi2, phi_jl, tilt1, tilt2, phi12, dist_mpc, phi_ref, theta_jn, iota, ra, dec, psi, tgps_geocent 
 
 
-def get_dict_from_samples(samples, angles=False, **kwargs):    
+def get_dict_from_samples(samples, **kwargs):    
     keys = ['mtotal', 'q', 'chi1', 'chi2', 'phi_jl', 'tilt1', 'tilt2', 'phi12', 'dist', 'phase', 'theta_jn', 'iota',
                 'ra', 'dec', 'psi', 'tgps_geocent']
-    f = samp_to_phys_angles
-    return dict(zip(keys, f(samples.T, **kwargs)))
+    samples_dict = dict(zip(keys, samp_to_phys_angles(samples.T, **kwargs)))
+    return samples_dict
 
 '''
 Prior function

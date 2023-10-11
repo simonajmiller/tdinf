@@ -5,6 +5,7 @@ from . import reconstructwf as rwf
 from .spins_and_masses import *
 import scipy.signal as sig
 import json
+import os
 
 data_dir = '/home/simona.miller/time-domain-gw-inference/data/'
 
@@ -394,12 +395,12 @@ def load_posterior_samples(date, run, start_cut, end_cut,
     """
     
     # Template for loading 
-    path_template = pe_output_dir + f'{date}_{run}_' + '{0}_{1}cycles'
+    path_template = pe_output_dir + f'{date}_{run}_' + '{0}_{1}cycles.dat'
     
     # Arange all the time slices to load
     dx = 0.5
     cuts_float = np.arange(start_cut, end_cut+0.5, 0.5)
-    cuts = [int(c) if c.is_interger() else c for c in cuts_float]
+    cuts = [int(c) if c.is_integer() else c for c in cuts_float]
         
     modes = ['pre', 'post']
     
@@ -422,7 +423,7 @@ def load_posterior_samples(date, run, start_cut, end_cut,
     paths['full'] = path_template.format('full', '0')
 
     # Prior samples
-    paths['prior'] = pe_output_dir+'gw190521_tests/092123_test_prior.h5'
+    paths['prior'] = pe_output_dir+'gw190521_tests/092123_test_prior.dat'
 
     # Parse samples
     td_samples = {}
@@ -435,7 +436,7 @@ def load_posterior_samples(date, run, start_cut, end_cut,
             samps = np.genfromtxt(p, names=True, dtype=float)
             
             # Calculate component masses
-            m1s, m2s = m1m2_from_mtotq(samps['mtot'], samps['q'])
+            m1s, m2s = m1m2_from_mtotq(samps['mtotal'], samps['q'])
             
             # Calculate chi-eff
             chieffs = chi_effective(m1s, samps['chi1'], samps['tilt1'], m2s, samps['chi2'], samps['tilt2'])

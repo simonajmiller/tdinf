@@ -354,7 +354,7 @@ tau = sampler.get_autocorr_time(quiet=True)
 burnin = int(5*np.max(tau))
 thin = int(0.5*np.min(tau))
 samples = sampler.get_chain(discard=burnin, flat=True, thin=thin)
-samples_dict = ll.get_dict_from_samples(samples, angles=True, **kwargs)
+samples_dict = ll.get_dict_from_samples(samples, **kwargs)
 
 # Posteriors
 samples_lnp = sampler.get_log_prob(discard=burnin, flat=True, thin=thin)
