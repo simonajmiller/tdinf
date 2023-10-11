@@ -399,7 +399,7 @@ def load_posterior_samples(date, run, start_cut, end_cut,
     # Arange all the time slices to load
     dx = 0.5
     cuts_float = np.arange(start_cut, end_cut+0.5, 0.5)
-    cuts = [int(c) for c in cuts_float if c.is_interger() else c]
+    cuts = [int(c) if c.is_interger() else c for c in cuts_float]
         
     modes = ['pre', 'post']
     
