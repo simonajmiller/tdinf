@@ -7,9 +7,7 @@ import scipy.signal as sig
 import json
 import os
 
-data_dir = '/home/simona.miller/time-domain-gw-inference/data/'
-
-def load_raw_data(path=data_dir+'input/GW190521_data/{}-{}_GWOSC_16KHZ_R2-1242442952-32.hdf5',
+def load_raw_data(path,
                   ifos=('H1', 'L1', 'V1'), verbose=True):
     
     """
@@ -54,7 +52,7 @@ def load_raw_data(path=data_dir+'input/GW190521_data/{}-{}_GWOSC_16KHZ_R2-124244
     return raw_time_dict, raw_data_dict
 
 
-def get_pe(raw_time_dict, path=data_dir+'input/GW190521_data/GW190521_posterior_samples.h5', 
+def get_pe(raw_time_dict, path,
            psd_path=None, verbose=True, f_ref=11, f_low=11):
     
     """
