@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+/usr/bin/env python
 
 from pylab import *
 import argparse
@@ -17,7 +17,7 @@ from utils import reconstructwf as rwf
 from utils import likelihood as ll
 import sys
 
-data_dir = '/home/simona.miller/time-domain-gw-inference/data/'
+data_dir = '/home/sophie.hourihane/src/time-domain-gw-inference/data/'
 
 """
 Parse agruments
@@ -29,6 +29,7 @@ p = argparse.ArgumentParser()
 p.add_argument('-o', '--output')
 # ... and whether to run pre-Tcut, post-Tcut, or full (Tstart to Tend)?
 p.add_argument('-m', '--mode')
+p.add_argument('--data-dir', required=True, type=str, help='directory where input and output data live')
 
 # Args for cutoff (defined in # of cycles), start, & end times
 p.add_argument('-t', '--Tcut-cycles', type=float, default=0) # defaults to the 0 as calculated from peak emission
@@ -44,8 +45,9 @@ p.add_argument('--downsample', type=int, default=8)
 p.add_argument('--flow', type=float, default=11)
 p.add_argument('--fref', type=float, default=11)
 p.add_argument('--ifos', nargs='+', default=['H1', 'L1', 'V1'])
-p.add_argument('--data-path', default=data_dir+'input/GW190521_data/{}-{}_GWOSC_16KHZ_R2-1242442952-32.hdf5')
-p.add_argument('--psd-path', default=data_dir+'input/GW190521_data/glitch_median_PSD_for_LI_{}.dat') ## for LI 
+
+p.add_argument('--data-path', default='input/GW190521_data/{}-{}_GWOSC_16KHZ_R2-1242442952-32.hdf5')
+p.add_argument('--psd-path', default='input/GW190521_data/glitch_median_PSD_for_LI_{}.dat') ## for LI 
 
 # Option to do an injection instead of use real data;
 # if "REALDATA", do not do an injection, else file path to injected parameters
@@ -69,7 +71,9 @@ assert run_mode in ['full', 'pre', 'post'], f"mode must be 'full', 'pre', or 'po
 
 # Unpack some basic parameters
 ifos = args.ifos
-psd_path = args.psd_path
+psd_path = os.path.join(args.data_dir, args.psd_path)
+data_path = os.path.join(args.data_dir, args.data_path)
+backend_path = os.path.join(args.data_dir, 'output', args.output) # where emcee spits its output 
 f_ref = args.fref
 f_low = args.flow
 ds_factor = args.downsample
@@ -84,7 +88,7 @@ Load or generate data
 if args.injected_parameters == "REALDATA": 
     
     # Load data
-    raw_time_dict, raw_data_dict = utils.load_raw_data(ifos=ifos,path=args.data_path)
+    raw_time_dict, raw_data_dict = utils.load_raw_data(ifos=ifos,path=data_path)
     pe_out = utils.get_pe(raw_time_dict, verbose=False, psd_path=psd_path)
     tpeak_geocent, pe_samples, log_prob, pe_psds, skypos = pe_out
     
@@ -119,7 +123,7 @@ else:
         pe_psds[ifo] = genfromtxt(psd_path.format(ifo), dtype=float)
         
     # Times
-    raw_time_dict = utils.load_raw_data(ifos=ifos,path=args.data_path)[0]
+    raw_time_dict = utils.load_raw_data(ifos=ifos,path=data_path)[0]
     
     # Injection
     raw_data_dict = utils.injectWaveform(parameters=injected_parameters, time_dict=raw_time_dict, 
@@ -264,7 +268,6 @@ if args.vary_skypos:
 print("Sampling %i parameters." % ndim)
 
 # Where to save samples while sampler running
-backend_path = data_dir + 'output/' + args.output
 backend = emcee.backends.HDFBackend(backend_path)
 
 # Resume if we want 
@@ -376,6 +379,6 @@ df.attrs['skypos'] = skypos
 df.attrs['injected_parameters'] = injected_parameters
 
 # Save
-dat_path = backend_path.replace('h5', 'dat')
-df.to_csv(dat_path, sep=' ', index=False)
-print("File saved: %r" % dat_path)
+sample_path = backend_path.replace('h5', 'dat')
+df.to_csv(sample_path, sep=' ', index=False)
+print("File saved: %r" % sample_path)
