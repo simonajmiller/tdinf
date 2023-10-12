@@ -7,8 +7,7 @@ import scipy.signal as sig
 import json
 import os
 
-def load_raw_data(path,
-                  ifos=('H1', 'L1', 'V1'), verbose=True):
+def load_raw_data(path, ifos=('H1', 'L1', 'V1'), verbose=True):
     
     """
     Load in raw interferometer timeseries strain data

@@ -12,35 +12,38 @@ import os
 import utils
 from utils import likelihood as ll
 
-
 def main():
+    
     """
     Parse arguments
     """
     p = argparse.ArgumentParser()
 
-    # Required args: where to save data ...
+    # Required args: path to where to save data ...
     p.add_argument('-o', '--output', help='savename for emcee')
     # ... and whether to run pre-Tcut, post-Tcut, or full (Tstart to Tend)?
     p.add_argument('-m', '--mode')
+    
+    # Place where
+    p.add_argument('--data-path', default='{}-{}_GWOSC_16KHZ_R2-1242442952-32.hdf5')
+    p.add_argument('--psd-path', default='glitch_median_PSD_for_LI_{}.dat')
 
     # Args for cutoff (defined in # of cycles), start, & end times
     p.add_argument('-t', '--Tcut-cycles', type=float, default=0)  # defaults to the 0 as calculated from peak emission
     p.add_argument('--Tstart', type=float, default=1242442966.9077148)
     p.add_argument('--Tend', type=float, default=1242442967.607715)
 
-    # Optional args to specify waveform, data, and sampler settings
-    p.add_argument('--nwalkers', type=int, default=200)
-    p.add_argument('--nsteps', type=int, default=1000)
-    p.add_argument('--ncpu', type=int, default=4)
+    # Optional args for waveform/data settings
     p.add_argument('--approx', default='NRSur7dq4')
     p.add_argument('--downsample', type=int, default=8)
     p.add_argument('--flow', type=float, default=11)
     p.add_argument('--fref', type=float, default=11)
     p.add_argument('--ifos', nargs='+', default=['H1', 'L1', 'V1'])
-
-    p.add_argument('--data-path', default='{}-{}_GWOSC_16KHZ_R2-1242442952-32.hdf5')
-    p.add_argument('--psd-path', default='glitch_median_PSD_for_LI_{}.dat')
+    
+    # Optional args sampler settings
+    p.add_argument('--nwalkers', type=int, default=200)
+    p.add_argument('--nsteps', type=int, default=1000)
+    p.add_argument('--ncpu', type=int, default=4)
 
     # Option to do an injection instead of use real data;
     # if "REALDATA", do not do an injection, else file path to injected parameters
