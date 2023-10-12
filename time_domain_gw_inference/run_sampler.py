@@ -23,7 +23,7 @@ def main():
     # ... and whether to run pre-Tcut, post-Tcut, or full (Tstart to Tend)?
     p.add_argument('-m', '--mode')
     
-    # Place where
+    # Place where input data is stored
     p.add_argument('--data-path', default='{}-{}_GWOSC_16KHZ_R2-1242442952-32.hdf5')
     p.add_argument('--psd-path', default='glitch_median_PSD_for_LI_{}.dat')
 
@@ -73,7 +73,7 @@ def main():
     f_low = args.flow
     ds_factor = args.downsample
 
-    print('')  # for printing aesthetics lol
+    print('')  
 
     """
     Load or generate data

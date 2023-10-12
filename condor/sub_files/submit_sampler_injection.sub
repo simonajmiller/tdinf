@@ -1,6 +1,9 @@
 Root = /home/simona.miller/time-domain-gw-inference
-Savename = $(Date)_injection_$(Injection)_$(RunMode)_$(Cycles)cycles
 
+Savename = $(Root)/data/output/$(Date)_injection_$(Injection)_$(RunMode)_$(Cycles)cycles
+
+DataPath = $(Root)/data/input/GW190521_data/{}-{}_GWOSC_16KHZ_R2-1242442952-32.hdf5
+PSDPath = $(Root)/data/input/GW190521_data/glitch_median_PSD_for_LI_{}.dat
 InjectionPath = $(Root)/data/input/injection_params/$(Injection).json
 
 Nproc = 64
@@ -9,7 +12,7 @@ Nwalkers = 512
 
 executable = $(Root)/scripts/run_sampler.sh
 universe = vanilla
-arguments = $(Savename) $(RunMode) $(Cycles) $(Nproc) $(Nsteps) $(Nwalkers) $(InjectionPath) $(Fref)
+arguments = $(Savename) $(RunMode) $(Cycles) $(Nproc) $(Nsteps) $(Nwalkers) $(InjectionPath) $(Fref) $(DataPath) $(PSDPath)
 
 request_cpus = $(Nproc)
 request_memory = 4 GB

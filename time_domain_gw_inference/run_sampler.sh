@@ -13,15 +13,19 @@ nsteps=$5
 nwalkers=$6
 injection=$7
 fref=$8
+datapath=$9
+psdpath=${10} 
 
 python /home/simona.miller/time-domain-gw-inference/time_domain_gw_inference/run_sampler.py \
         -o $savename.h5 \
         -m $runmode \
         -t $ncycles \
+        --data-path $datapath \
+        --psd-path $psdpath
+        --injected-parameters $injection \
         --ncpu $nproc \
         --nsteps $nsteps \
         --nwalkers $nwalkers \
-        --injected-parameters $injection \
         --fref $fref \
         --resume
 
