@@ -1,5 +1,5 @@
-from pylab import *
 import lal
+import numpy as np
 import h5py
 from . import reconstructwf as rwf
 from .spins_and_masses import *
@@ -37,9 +37,9 @@ def load_raw_data(path, ifos=('H1', 'L1', 'V1'), verbose=True):
     for ifo in ifos:
         # for real data downloaded from gwosc...
         with h5py.File(path.format(ifo[0], ifo), 'r') as f:
-            strain = array(f['strain/Strain'])
+            strain = np.array(f['strain/Strain'])
             T0 = f['meta/GPSstart'][()]
-            ts = T0 + arange(len(strain))*f['meta/Duration'][()]/len(strain)
+            ts = T0 + np.arange(len(strain))*f['meta/Duration'][()]/len(strain)
         
         raw_time_dict[ifo] = ts
         raw_data_dict[ifo] = strain
@@ -106,11 +106,11 @@ def get_pe(raw_time_dict, path,
                 pe_psds[ifo] = f['NRSur7dq4']['psds'][ifo][()]
     else: # use different, provided file
         for ifo in ifos: 
-            pe_psds[ifo] = genfromtxt(psd_path.format(ifo), dtype=float)
+            pe_psds[ifo] = np.genfromtxt(psd_path.format(ifo), dtype=float)
             
     # Find sample where posterior is maximized
     log_prob = pe_samples['log_likelihood'] + pe_samples['log_prior']
-    imax = argmax(log_prob)
+    imax = np.argmax(log_prob)
     
     # Sky position for the max. posterior sample
     ra = pe_samples['ra'][imax]   # right ascension
@@ -239,8 +239,8 @@ def condition(raw_time_dict, raw_data_dict, t_dict, ds_factor=16, f_low=11,
         i = np.argmin(np.abs(raw_time_dict[ifo] - t_dict[ifo]))
         ir = i % ds_factor
         print('\nRolling {:s} by {:d} samples'.format(ifo, ir))
-        raw_data = roll(raw_data_dict[ifo], -ir)
-        raw_time = roll(raw_time_dict[ifo], -ir)
+        raw_data = np.roll(raw_data_dict[ifo], -ir)
+        raw_time = np.roll(raw_time_dict[ifo], -ir)
         
         # Filter
         if f_low:
@@ -261,7 +261,7 @@ def condition(raw_time_dict, raw_data_dict, t_dict, ds_factor=16, f_low=11,
             time = raw_time
         
         # Subtract mean and store
-        data_dict[ifo] = data - mean(data)
+        data_dict[ifo] = data - np.mean(data)
         time_dict[ifo] = time
         
         # Locate target sample

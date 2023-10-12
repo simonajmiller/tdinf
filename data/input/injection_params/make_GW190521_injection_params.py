@@ -1,7 +1,7 @@
 import numpy as np
 import json
 import sys
-sys.path.append('../../../scripts/')
+sys.path.append('../../../time_domain_gw_inference/')
 from utils.io import load_raw_data, get_pe
 
 def get_param_dict(sample): 
