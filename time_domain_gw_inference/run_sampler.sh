@@ -14,7 +14,7 @@ nwalkers=$6
 injection=$7
 fref=$8
 
-python /home/simona.miller/time-domain-gw-inference/scripts/run_sampler.py \
+python /home/simona.miller/time-domain-gw-inference/time_domain_gw_inference/run_sampler.py \
         -o $savename.h5 \
         -m $runmode \
         -t $ncycles \
