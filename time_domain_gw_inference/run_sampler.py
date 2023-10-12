@@ -9,8 +9,7 @@ import pandas as pd
 from multiprocessing import Pool
 from contextlib import closing
 import os
-import utils
-from utils import likelihood as ll
+from time_domain_gw_inference.utils import likelihood as ll
 
 def main():
     
