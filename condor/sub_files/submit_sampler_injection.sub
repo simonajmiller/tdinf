@@ -1,6 +1,7 @@
 Root = /home/simona.miller/time-domain-gw-inference
 
-Savename = $(Root)/data/output/$(Date)_injection_$(Injection)_$(RunMode)_$(Cycles)cycles
+RunName = $(Date)_injection_$(Injection)_$(RunMode)_$(Cycles)cycles
+Savename = $(Root)/data/output/$(RunName)
 
 DataPath = $(Root)/data/input/GW190521_data/{}-{}_GWOSC_16KHZ_R2-1242442952-32.hdf5
 PSDPath = $(Root)/data/input/GW190521_data/glitch_median_PSD_for_LI_{}.dat
@@ -10,7 +11,7 @@ Nproc = 64
 Nsteps = 50000
 Nwalkers = 512
 
-executable = $(Root)/scripts/run_sampler.sh
+executable = $(Root)/time_domain_gw_inference/run_sampler.sh
 universe = vanilla
 arguments = $(Savename) $(RunMode) $(Cycles) $(Nproc) $(Nsteps) $(Nwalkers) $(InjectionPath) $(Fref) $(DataPath) $(PSDPath)
 
@@ -19,9 +20,9 @@ request_memory = 4 GB
 request_disk = 5000
 accounting_group = ligo.dev.o4.cbc.testgr.tiger
 
-log = $(Root)/condor/logs/$(Savename).log
-output = $(Root)/condor/logs/$(Savename).out
-error = $(Root)/condor/logs/$(Savename).err
+log = $(Root)/condor/logs/$(RunName).log
+output = $(Root)/condor/logs/$(RunName).out
+error = $(Root)/condor/logs/$(RunName).err
 
 getenv = True
 
