@@ -51,8 +51,7 @@ def load_raw_data(path, ifos=('H1', 'L1', 'V1'), verbose=True):
     return raw_time_dict, raw_data_dict
 
 
-def get_pe(raw_time_dict, path,
-           psd_path=None, verbose=True, f_ref=11, f_low=11):
+def get_pe(raw_time_dict, path, psd_path=None, verbose=True, f_ref=11, f_low=11):
     
     """
     Load in parameter estimation (pe) samples from LVC GW190521 analysis, and calculate

@@ -10,6 +10,7 @@ from multiprocessing import Pool
 from contextlib import closing
 import os
 from time_domain_gw_inference.utils import likelihood as ll
+import time_domain_gw_inference.utils.io as utils
 
 def main():
     
@@ -84,7 +85,9 @@ def main():
 
         # Load data
         raw_time_dict, raw_data_dict = utils.load_raw_data(ifos=ifos, path=data_path)
-        pe_out = utils.get_pe(raw_time_dict, verbose=False, psd_path=psd_path)
+        pe_input_path = os.path.join(*(data_path.split('/')[:-1]), 
+                                     'GW190521_posterior_samples.h5') ## TODO: change
+        pe_out = utils.get_pe(raw_time_dict, pe_input_path, verbose=False, psd_path=psd_path)
         tpeak_geocent, pe_samples, log_prob, pe_psds, skypos = pe_out
 
         # "Injected parameters" = max(P) draw from the samples associated with this data
@@ -227,22 +230,29 @@ def main():
     """
 
     kwargs = {
+        
         'mtot_lim': [200, 350],
         'q_lim': [0.17, 1],
         'chi_lim': [0, 0.99],
         'dist_lim': [1000, 10000],
+        
         'approx': args.approx,
         'f_ref': f_ref,
         'f_low': f_low,
         'only_prior': args.only_prior,
         'delta_t': dt,
+        
         'ra': skypos['ra'],  # default right ascension if not varied
         'dec': skypos['dec'],  # default declination if not varied
         'psi': skypos['psi'],  # default polarization if not varied
-        'tgps_geocent': tpeak_geocent  # default waveform placement time if not varied
+        'tgps_geocent': tpeak_geocent,  # default waveform placement time if not varied
+        
+        'rho_dict':rho_dict, 
+        'time_dict':time_dict, 
+        'data_dict':data_dict, 
+        'ap_dict':ap_dict, 
+        'tpeak_dict':tpeak_dict
     }
-    kwargs.update({k: globals()[k] for k in ['rho_dict', 'time_dict', 'data_dict',
-                                             'ap_dict', 'tpeak_dict']})
 
     """
     Set up sampler

@@ -21,12 +21,12 @@ python /home/simona.miller/time-domain-gw-inference/time_domain_gw_inference/run
         -m $runmode \
         -t $ncycles \
         --data-path $datapath \
-        --psd-path $psdpath
+        --psd-path $psdpath \
         --injected-parameters $injection \
         --ncpu $nproc \
         --nsteps $nsteps \
         --nwalkers $nwalkers \
         --fref $fref \
-        --resume
+        --resume 
 
 conda deactivate
