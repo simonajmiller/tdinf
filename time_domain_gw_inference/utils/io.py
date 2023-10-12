@@ -383,9 +383,8 @@ def get_Tcut_from_Ncycles(Ncycles, **kwargs):
     return tcut_geo
 
 
-
-def load_posterior_samples(date, run, start_cut, end_cut, 
-        pe_output_dir='/home/simona.miller/time-domain-gw-inference/data/output/'): 
+def load_posterior_samples(date, run, start_cut, end_cut, pe_output_dir='../../data/output/', 
+                          prior_fname='092123_test_prior.dat'): 
     
     """
     Function to load in posterior samples from one of our runs
@@ -420,7 +419,7 @@ def load_posterior_samples(date, run, start_cut, end_cut,
     paths['full'] = path_template.format('full', '0')
 
     # Prior samples
-    paths['prior'] = pe_output_dir+'092123_test_prior.dat'
+    paths['prior'] = pe_output_dir+prior_fname
 
     # Parse samples
     td_samples = {}
@@ -455,4 +454,3 @@ def load_posterior_samples(date, run, start_cut, end_cut,
             print(f'could not find {p}')
                             
     return td_samples
-    
