@@ -1,7 +1,9 @@
-from pylab import *
+import numpy as np
 from scipy.linalg import solve_toeplitz
 import lal
 import lalsimulation as lalsim
+import sys
+
 try: 
     import reconstructwf as rwf
     import io
@@ -12,10 +14,10 @@ except:
     from .spins_and_masses import m1m2_from_mtotq
 
 def logit(x, xmin=0, xmax=1):
-    return log(x - xmin) - log(xmax - x)
+    return np.log(x - xmin) - np.log(xmax - x)
 
 def inv_logit(y, xmin=0, xmax=1):
-    return (exp(y)*xmax + xmin)/(1 + exp(y))
+    return (np.exp(y)*xmax + xmin)/(1 + np.exp(y))
 
 def logit_jacobian(x, xmin=0, xmax=1):
     return 1./(x-xmin) + 1./(xmax-x)
@@ -56,29 +58,29 @@ def samp_to_phys(x, **kws):
     # deal with polarization, skyposition,
     if len(x) >= 19: 
         # get ra from quadratures
-        ra = arctan2(ra_y, ra_x) + np.pi
+        ra = np.arctan2(ra_y, ra_x) + np.pi
         # get dec from sin dec
         dec = np.arcsin(inv_logit(x_sindec, -1, 1))
         # get polarization from quadratures
-        psi = arctan2(psi_y, psi_x)
+        psi = np.arctan2(psi_y, psi_x)
     else: 
         ra = kws['ra']
         dec = kws['dec']
         psi = kws['psi']
     
     # renormalize 3D spins
-    chi1_norm = chi1 / sqrt(c1x**2 + c1y**2 + c1z**2)
+    chi1_norm = chi1 / np.sqrt(c1x**2 + c1y**2 + c1z**2)
     chi1x = c1x * chi1_norm
     chi1y = c1y * chi1_norm
     chi1z = c1z * chi1_norm
 
-    chi2_norm = chi2 / sqrt(c2x**2 + c2y**2 + c2z**2)
+    chi2_norm = chi2 / np.sqrt(c2x**2 + c2y**2 + c2z**2)
     chi2x = c2x * chi2_norm
     chi2y = c2y * chi2_norm
     chi2z = c2z * chi2_norm
 
     # get phase from quadratures
-    phi_ref = arctan2(phi_y, phi_x)
+    phi_ref = np.arctan2(phi_y, phi_x)
     
     return mtot, q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, dist_mpc, phi_ref, iota, ra, dec, psi, tgps_geocent
 
@@ -135,8 +137,8 @@ def get_lnprior(x, **kws):
     mtot, q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, dist_mpc, phi_ref, iota, ra, dec, psi, tgps_geocent = x_phys
     
     # Spin magnitudes
-    chi1 = sqrt(chi1x**2 + chi1y**2 + chi1z**2)
-    chi2 = sqrt(chi2x**2 + chi2y**2 + chi2z**2)
+    chi1 = np.sqrt(chi1x**2 + chi1y**2 + chi1z**2)
+    chi2 = np.sqrt(chi2x**2 + chi2y**2 + chi2z**2)
     
     # Gaussian prior for phase quadratures
     lnprior = -0.5*(phi_x**2 + phi_y**2)
@@ -145,15 +147,15 @@ def get_lnprior(x, **kws):
     for k, v in zip(['mtot', 'q', 'chi', 'chi', 'dist'],
                     [mtot, q, chi1, chi2, dist_mpc]):
         v_min, v_max = kws['%s_lim' % k]
-        lnprior -= log(logit_jacobian(v, v_min, v_max))
+        lnprior -= np.log(logit_jacobian(v, v_min, v_max))
         
     if len(x) >= 14: # if sampling incl
-        lnprior -= log(logit_jacobian(cos(iota), -1, 1))
+        lnprior -= np.log(logit_jacobian(np.cos(iota), -1, 1))
     
     if len(x) >= 19: # if sampling pol + skypos
         lnprior -= 0.5*(psi_x**2 + psi_y**2)
         lnprior -= 0.5*(ra_x**2 + ra_y**2)
-        lnprior -= log(logit_jacobian(sin(dec), -1, 1))
+        lnprior -= np.log(logit_jacobian(np.sin(dec), -1, 1))
         
     if len(x) == 15 or len(x)==20: # if sampling time 
         # gaussian 

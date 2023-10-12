@@ -9,7 +9,7 @@ condor/sub_files/gw190521_tests
 !/data/input/GW190521_data/*.dat
 data/output/gw190521_tests/
 data/output/copy_from_hawk.py
-scripts/dev
+time_domain_gw_inference/dev
 data/output/plot_results/
 !data/output/plot_results/101123_view_results_full_runs.ipynb
 
