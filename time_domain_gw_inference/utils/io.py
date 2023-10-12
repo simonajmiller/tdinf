@@ -420,7 +420,7 @@ def load_posterior_samples(date, run, start_cut, end_cut,
     paths['full'] = path_template.format('full', '0')
 
     # Prior samples
-    paths['prior'] = pe_output_dir+'gw190521_tests/092123_test_prior.dat'
+    paths['prior'] = pe_output_dir+'092123_test_prior.dat'
 
     # Parse samples
     td_samples = {}
