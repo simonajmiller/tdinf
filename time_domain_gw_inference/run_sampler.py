@@ -12,21 +12,26 @@ import os
 from time_domain_gw_inference.utils import likelihood as ll
 import time_domain_gw_inference.utils.io as utils
 
-def main():
-    
+
+def create_run_sampler_arg_parser():
     """
     Parse arguments
     """
     p = argparse.ArgumentParser()
 
     # Required args: path to where to save data ...
-    p.add_argument('-o', '--output', help='savename for emcee')
+    p.add_argument('-o', '--output', help='savename for emcee', required=True)
     # ... and whether to run pre-Tcut, post-Tcut, or full (Tstart to Tend)?
-    p.add_argument('-m', '--mode')
-    
+    p.add_argument('-m', '--mode', required=True)
+
     # Place where input data is stored
-    p.add_argument('--data-path', default='{}-{}_GWOSC_16KHZ_R2-1242442952-32.hdf5')
-    p.add_argument('--psd-path', default='glitch_median_PSD_for_LI_{}.dat')
+    p.add_argument('--pe-posterior-h5-file', default=None,
+                   help='posterior file containing pe samples, used only if injected-parameters==None')
+    p.add_argument('--data-path-dict', required=True, help="Dictionary containing path to strain data h5 files")
+    p.add_argument('--psd-path-dict', required=True, help="dictionary containing path to psd files")
+    # Option to do an injection instead of use real data;
+    # if "REALDATA", do not do an injection, else file path to injected parameters
+    p.add_argument('--injected-parameters', default=None)
 
     # Args for cutoff (defined in # of cycles), start, & end times
     p.add_argument('-t', '--Tcut-cycles', type=float, default=0)  # defaults to the 0 as calculated from peak emission
@@ -39,15 +44,11 @@ def main():
     p.add_argument('--flow', type=float, default=11)
     p.add_argument('--fref', type=float, default=11)
     p.add_argument('--ifos', nargs='+', default=['H1', 'L1', 'V1'])
-    
+
     # Optional args sampler settings
     p.add_argument('--nwalkers', type=int, default=200)
     p.add_argument('--nsteps', type=int, default=1000)
     p.add_argument('--ncpu', type=int, default=4)
-
-    # Option to do an injection instead of use real data;
-    # if "REALDATA", do not do an injection, else file path to injected parameters
-    p.add_argument('--injected-parameters', default="REALDATA")
 
     # Do we want to run with only the prior?
     p.add_argument('--only-prior', action='store_true')
@@ -59,6 +60,11 @@ def main():
     # Do we want to resume an old run?
     p.add_argument('--resume', action='store_true')
 
+    return p
+
+
+def main():
+    p = create_run_sampler_arg_parser()
     args = p.parse_args()
 
     # Check that the given mode is allowed
@@ -67,8 +73,13 @@ def main():
 
     # Unpack some basic parameters
     ifos = args.ifos
-    psd_path = args.psd_path
-    data_path = args.data_path
+    print("about to load data")
+
+    data_path_dict = eval(args.data_path_dict)
+    psd_path_dict = eval(args.psd_path_dict)
+    print("successfully loaded data and psd")
+    print("data is", data_path_dict)
+    pe_posterior_h5_file = args.pe_posterior_h5_file
     backend_path = args.output  # where emcee spits its output
     f_ref = args.fref
     f_low = args.flow
@@ -81,13 +92,11 @@ def main():
     """
 
     # If real data ...
-    if args.injected_parameters == "REALDATA":
+    if args.injected_parameters is None:
 
         # Load data
-        raw_time_dict, raw_data_dict = utils.load_raw_data(ifos=ifos, path=data_path)
-        pe_input_path = os.path.join(*(data_path.split('/')[:-1]), 
-                                     'GW190521_posterior_samples.h5') ## TODO: change
-        pe_out = utils.get_pe(raw_time_dict, pe_input_path, verbose=False, psd_path=psd_path)
+        raw_time_dict, raw_data_dict = utils.load_raw_data(ifos=ifos, path_dict=data_path_dict)
+        pe_out = utils.get_pe(raw_time_dict, pe_posterior_h5_file, verbose=False, psd_path_dict=psd_path_dict)
         tpeak_geocent, pe_samples, log_prob, pe_psds, skypos = pe_out
 
         # "Injected parameters" = max(P) draw from the samples associated with this data
@@ -120,10 +129,10 @@ def main():
         # PSDs
         pe_psds = {}
         for ifo in ifos:
-            pe_psds[ifo] = np.genfromtxt(psd_path.format(ifo), dtype=float)
+            pe_psds[ifo] = np.genfromtxt(psd_path_dict[ifo], dtype=float)
 
         # Times
-        raw_time_dict = utils.load_raw_data(ifos=ifos, path=data_path)[0]
+        raw_time_dict = utils.load_raw_data(ifos=ifos, path_dict=data_path_dict)[0]
 
         # Injection
         raw_data_dict = utils.injectWaveform(parameters=injected_parameters, time_dict=raw_time_dict,
@@ -156,7 +165,7 @@ def main():
     """
 
     # icut = index corresponding to cutoff time
-    time_dict, data_dict, icut_dict = utils.condition(raw_time_dict, raw_data_dict, tcut_dict, ds_factor, f_low)
+    time_dict, data_path_dict, icut_dict = utils.condition(raw_time_dict, raw_data_dict, tcut_dict, ds_factor, f_low)
 
     # Time spacing of data
     dt = time_dict['H1'][1] - time_dict['H1'][0]
@@ -185,7 +194,7 @@ def main():
     for ifo, idx in icut_dict.items():
         # idx = sample closest to desired time
         time_dict[ifo] = time_dict[ifo][idx - Npre:idx + Npost]
-        data_dict[ifo] = data_dict[ifo][idx - Npre:idx + Npost]
+        data_path_dict[ifo] = data_path_dict[ifo][idx - Npre:idx + Npost]
 
     """
     Calculate ACF
@@ -249,7 +258,7 @@ def main():
         
         'rho_dict':rho_dict, 
         'time_dict':time_dict, 
-        'data_dict':data_dict, 
+        'data_dict':data_path_dict,
         'ap_dict':ap_dict, 
         'tpeak_dict':tpeak_dict
     }

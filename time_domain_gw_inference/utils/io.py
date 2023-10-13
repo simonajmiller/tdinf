@@ -7,16 +7,15 @@ import scipy.signal as sig
 import json
 import os
 
-def load_raw_data(path, ifos=('H1', 'L1', 'V1'), verbose=True):
+def load_raw_data(path_dict, ifos=('H1', 'L1', 'V1'), verbose=True):
     
     """
     Load in raw interferometer timeseries strain data
     
     Parameters
     ----------
-    path : string (optional)
-        file path to location of raw timeseries strain data for GW190521; the {} 
-        are where the names of the interferometers go
+    path_dict : dict
+        dictionary:ifo_name -> to where each h5 file is located
     ifos : tuple of strings (optional)
         which interometers to load data from (some combination of 'H1', 'L1',
         and 'V1')
@@ -36,7 +35,7 @@ def load_raw_data(path, ifos=('H1', 'L1', 'V1'), verbose=True):
     
     for ifo in ifos:
         # for real data downloaded from gwosc...
-        with h5py.File(path.format(ifo[0], ifo), 'r') as f:
+        with h5py.File(path_dict[ifo], 'r') as f:
             strain = np.array(f['strain/Strain'])
             T0 = f['meta/GPSstart'][()]
             ts = T0 + np.arange(len(strain))*f['meta/Duration'][()]/len(strain)
@@ -51,8 +50,8 @@ def load_raw_data(path, ifos=('H1', 'L1', 'V1'), verbose=True):
     return raw_time_dict, raw_data_dict
 
 
-def get_pe(raw_time_dict, path, psd_path=None, verbose=True, f_ref=11, f_low=11):
-    
+def get_pe(raw_time_dict, path, psd_path_dict=None, verbose=True, f_ref=11, f_low=11):
+
     """
     Load in parameter estimation (pe) samples from LVC GW190521 analysis, and calculate
     the peak strain time at geocenter and each detector, the detector antenna patterns, 
@@ -64,9 +63,9 @@ def get_pe(raw_time_dict, path, psd_path=None, verbose=True, f_ref=11, f_low=11)
         output from load_raw_data function above
     path : string (optional)
         file path for pe samples
-    psd_path : string (optional)
+    psd_path_dict : dict (optional)
         if power spectral density (psd) in a different file than the pe samples, provide
-        the file path here
+        the file path in this dict
     verbose : boolean (optional)
         whether or not to print out information as the data is loaded
     
@@ -99,14 +98,14 @@ def get_pe(raw_time_dict, path, psd_path=None, verbose=True, f_ref=11, f_low=11)
     
     # Load in PSDs
     pe_psds = {}
-    if psd_path is None: # use same file as posteriors 
+    if psd_path_dict is None: # use same file as posteriors
         with h5py.File(path, 'r') as f:
             for ifo in ifos:
                 pe_psds[ifo] = f['NRSur7dq4']['psds'][ifo][()]
-    else: # use different, provided file
-        for ifo in ifos: 
-            pe_psds[ifo] = np.genfromtxt(psd_path.format(ifo), dtype=float)
-            
+    else:
+        for ifo in ifos:
+            pe_psds[ifo] = np.genfromtxt(psd_path_dict[ifo], dtype=float)
+
     # Find sample where posterior is maximized
     log_prob = pe_samples['log_likelihood'] + pe_samples['log_prior']
     imax = np.argmax(log_prob)
