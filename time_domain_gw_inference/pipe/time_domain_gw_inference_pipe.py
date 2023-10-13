@@ -1,15 +1,15 @@
 import abc
 import configparser
-import argparse
 import os
 import shutil
 import pathlib
 from dataclasses import dataclass
-import numpy as np
 from ezdag import DAG, Layer, Node, Option
 from typing import Dict, List, Tuple
 from htcondor.dags import SimpleFormatter
-
+import argparse
+import subprocess
+from time_domain_gw_inference.run_sampler import create_run_sampler_arg_parser
 
 def get_option_from_list(option_name: str, option_list: list[Option]):
     return next((opt for opt in option_list if opt.name == option_name), None)
@@ -54,10 +54,47 @@ class AbstractPipelineDAG(abc.ABC):
         return condor_settings
 
     @staticmethod
-    def validate_executables(executables: Dict[str, str]):
+    def check_and_create_directory(directory_path):
+        """
+        Check if directory exists. If no, create it, if yes, ask if should continue
+        :param directory_path:
+        :return:
+        """
+        if not os.path.exists(directory_path):
+            os.makedirs(directory_path)
+        else:
+            continue_existing = input(
+                f"The directory {directory_path} already exists."
+                "This may overwrite a previous run and is not guaranteed to work"
+                f" Do you want to continue? (yes/no): ").lower()
+            if continue_existing not in {'yes', 'y'}:
+                print("You chose wisely, exiting program.")
+                exit()
+
+    @staticmethod
+    def find_executable_path(script_name):
+        """
+        Find the path of a script using the 'which' command.
+
+        Parameters:
+        - script_name (str): The name of the script to find.
+
+        Returns:
+        - str: The path of the script or an error message.
+        """
+        command = f'which {script_name}'
+        result = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+        if result.returncode == 0:
+            return result.stdout.strip()
+        raise FileNotFoundError(f'Error: {result.stderr.strip()}')
+
+    def validate_executables(self, executables: Dict[str, str]):
         if not os.path.exists(executables['run_sampler']):
-            raise FileNotFoundError(f"Executable {executables['run_sampler']} not found")
-        executables['run_sampler'] = os.path.abspath(executables['run_sampler'])
+            # Run the 'which' command to find the path of run_sampler.py
+            executables['run_sampler'] = self.find_executable_path(executables['run_sampler'])
+        else:
+            executables['run_sampler'] = os.path.abspath(executables['run_sampler'])
 
     @staticmethod
     def validate_condor_settings(condor_settings: Dict[str, str]):
@@ -122,7 +159,7 @@ class AbstractPipelineDAG(abc.ABC):
 
     def create_pipeline_dag(self):
         # Create the output directory if it doesn't exist
-        os.makedirs(self.output_directory, exist_ok=True)
+        self.check_and_create_directory(self.output_directory)
 
         # Create the DAG
         dag = DAG(formatter=SimpleFormatter())
@@ -239,6 +276,11 @@ class AbstractLayerManager(abc.ABC):
 
     @property
     @abc.abstractmethod
+    def argument_parser(self) -> argparse.ArgumentParser:
+        raise NotImplementedError
+
+    @property
+    @abc.abstractmethod
     def method_name(self) -> str:
         raise NotImplementedError("method_name has not been implemented yet")
 
@@ -291,14 +333,24 @@ class RunSamplerLayerManager(AbstractLayerManager):
 
     @property
     def condor_settings(self):
+        condor_settings = self.shared_condor_settings
         additional_settings = {
             "request_memory": "4GB",
             "request_disk": "5000MB",
-            "request_cpus": "64",  # TODO allow to modify
+            "request_cpus": self.argument_parser.get_default('ncpu'),
             "when_to_transfer_output": "ON_EXIT_OR_EVICT",
         }
-        additional_settings.update(self.shared_condor_settings)
-        return additional_settings
+        run_options = self.get_run_options()
+        N_cpu = get_option_from_list('ncpu', run_options)
+        if N_cpu is not None:
+            additional_settings['request_cpus'] = N_cpu.argument[0]
+
+        condor_settings.update(additional_settings)
+        return condor_settings
+
+    @property
+    def argument_parser(self) -> argparse.ArgumentParser:
+        return create_run_sampler_arg_parser()
 
     @staticmethod
     def get_output_filename_prefix(run_mode, cycles):
