@@ -6,21 +6,13 @@ import sys
 
 try: 
     import reconstructwf as rwf
-    import io
     from spins_and_masses import m1m2_from_mtotq
+    from misc import logit, inv_logit, logit_jacobian
 except: 
     from . import reconstructwf as rwf
-    from . import io
     from .spins_and_masses import m1m2_from_mtotq
+    from .misc import logit, inv_logit, logit_jacobian
 
-def logit(x, xmin=0, xmax=1):
-    return np.log(x - xmin) - np.log(xmax - x)
-
-def inv_logit(y, xmin=0, xmax=1):
-    return (np.exp(y)*xmax + xmin)/(1 + np.exp(y))
-
-def logit_jacobian(x, xmin=0, xmax=1):
-    return 1./(x-xmin) + 1./(xmax-x)
 
 def samp_to_phys(x, **kws):
     
@@ -84,32 +76,6 @@ def samp_to_phys(x, **kws):
     
     return mtot, q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, dist_mpc, phi_ref, iota, ra, dec, psi, tgps_geocent
 
-
-def samp_to_phys_angles(x, **kwargs):
-        
-    # get physical parameters
-    x_phys = np.array([samp_to_phys(x_i, **kwargs) for x_i in x.T], ndmin=2)
-                
-    # change to LALInference spin convention
-    ys = []
-    for x_i in x_phys:
-        mtot, q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, dist_mpc, phi_ref, iota, ra, dec, psi, tgps_geocent = x_i
-        m1, m2 = m1m2_from_mtotq(mtot, q)    
-        ys.append(lalsim.SimInspiralTransformPrecessingWvf2PE(
-            iota, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, m1, m2,
-            kwargs['f_low'], phi_ref
-        ))
-    # quantities to return
-    theta_jn, phi_jl, tilt1, tilt2, phi12, chi1, chi2 = np.array(ys, ndmin=2).T
-    mtot, q, _, _, _, _, _, _, dist_mpc, phi_ref, iota, ra, dec, psi, tgps_geocent = np.array(x_phys.T)
-    return mtot, q, chi1, chi2, phi_jl, tilt1, tilt2, phi12, dist_mpc, phi_ref, theta_jn, iota, ra, dec, psi, tgps_geocent 
-
-
-def get_dict_from_samples(samples, **kwargs):    
-    keys = ['mtotal', 'q', 'chi1', 'chi2', 'phi_jl', 'tilt1', 'tilt2', 'phi12', 'dist', 'phase', 'theta_jn', 'iota',
-                'ra', 'dec', 'psi', 'tgps_geocent']
-    samples_dict = dict(zip(keys, samp_to_phys_angles(samples.T, **kwargs)))
-    return samples_dict
 
 '''
 Prior function
@@ -203,12 +169,12 @@ def get_lnprob(x, f_low=11, f_ref=11, return_wf=False, return_params=False,
 
         # If we are sampling over sky position and/or time ...
         if ap_dict is None and tpeak_dict is None: # both
-            TP_dict, AP_dict = io.get_tgps_and_ap_dicts(tgps_geocent, ifos, ra, dec, psi, verbose=False) 
+            TP_dict, AP_dict = rwf.get_tgps_and_ap_dicts(tgps_geocent, ifos, ra, dec, psi, verbose=False) 
         elif ap_dict is None: # just skypos
-            _, AP_dict = io.get_tgps_and_ap_dicts(tgps_geocent, ifos, ra, dec, psi, verbose=False) 
+            _, AP_dict = rwf.get_tgps_and_ap_dicts(tgps_geocent, ifos, ra, dec, psi, verbose=False) 
             TP_dict = tpeak_dict.copy()
         elif tpeak_dict is None: # just time
-            TP_dict, _ = io.get_tgps_and_ap_dicts(tgps_geocent, ifos, ra, dec, psi, verbose=False) 
+            TP_dict, _ = rwf.get_tgps_and_ap_dicts(tgps_geocent, ifos, ra, dec, psi, verbose=False) 
             AP_dict = ap_dict.copy()
         else: # neither
             TP_dict = tpeak_dict.copy()

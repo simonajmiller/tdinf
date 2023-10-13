@@ -17,11 +17,11 @@ lalsim = lalsimulation
 Functions to generate waveform reconstructions
 """
 
-def get_peak_times(*args, **kwargs):
+def get_trigger_times(*args, **kwargs):
     
     """
-    Get the time at which the Hanford strain is loudest (peak time) at geocenter and 
-    each inferometer 
+    Get the trigger time: time at which the Hanford strain is loudest (peak time) 
+    at geocenter and each inferometer 
     """
     
     # Unpack inputs
@@ -85,6 +85,60 @@ def get_peak_times(*args, **kwargs):
         tp_dict[ifo] = tp_geo + timedelay
     
     return tp_dict
+
+
+def get_tgps_and_ap_dicts(tgps_geocent, ifos, ra, dec, psi, verbose=True):
+    
+    """
+    Get the time and antenna pattern at each detector at the given geocenter time and 
+    sky position 
+    
+    Parameters
+    ----------
+    tgps_geocent : float
+        geocenter time
+    ifos : tuple of strings (optional)
+        which interometers to load data from (some combination of 'H1', 'L1',
+        and 'V1')
+    ra : float
+        right ascension
+    dec : float
+        declination
+    psi : float
+        polarization angle
+    verbose : boolean (optional)
+        whether or not to print out information calculated
+    
+    Returns
+    -------
+    tgps_dict : dictionary
+        time at each detector at the given geocenter time and sky position 
+    ap_dict : dictionary
+        antenna pattern for each interferometer at the given geocenter time and sky 
+        position 
+    """
+    
+    tgps_dict = {}
+    ap_dict = {}
+    
+    # Greenwich mean sidereal time 
+    gmst = lal.GreenwichMeanSiderealTime(lal.LIGOTimeGPS(tgps_geocent))
+    
+    # Cycle through interferometers
+    for ifo in ifos:
+        
+        # Calculate time delay between geocenter and this ifo 
+        dt_ifo = lal.TimeDelayFromEarthCenter(lal.cached_detector_by_prefix[ifo].location,
+                                              ra, dec, lal.LIGOTimeGPS(tgps_geocent))
+        tgps_dict[ifo] = tgps_geocent + dt_ifo
+        
+        # Calculate antenna pattern 
+        ap_dict[ifo] = lal.ComputeDetAMResponse(lal.cached_detector_by_prefix[ifo].response,
+                                                ra, dec, psi, gmst)
+        if verbose:
+            print(ifo, tgps_dict[ifo], ap_dict[ifo])
+            
+    return tgps_dict, ap_dict
 
 
 def generate_lal_hphc(approximant_key, m1_msun, m2_msun, chi1, chi2, dist_mpc=1,

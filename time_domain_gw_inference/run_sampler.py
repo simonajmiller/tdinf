@@ -9,7 +9,6 @@ import pandas as pd
 from multiprocessing import Pool
 from contextlib import closing
 import os
-from time_domain_gw_inference.utils import likelihood as ll
 import time_domain_gw_inference.utils.io as utils
 
 def main():
@@ -322,7 +321,7 @@ def main():
     print("Running with %i cores." % args.ncpu)
     with closing(Pool(processes=args.ncpu)) as pool:
 
-        sampler = emcee.EnsembleSampler(nwalkers, ndim, ll.get_lnprob,
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, utils.get_lnprob,
                                         backend=backend, pool=pool,
                                         runtime_sortingfn=sort_on_runtime,
                                         kwargs=kwargs)
@@ -355,22 +354,8 @@ def main():
     # Print dimensions of chain
     print(sampler.get_chain().shape)
 
-    # Post processing
-    tau = sampler.get_autocorr_time(quiet=True)
-    burnin = int(5 * np.max(tau))
-    thin = int(0.5 * np.min(tau))
-    samples = sampler.get_chain(discard=burnin, flat=True, thin=thin)
-    samples_dict = ll.get_dict_from_samples(samples, **kwargs)
-
-    # Posteriors
-    samples_lnp = sampler.get_log_prob(discard=burnin, flat=True, thin=thin)
-    samples_dict['ln_posterior'] = samples_lnp
-    samples_lnprior = np.asarray([ll.get_lnprior(x, **kwargs) for x in samples])
-    samples_dict['ln_prior'] = samples_lnprior
-
-    # Turn into data frame
-    df = pd.DataFrame(samples_dict)
-    df = df[[k for k, v in df.items() if v.min() != v.max()]]
+    # Postprocessing
+    df = utils.postprocess_samples(sampler)
 
     # Add info about tpeak, tcut, and injected parameters
     if not args.vary_time:
