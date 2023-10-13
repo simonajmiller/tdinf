@@ -30,11 +30,10 @@ def create_run_sampler_arg_parser():
     p.add_argument('--data-path-dict', required=True, help="Dictionary containing path to strain data h5 files")
     p.add_argument('--psd-path-dict', required=True, help="dictionary containing path to psd files")
     # Option to do an injection instead of use real data;
-    # if "REALDATA", do not do an injection, else file path to injected parameters
     p.add_argument('--injected-parameters', default=None)
 
     # Args for cutoff (defined in # of cycles), start, & end times
-    p.add_argument('-t', '--Tcut-cycles', type=float, default=0)  # defaults to the 0 as calculated from peak emission
+    p.add_argument('-t', '--Tcut-cycles', type=float, required=True)
     p.add_argument('--Tstart', type=float, default=1242442966.9077148)
     p.add_argument('--Tend', type=float, default=1242442967.607715)
 
@@ -46,8 +45,8 @@ def create_run_sampler_arg_parser():
     p.add_argument('--ifos', nargs='+', default=['H1', 'L1', 'V1'])
 
     # Optional args sampler settings
-    p.add_argument('--nwalkers', type=int, default=200)
-    p.add_argument('--nsteps', type=int, default=1000)
+    p.add_argument('--nwalkers', type=int, default=512)
+    p.add_argument('--nsteps', type=int, default=50000)
     p.add_argument('--ncpu', type=int, default=4)
 
     # Do we want to run with only the prior?
