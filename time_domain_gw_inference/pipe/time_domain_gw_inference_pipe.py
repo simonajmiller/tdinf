@@ -300,7 +300,7 @@ class RunSamplerLayerManager(AbstractLayerManager):
         return additional_settings
 
     @staticmethod
-    def get_output_filename(run_mode, cycles):
+    def get_output_filename_prefix(run_mode, cycles):
         return f'{run_mode}_{cycles}cycles'
 
     def get_run_options(self, additional_options=None, **kwargs) -> List[Option]:
@@ -313,7 +313,7 @@ class RunSamplerLayerManager(AbstractLayerManager):
         if additional_options is not None:
             self.update_options_list(run_options, additional_options)
 
-        self.raise_option_exists_error("output", run_options)
+        self.raise_option_exists_error("output-h5", run_options)
         self.raise_option_exists_error("mode", run_options)
         return run_options
 
@@ -322,15 +322,15 @@ class RunSamplerLayerManager(AbstractLayerManager):
         return [Option('data-directory', 'data_directory', suppress=True)]
 
     def get_outputs(self, run_mode, cycles):
-        dat_file = f'{self.get_output_filename(run_mode, cycles)}.dat'
-        h5_file = f'{self.get_output_filename(run_mode, cycles)}.h5'
-        return [Option('dat_file', dat_file, suppress=True), Option('h5_file', h5_file, suppress=True)]
+        dat_file = f'{self.get_output_filename_prefix(run_mode, cycles)}.dat'
+        h5_file = f'{self.get_output_filename_prefix(run_mode, cycles)}.h5'
+        return [Option('dat_file', dat_file, suppress=True), Option('output-h5', h5_file)]
 
     def add_job(self, run_mode, cycles, additional_options=None) -> None:
 
         run_options = self.get_run_options(additional_options)
-        run_options.append(Option('output', self.get_output_filename(run_mode, cycles)))
         run_options.append(Option('mode', run_mode))
+        run_options.append(Option('Tcut-cycles', cycles))
 
         inputs = self.get_inputs()
         outputs = self.get_outputs(run_mode, cycles)

@@ -20,7 +20,7 @@ def create_run_sampler_arg_parser():
     p = argparse.ArgumentParser()
 
     # Required args: path to where to save data ...
-    p.add_argument('-o', '--output', help='savename for emcee', required=True)
+    p.add_argument('-o', '--output-h5', help='h5 filename for emcee', required=True)
     # ... and whether to run pre-Tcut, post-Tcut, or full (Tstart to Tend)?
     p.add_argument('-m', '--mode', required=True)
 
