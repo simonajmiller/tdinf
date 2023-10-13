@@ -7,8 +7,8 @@ import scipy.signal as sig
 import json
 import os
 
-def load_raw_data(path_dict, ifos=('H1', 'L1', 'V1'), verbose=True):
 
+def load_raw_data(path_dict, ifos=('H1', 'L1', 'V1'), verbose=True):
     """
     Load in raw interferometer timeseries strain data
     
@@ -38,12 +38,12 @@ def load_raw_data(path_dict, ifos=('H1', 'L1', 'V1'), verbose=True):
         with h5py.File(path_dict[ifo], 'r') as f:
             strain = np.array(f['strain/Strain'])
             T0 = f['meta/GPSstart'][()]
-            ts = T0 + np.arange(len(strain))*f['meta/Duration'][()]/len(strain)
+            ts = T0 + np.arange(len(strain)) * f['meta/Duration'][()] / len(strain)
 
         raw_time_dict[ifo] = ts
         raw_data_dict[ifo] = strain
 
-        fsamp = 1.0/(ts[1]-ts[0])
+        fsamp = 1.0 / (ts[1] - ts[0])
         if verbose:
             print("Raw %s data sampled at %.1f Hz" % (ifo, fsamp))
 
@@ -51,7 +51,6 @@ def load_raw_data(path_dict, ifos=('H1', 'L1', 'V1'), verbose=True):
 
 
 def get_pe(raw_time_dict, path, psd_path_dict=None, verbose=True, f_ref=11, f_low=11):
-
     """
     Load in parameter estimation (pe) samples from LVC GW190521 analysis, and calculate
     the peak strain time at geocenter and each detector, the detector antenna patterns, 
@@ -98,7 +97,7 @@ def get_pe(raw_time_dict, path, psd_path_dict=None, verbose=True, f_ref=11, f_lo
 
     # Load in PSDs
     pe_psds = {}
-    if psd_path_dict is None: # use same file as posteriors
+    if psd_path_dict is None:  # use same file as posteriors
         with h5py.File(path, 'r') as f:
             for ifo in ifos:
                 pe_psds[ifo] = f['NRSur7dq4']['psds'][ifo][()]
@@ -111,14 +110,14 @@ def get_pe(raw_time_dict, path, psd_path_dict=None, verbose=True, f_ref=11, f_lo
     imax = np.argmax(log_prob)
 
     # Sky position for the max. posterior sample
-    ra = pe_samples['ra'][imax]   # right ascension
-    dec = pe_samples['dec'][imax] # declination
-    psi = pe_samples['psi'][imax] # polarization angle
-    maxP_skypos = {'ra':ra, 'dec':dec, 'psi':psi}
+    ra = pe_samples['ra'][imax]  # right ascension
+    dec = pe_samples['dec'][imax]  # declination
+    psi = pe_samples['psi'][imax]  # polarization angle
+    maxP_skypos = {'ra': ra, 'dec': dec, 'psi': psi}
 
     # Set truncation time
     amporder = 1
-    fstart = f_low * 2./(amporder+2)
+    fstart = f_low * 2. / (amporder + 2)
     peak_times = rwf.get_peak_times(parameters=pe_samples[imax], times=raw_time_dict[ifos[0]],
                                     f_ref=f_ref, f_low=fstart, lal_amporder=1)
 
@@ -134,7 +133,6 @@ def get_pe(raw_time_dict, path, psd_path_dict=None, verbose=True, f_ref=11, f_lo
 
 
 def get_tgps_and_ap_dicts(tgps_geocent, ifos, ra, dec, psi, verbose=True):
-
     """
     Get the time and antenna pattern at each detector at the given geocenter time and 
     sky position 
@@ -189,7 +187,6 @@ def get_tgps_and_ap_dicts(tgps_geocent, ifos, ra, dec, psi, verbose=True):
 
 def condition(raw_time_dict, raw_data_dict, t_dict, ds_factor=16, f_low=11,
               scipy_decimate=True, verbose=True):
-
     """
     Filter and downsample the data, and locate target sample corresponding
     to the times in t_dict
@@ -242,8 +239,8 @@ def condition(raw_time_dict, raw_data_dict, t_dict, ds_factor=16, f_low=11,
 
         # Filter
         if f_low:
-            fny = 0.5/(raw_time[1]-raw_time[0])
-            b, a = sig.butter(4, f_low/fny, btype='highpass', output='ba')
+            fny = 0.5 / (raw_time[1] - raw_time[0])
+            b, a = sig.butter(4, f_low / fny, btype='highpass', output='ba')
             data = sig.filtfilt(b, a, raw_data)
         else:
             data = raw_data.copy()
@@ -266,14 +263,12 @@ def condition(raw_time_dict, raw_data_dict, t_dict, ds_factor=16, f_low=11,
         i_dict[ifo] = np.argmin(np.abs(time - t_dict[ifo]))
         if verbose:
             print('tgps_{:s} = {:.6f}'.format(ifo, t_dict[ifo]))
-            print('t_{:s} - tgps_{:s} is {:.2e} s'.format(ifo, ifo, time[i_dict[ifo]]-t_dict[ifo]))
+            print('t_{:s} - tgps_{:s} is {:.2e} s'.format(ifo, ifo, time[i_dict[ifo]] - t_dict[ifo]))
 
     return time_dict, data_dict, i_dict
 
 
-
 def parse_injected_parameters(filepath):
-
     """
     Function to load in the parameters for an injection
     """
@@ -281,7 +276,7 @@ def parse_injected_parameters(filepath):
     assert filepath[-4:] == 'json', 'File type not supported'
 
     # Load file 
-    with open(filepath,'r') as jf:
+    with open(filepath, 'r') as jf:
         inj_file = json.load(jf)
 
     # 15D gravitational-wave parameter space
@@ -290,13 +285,12 @@ def parse_injected_parameters(filepath):
               'f_ref']
 
     # Format correctly
-    injected_parameters = {p:inj_file[p] for p in params}
+    injected_parameters = {p: inj_file[p] for p in params}
 
     return injected_parameters
 
 
 def injectWaveform(**kwargs):
-
     # Unpack inputs
     p = kwargs.pop('parameters')
     time_dict = kwargs.pop('time_dict')
@@ -313,8 +307,8 @@ def injectWaveform(**kwargs):
 
     # Change spin convention
     iota, s1x, s1y, s1z, s2x, s2y, s2z = transform_spins(p['theta_jn'], p['phi_jl'], p['tilt_1'], p['tilt_2'],
-                                          p['phi_12'], p['a_1'], p['a_2'], p['mass_1'], p['mass_2'],
-                                          f_ref, p['phase'])
+                                                         p['phi_12'], p['a_1'], p['a_2'], p['mass_1'], p['mass_2'],
+                                                         f_ref, p['phase'])
 
     # Get strain
     hp, hc = rwf.generate_lal_hphc(approx,
@@ -327,27 +321,24 @@ def injectWaveform(**kwargs):
                                    f_ref=f_ref,
                                    inclination=iota,
                                    phi_ref=p['phase']
-                                  )
+                                   )
 
     # Project into each detector 
     h_ifos = {}
     for ifo in ifos:
-
         # Time align
         h = rwf.generate_lal_waveform(hplus=hp, hcross=hc, times=time_dict[ifo], triggertime=tpeak_dict[ifo])
 
         # Project onto H1
         Fp, Fc = ap_dict[ifo]
-        h_ifo = Fp*h.real - Fc*h.imag
+        h_ifo = Fp * h.real - Fc * h.imag
 
         h_ifos[ifo] = h_ifo
 
     return h_ifos
 
 
-
 def get_Tcut_from_Ncycles(Ncycles, **kwargs):
-
     """
     Calculate the cutoff time given the cutoff cycle and the parameters of the 
     waveform to base the cutoff time from
@@ -364,10 +355,10 @@ def get_Tcut_from_Ncycles(Ncycles, **kwargs):
     t_cycles_H1 = times[idxs]
 
     # Get the cycle we care about
-    i0 = np.argmax(np.abs(h_H1[idxs])) # index corresponding to merger (absolute peak time)
-    n_i = 2*Ncycles                    # one index = 1/2 cycle
-    assert(n_i.is_integer()), '# of half cycles does not correspond to an integer value'
-    icut = i0 + int(n_i)               # index corresponding to the cycle we care about
+    i0 = np.argmax(np.abs(h_H1[idxs]))  # index corresponding to merger (absolute peak time)
+    n_i = 2 * Ncycles  # one index = 1/2 cycle
+    assert (n_i.is_integer()), '# of half cycles does not correspond to an integer value'
+    icut = i0 + int(n_i)  # index corresponding to the cycle we care about
 
     # Get time in H1
     tcut_H1 = t_cycles_H1[icut]
@@ -376,14 +367,13 @@ def get_Tcut_from_Ncycles(Ncycles, **kwargs):
     skypos = kwargs['skypos']
     dt_H = lal.TimeDelayFromEarthCenter(lal.cached_detector_by_prefix['H1'].location,
                                         skypos['ra'], skypos['dec'], lal.LIGOTimeGPS(tcut_H1))
-    tcut_geo = tcut_H1-dt_H
+    tcut_geo = tcut_H1 - dt_H
 
     return tcut_geo
 
 
 def load_posterior_samples(date, run, start_cut, end_cut, pe_output_dir='../../data/output/',
-                          prior_fname='092123_test_prior.dat'):
-
+                           prior_fname='092123_test_prior.dat'):
     """
     Function to load in posterior samples from one of our runs
     """
@@ -393,7 +383,7 @@ def load_posterior_samples(date, run, start_cut, end_cut, pe_output_dir='../../d
 
     # Arange all the time slices to load
     dx = 0.5
-    cuts_float = np.arange(start_cut, end_cut+0.5, 0.5)
+    cuts_float = np.arange(start_cut, end_cut + 0.5, 0.5)
     cuts = [int(c) if c.is_integer() else c for c in cuts_float]
 
     modes = ['pre', 'post']
@@ -404,7 +394,6 @@ def load_posterior_samples(date, run, start_cut, end_cut, pe_output_dir='../../d
     # Cycle through the runs to get all the file paths
     for cut in cuts:
         for mode in modes:
-
             # Format the file name
             fname = path_template.format(mode, cut)
 
@@ -412,12 +401,11 @@ def load_posterior_samples(date, run, start_cut, end_cut, pe_output_dir='../../d
             key = f'{mode} {cut} cycles'
             paths[key] = fname
 
-
     # Samples from full duration (no time cut)
     paths['full'] = path_template.format('full', '0')
 
     # Prior samples
-    paths['prior'] = pe_output_dir+prior_fname
+    paths['prior'] = pe_output_dir + prior_fname
 
     # Parse samples
     td_samples = {}
@@ -439,7 +427,7 @@ def load_posterior_samples(date, run, start_cut, end_cut, pe_output_dir='../../d
             chips = chi_precessing(m1s, samps['chi1'], samps['tilt1'], m2s, samps['chi2'], samps['tilt2'])
 
             # Make into dict 
-            samps_dict = {k:samps[k] for k in samps.dtype.names}
+            samps_dict = {k: samps[k] for k in samps.dtype.names}
             samps_dict['m1'] = m1s
             samps_dict['m2'] = m2s
             samps_dict['chieff'] = chieffs

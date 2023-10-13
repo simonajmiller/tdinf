@@ -2,13 +2,12 @@ import numpy as np
 import lal
 from lalsimulation import SimInspiralTransformPrecessingNewInitialConditions
 
-
 """
 Functions to calculate various mass quantities
 """
 
+
 def m1m2_from_mtotq(mtot, q):
-    
     """
     Calculate component masses from total mass and mass ratio
     
@@ -35,8 +34,8 @@ def m1m2_from_mtotq(mtot, q):
 Functions to calculate various spin quantities
 """
 
+
 def transform_spins(theta_jn, phi_jl, tilt1, tilt2, phi12, a1, a2, m1, m2, f_ref, phi_ref):
-    
     """
     Get inclination angle and spin components at a given reference frequency from the 
     masses, spin magnitudes, and various tilt and azimuthal angles
@@ -86,9 +85,9 @@ def transform_spins(theta_jn, phi_jl, tilt1, tilt2, phi12, a1, a2, m1, m2, f_ref
     """
 
     # Transform spins 
-    m1_SI = m1*lal.MSUN_SI   
-    m2_SI = m2*lal.MSUN_SI
-    
+    m1_SI = m1 * lal.MSUN_SI
+    m2_SI = m2 * lal.MSUN_SI
+
     # Check if float or array 
     if isinstance(m1, float):
         incl, s1x, s1y, s1z, s2x, s2y, s2z = SimInspiralTransformPrecessingNewInitialConditions(
@@ -104,18 +103,17 @@ def transform_spins(theta_jn, phi_jl, tilt1, tilt2, phi12, a1, a2, m1, m2, f_ref
         s2y = np.zeros(nsamps)
         s2z = np.zeros(nsamps)
 
-        for i in range(nsamps): 
-
-            incl[i], s1x[i], s1y[i], s1z[i], s2x[i], s2y[i], s2z[i] = SimInspiralTransformPrecessingNewInitialConditions(
-                theta_jn[i], phi_jl[i], tilt1[i], tilt2[i], phi12[i], a1[i], a2[i], 
+        for i in range(nsamps):
+            incl[i], s1x[i], s1y[i], s1z[i], s2x[i], s2y[i], s2z[
+                i] = SimInspiralTransformPrecessingNewInitialConditions(
+                theta_jn[i], phi_jl[i], tilt1[i], tilt2[i], phi12[i], a1[i], a2[i],
                 m1_SI[i], m2_SI[i], f_ref, phi_ref[i]
             )
-        
+
     return incl, s1x, s1y, s1z, s2x, s2y, s2z
 
 
 def chi_precessing(m1, a1, tilt1, m2, a2, tilt2):
-    
     """
     Calculate the effective precessing spin, chi_p
     
@@ -139,19 +137,18 @@ def chi_precessing(m1, a1, tilt1, m2, a2, tilt2):
     chi_p : `numpy.array` or float
         effective precessing spin 
     """
-    
-    q_inv = m1/m2
-    A1 = 2. + (3.*q_inv/2.)
-    A2 = 2. + 3./(2.*q_inv)
-    S1_perp = a1*np.sin(tilt1)*m1*m1
-    S2_perp = a2*np.sin(tilt2)*m2*m2
-    Sp = np.maximum(A1*S2_perp, A2*S1_perp)
-    chi_p = Sp/(A2*m1*m1)
+
+    q_inv = m1 / m2
+    A1 = 2. + (3. * q_inv / 2.)
+    A2 = 2. + 3. / (2. * q_inv)
+    S1_perp = a1 * np.sin(tilt1) * m1 * m1
+    S2_perp = a2 * np.sin(tilt2) * m2 * m2
+    Sp = np.maximum(A1 * S2_perp, A2 * S1_perp)
+    chi_p = Sp / (A2 * m1 * m1)
     return chi_p
 
 
 def chi_effective(m1, a1, tilt1, m2, a2, tilt2):
-    
     """
     Calculate the effective spin, chi_eff
     
@@ -175,13 +172,12 @@ def chi_effective(m1, a1, tilt1, m2, a2, tilt2):
     chi_eff : `numpy.array` or float
         effective spin 
     """
-    
-    chieff = (m1*a1*np.cos(tilt1) + m2*a2*np.cos(tilt2))/(m1+m2)
+
+    chieff = (m1 * a1 * np.cos(tilt1) + m2 * a2 * np.cos(tilt2)) / (m1 + m2)
     return chieff
 
 
-def calculate_generalizedChiP(m1, a1, tilt1, m2, a2, tilt2, phi12): 
-    
+def calculate_generalizedChiP(m1, a1, tilt1, m2, a2, tilt2, phi12):
     """
     Calculate generalized chi_p: Eq.(15) of https://arxiv.org/abs/2011.11948
     
@@ -205,21 +201,20 @@ def calculate_generalizedChiP(m1, a1, tilt1, m2, a2, tilt2, phi12):
     gen_chip : `numpy.array` or float
         generalized chi_p 
     """
-    
-    q = m2/m1
-    omega_tilda = q*(4*q + 3)/(4 + 3*q) 
-    
-    term1 = a1*np.sin(tilt1)
-    term2 = omega_tilda*a2*np.sin(tilt2)
-    term3 = 2*omega_tilda*a1*a2*np.sin(tilt1)*np.sin(tilt2)*np.cos(phi12)
-    
-    gen_chip = np.sqrt(term1**2 + term2**2 + term3**3)
-    
+
+    q = m2 / m1
+    omega_tilda = q * (4 * q + 3) / (4 + 3 * q)
+
+    term1 = a1 * np.sin(tilt1)
+    term2 = omega_tilda * a2 * np.sin(tilt2)
+    term3 = 2 * omega_tilda * a1 * a2 * np.sin(tilt1) * np.sin(tilt2) * np.cos(phi12)
+
+    gen_chip = np.sqrt(term1 ** 2 + term2 ** 2 + term3 ** 3)
+
     return gen_chip
 
 
-def calculate_magnitudeChiPerp(m1, m2, s1x, s1y, s1z, s2x, s2y, s2z): 
-    
+def calculate_magnitudeChiPerp(m1, m2, s1x, s1y, s1z, s2x, s2y, s2z):
     """
     Calculate magnitude of chi_perp: Eq.(9) of https://arxiv.org/abs/2012.02209
     
@@ -251,27 +246,27 @@ def calculate_magnitudeChiPerp(m1, m2, s1x, s1y, s1z, s2x, s2y, s2z):
     # dimensonless spin vectors
     vec_chi1 = [s1x, s1y, s1z]
     vec_chi2 = [s2x, s2y, s2z]
-    
+
     # add dimension
-    vec_S1 = np.array(vec_chi1)*m1*m1
-    vec_S2 = np.array(vec_chi2)*m2*m2
-    
+    vec_S1 = np.array(vec_chi1) * m1 * m1
+    vec_S2 = np.array(vec_chi2) * m2 * m2
+
     # total spin 
-    vec_S = vec_S1 + vec_S2 
-        
+    vec_S = vec_S1 + vec_S2
+
     # mag of in plane (perp) components
     S1_perp = get_mag(vec_S1[0:-1])
     S2_perp = get_mag(vec_S2[0:-1])
     S_perp = get_mag(vec_S[0:-1])
-    
+
     # figured out norm based on conditions
-    mask = S1_perp>=S2_perp
-    norm1 = m1*m1 + S2_perp
-    norm2 = m2*m2 + S1_perp
-        
+    mask = S1_perp >= S2_perp
+    norm1 = m1 * m1 + S2_perp
+    norm2 = m2 * m2 + S1_perp
+
     # calculate mag_ chiperp
     mag_chiperp = np.zeros(len(m1))
-    mag_chiperp[mask] = S_perp[mask]/norm1[mask]
-    mag_chiperp[~mask] = S_perp[~mask]/norm2[~mask]
-    
+    mag_chiperp[mask] = S_perp[mask] / norm1[mask]
+    mag_chiperp[~mask] = S_perp[~mask] / norm2[~mask]
+
     return mag_chiperp

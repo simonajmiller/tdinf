@@ -84,7 +84,7 @@ def main():
     f_low = args.flow
     ds_factor = args.downsample
 
-    print('')  
+    print('')
 
     """
     Load or generate data
@@ -238,28 +238,28 @@ def main():
     """
 
     kwargs = {
-        
+
         'mtot_lim': [200, 350],
         'q_lim': [0.17, 1],
         'chi_lim': [0, 0.99],
         'dist_lim': [1000, 10000],
-        
+
         'approx': args.approx,
         'f_ref': f_ref,
         'f_low': f_low,
         'only_prior': args.only_prior,
         'delta_t': dt,
-        
+
         'ra': skypos['ra'],  # default right ascension if not varied
         'dec': skypos['dec'],  # default declination if not varied
         'psi': skypos['psi'],  # default polarization if not varied
         'tgps_geocent': tpeak_geocent,  # default waveform placement time if not varied
-        
-        'rho_dict':rho_dict, 
-        'time_dict':time_dict, 
-        'data_dict':data_path_dict,
-        'ap_dict':ap_dict, 
-        'tpeak_dict':tpeak_dict
+
+        'rho_dict': rho_dict,
+        'time_dict': time_dict,
+        'data_dict': data_path_dict,
+        'ap_dict': ap_dict,
+        'tpeak_dict': tpeak_dict
     }
 
     """

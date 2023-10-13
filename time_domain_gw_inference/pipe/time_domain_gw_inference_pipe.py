@@ -152,6 +152,7 @@ class RunSamplerDag(AbstractPipelineDAG):
     does not depend on the model settings
     Will not matter if the data is real or simulated
     """
+
     @staticmethod
     def _copy_file_to_directory_and_return_new_name_(file, target_directory, relative_path=None):
         shutil.copy(file, target_directory)
@@ -192,7 +193,7 @@ class RunSamplerDag(AbstractPipelineDAG):
                     'Neither injected-parameters nor pe-posterior-h5-file supplied, please include one')
             self.time_domain_gw_inference_settings['pe-posterior-h5-file'] = \
                 self._copy_file_to_directory_and_return_new_name_(
-                pe_posterior_h5_file, data_directory, self.output_directory)
+                    pe_posterior_h5_file, data_directory, self.output_directory)
         else:
             pe_posterior_h5_file = self.time_domain_gw_inference_settings.get('pe-posterior-h5-file', None)
             if pe_posterior_h5_file is not None:
@@ -200,7 +201,7 @@ class RunSamplerDag(AbstractPipelineDAG):
                     'both injected-parameters and pe-posterior-h5-file have been supplied, please only include one')
             self.time_domain_gw_inference_settings['injected-parameters'] = \
                 self._copy_file_to_directory_and_return_new_name_(
-                injected_parameters, data_directory, self.output_directory)
+                    injected_parameters, data_directory, self.output_directory)
 
         self.time_domain_gw_inference_settings['data-path-dict'] = '"' + str(new_data_dict) + '"'
         self.time_domain_gw_inference_settings['psd-path-dict'] = '"' + str(new_psd_dict) + '"'
@@ -293,7 +294,7 @@ class RunSamplerLayerManager(AbstractLayerManager):
         additional_settings = {
             "request_memory": "4GB",
             "request_disk": "5000MB",
-            "request_cpus": "64", # TODO allow to modify
+            "request_cpus": "64",  # TODO allow to modify
             "when_to_transfer_output": "ON_EXIT_OR_EVICT",
         }
         additional_settings.update(self.shared_condor_settings)
@@ -327,7 +328,6 @@ class RunSamplerLayerManager(AbstractLayerManager):
         return [Option('dat_file', dat_file, suppress=True), Option('output-h5', h5_file)]
 
     def add_job(self, run_mode, cycles, additional_options=None) -> None:
-
         run_options = self.get_run_options(additional_options)
         run_options.append(Option('mode', run_mode))
         run_options.append(Option('Tcut-cycles', cycles))
@@ -351,7 +351,7 @@ if __name__ == "__main__":
                         help="The path to the output directory that contains the dag files, config file, submit "
                              "script, and run_sampler output files")
     parser.add_argument("--cycle_list", required=True, nargs='+', type=float,
-                        help="Cycles before merger to cut data at, e.g. --cycle_list -3 0 1")  #TODO describe better
+                        help="Cycles before merger to cut data at, e.g. --cycle_list -3 0 1")  # TODO describe better
 
     parser.add_argument("--submit", action="store_true", help="Submit the DAG to Condor (NOT IMPLEMENTED YET))")
     args = parser.parse_args()
