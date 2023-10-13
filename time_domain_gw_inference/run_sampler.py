@@ -137,7 +137,7 @@ def main():
         # Injection
         raw_data_dict = utils.injectWaveform(parameters=injected_parameters, time_dict=raw_time_dict,
                                              tpeak_dict=tpeak_dict, ap_dict=ap_dict, skypos=skypos,
-                                             f_ref=f_ref, f_low=f_low)
+                                             f_ref=f_ref, f_low=f_low, approx=args.approx)
 
     ## tcut = cutoff time in waveform
     Ncycles = args.Tcut_cycles  # find truncation time in # number of cycles from peak
@@ -147,7 +147,7 @@ def main():
     else:
         tcut_geocent = utils.get_Tcut_from_Ncycles(Ncycles, parameters=injected_parameters, time_dict=raw_time_dict,
                                                    tpeak_dict=tpeak_dict, ap_dict=ap_dict, skypos=skypos, f_ref=f_ref,
-                                                   f_low=f_low)
+                                                   f_low=f_low, approx=args.approx)
 
     print('\nCutoff time:')
     tcut_dict, _ = utils.get_tgps_and_ap_dicts(tcut_geocent, ifos, skypos['ra'], skypos['dec'], skypos['psi'])
