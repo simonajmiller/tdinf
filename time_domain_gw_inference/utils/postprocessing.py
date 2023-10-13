@@ -6,11 +6,9 @@ import pandas as pd
 import emcee
 
 try: 
-    import reconstructwf as rwf
     from spins_and_masses import m1m2_from_mtotq
     import likelihood as ll
 except: 
-    from . import reconstructwf as rwf
     from .spins_and_masses import m1m2_from_mtotq
     from . import likelihood as ll 
     
