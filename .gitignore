@@ -16,6 +16,7 @@ data/output/copy_from_hawk.py
 data/output/plot_results/
 !data/output/plot_results/101123_view_results_full_runs.ipynb
 dev
+condor/config_file/test
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
