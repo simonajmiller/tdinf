@@ -9,7 +9,7 @@ import pandas as pd
 from multiprocessing import Pool
 from contextlib import closing
 import os
-import time_domain_gw_inference.utils.io as utils
+import time_domain_gw_inference.utils as utils
 
 def main():
     
@@ -357,20 +357,11 @@ def main():
     # Postprocessing
     df = utils.postprocess_samples(sampler)
 
-    # Add info about tpeak, tcut, and injected parameters
-    if not args.vary_time:
-        tpeak_dict['geocenter'] = tpeak_geocent
-        df.attrs['t_peak'] = tpeak_dict
-    tcut_dict['geocenter'] = tcut_geocent
-    df.attrs['t_cut'] = tcut_dict
-    df.attrs['skypos'] = skypos
-    df.attrs['injected_parameters'] = injected_parameters
-
     # Save
     sample_path = backend_path.replace('h5', 'dat')
     df.to_csv(sample_path, sep=' ', index=False)
     print("File saved: %r" % sample_path)
-
+    
 
 if __name__ == "__main__":
     main()

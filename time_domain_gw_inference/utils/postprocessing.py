@@ -50,7 +50,7 @@ def get_dict_from_samples(samples, **kwargs):
     return samples_dict
 
 
-def postprocess_samples(sampler): 
+def postprocess_samples(sampler, getRidOfFixed=False): 
     
     """
     Post-process emcee sample chains
@@ -80,7 +80,8 @@ def postprocess_samples(sampler):
     # Turn into data frame
     df = pd.DataFrame(samples_dict)
     
-    # Get rid of the fixed parameters
-    df = df[[k for k, v in df.items() if v.min() != v.max()]]
+    # Get rid of the fixed parameters if we want
+    if getRidOfFixed:
+        df = df[[k for k, v in df.items() if v.min() != v.max()]]
     
     return df 
