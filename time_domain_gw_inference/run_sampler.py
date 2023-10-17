@@ -24,8 +24,8 @@ def main():
     p.add_argument('-m', '--mode')
     
     # Place where input data is stored
-    p.add_argument('--data-path', default='../../data/input/{}-{}_GWOSC_16KHZ_R2-1242442952-32.hdf5')
-    p.add_argument('--psd-path', default='../../data/input/glitch_median_PSD_for_LI_{}.dat')
+    p.add_argument('--data-path', default='../data/input/GW190521_data/{}-{}_GWOSC_16KHZ_R2-1242442952-32.hdf5')
+    p.add_argument('--psd-path', default='../data/input/GW190521_data/glitch_median_PSD_for_LI_{}.dat')
 
     # Args for cutoff (defined in # of cycles), start, & end times
     p.add_argument('-t', '--Tcut-cycles', type=float, default=0)  # defaults to the 0 as calculated from peak emission
@@ -88,10 +88,6 @@ def main():
                                      'GW190521_posterior_samples.h5') ## TODO: change
         pe_out = utils.get_pe(raw_time_dict, pe_input_path, verbose=False, psd_path=psd_path)
         tpeak_geocent, pe_samples, log_prob, pe_psds, skypos = pe_out
-        
-        print(tpeak_geocent, skypos)
-        
-        sys.exit()
 
         # "Injected parameters" = max(P) draw from the samples associated with this data
         injected_parameters = pe_samples[np.argmax(log_prob)]
