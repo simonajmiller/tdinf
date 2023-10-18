@@ -79,7 +79,7 @@ def main():
     print("successfully loaded data and psd")
     print("data is", data_path_dict)
     pe_posterior_h5_file = args.pe_posterior_h5_file
-    backend_path = args.output  # where emcee spits its output
+    backend_path = args.output_h5  # where emcee spits its output
     f_ref = args.fref
     f_low = args.flow
     ds_factor = args.downsample
