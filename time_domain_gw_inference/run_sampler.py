@@ -27,8 +27,12 @@ def create_run_sampler_arg_parser():
     # Place where input data is stored
     p.add_argument('--pe-posterior-h5-file', default=None,
                    help='posterior file containing pe samples, used only if injected-parameters==None')
-    p.add_argument('--data-path-dict', required=True, help="Dictionary containing path to strain data h5 files")
-    p.add_argument('--psd-path-dict', required=True, help="dictionary containing path to psd files")
+
+    p.add_argument('--data', default=None, required=True,
+                   help='path to data formatted as --data {ifo}:path/To/psd', action='append')
+    p.add_argument('--psd', default=None, required=True,
+                   help='path to data formatted as --psd {ifo}:path/To/psd', action='append')
+
     # Option to do an injection instead of use real data;
     p.add_argument('--injected-parameters', default=None)
 
@@ -62,6 +66,37 @@ def create_run_sampler_arg_parser():
     return p
 
 
+def parse_data_and_psds(args):
+    """
+    Convert command line arguments into dictionaries of paths to PSD and data.
+
+    :param args: Command line arguments parsed by argparse.
+    :return:
+        data_path_dict: Dictionary mapping interferometer names to corresponding data paths.
+        psd_path_dict: Dictionary mapping interferometer names to corresponding PSD paths.
+    """
+    def _split_ifo_from_arg_(argument, ifo, arg_name):
+        prefix = f'{ifo}:'
+        matching_paths = [path.replace(prefix, '') for path in argument if path.startswith(prefix)]
+        if not matching_paths:
+            raise ValueError(
+                f"Error: {ifo} {arg_name} not provided. "
+                f"Either exclude that ifo or add --{arg_name} {ifo}:path/to/{arg_name}")
+        if len(matching_paths) != 1:
+            raise ValueError(
+                f"Error: {ifo} {arg_name} was provided more than once! "
+                f"Please only add --{arg_name} {ifo}:path/to/{arg_name} once")
+        return matching_paths[0]
+
+    data_path_dict = {}
+    psd_path_dict = {}
+    for ifo in args.ifos:
+        data_path_dict[ifo] = _split_ifo_from_arg_(args.data, ifo, 'data')
+        psd_path_dict[ifo] = _split_ifo_from_arg_(args.psd, ifo, 'psd')
+
+    return data_path_dict, psd_path_dict
+
+
 def main():
     p = create_run_sampler_arg_parser()
     args = p.parse_args()
@@ -74,8 +109,7 @@ def main():
     ifos = args.ifos
     print("about to load data")
 
-    data_path_dict = eval(args.data_path_dict)
-    psd_path_dict = eval(args.psd_path_dict)
+    data_path_dict, psd_path_dict = parse_data_and_psds(args)
     print("successfully loaded data and psd")
     print("data is", data_path_dict)
     pe_posterior_h5_file = args.pe_posterior_h5_file

@@ -4,12 +4,13 @@ import os
 import shutil
 import pathlib
 from dataclasses import dataclass
-from ezdag import DAG, Layer, Node, Option
-from typing import Dict, List, Tuple
+from ezdag import DAG, Layer, Node, Option, Argument
+from typing import Dict, List, Tuple, Union
 from htcondor.dags import SimpleFormatter
 import argparse
 import subprocess
 from time_domain_gw_inference.run_sampler import create_run_sampler_arg_parser
+
 
 def get_option_from_list(option_name: str, option_list: list[Option]):
     return next((opt for opt in option_list if opt.name == option_name), None)
@@ -47,9 +48,11 @@ class AbstractPipelineDAG(abc.ABC):
             "when_to_transfer_output": "ON_EXIT_OR_EVICT",
             "success_exit_code": 0,
             "getenv": "True",
-            "log": "logs/$(nodename)-$(cluster)-$(process).log",
             "initialdir": os.path.abspath(self.output_directory),
             "notification": "ERROR",
+            "output": "$(log_dir)/$(run_prefix)-$(nodename)-$(cluster)-$(process).out",
+            "error": "$(log_dir)/$(run_prefix)-$(nodename)-$(cluster)-$(process).err",
+            "log": "$(log_dir)/$(run_prefix)-$(nodename)-$(cluster)-$(process).log",
         }
         return condor_settings
 
@@ -200,7 +203,7 @@ class RunSamplerDag(AbstractPipelineDAG):
             new_file_path = os.path.relpath(new_file_path, relative_path)
         return new_file_path
 
-    def move_input_files(self):
+    def move_input_files(self) -> Tuple[Option, Option]:
         """
         Move assorted input files to directory containing all the runs,
         then replace paths with paths relative to output_directory
@@ -210,8 +213,8 @@ class RunSamplerDag(AbstractPipelineDAG):
         data_directory = os.path.join(self.output_directory, 'data_directory')
         os.makedirs(data_directory, exist_ok=True)
 
-        data_dict = eval(self.time_domain_gw_inference_settings['data-path-dict'])
-        psd_dict = eval(self.time_domain_gw_inference_settings['psd-path-dict'])
+        data_dict = eval(self.time_domain_gw_inference_settings.pop('data-path-dict'))
+        psd_dict = eval(self.time_domain_gw_inference_settings.pop('psd-path-dict'))
         new_data_dict = {}
         new_psd_dict = {}
 
@@ -240,14 +243,18 @@ class RunSamplerDag(AbstractPipelineDAG):
                 self._copy_file_to_directory_and_return_new_name_(
                     injected_parameters, data_directory, self.output_directory)
 
-        self.time_domain_gw_inference_settings['data-path-dict'] = '"' + str(new_data_dict) + '"'
-        self.time_domain_gw_inference_settings['psd-path-dict'] = '"' + str(new_psd_dict) + '"'
+        data_option = Option('data', [f"{key}:{path}" for key, path in new_data_dict.items()])
+        psd_option = Option('psd', [f"{key}:{path}" for key, path in new_psd_dict.items()])
+
+        return data_option, psd_option
 
     def attach_layers_to_dag(self, dag):
-        self.move_input_files()
+        data_option, psd_option = self.move_input_files()
+        data_options = [data_option, psd_option]
         runSamplerLayerManager = RunSamplerLayerManager(self.time_domain_gw_inference_settings,
                                                         self.executables['run_sampler'],
-                                                        self.condor_settings)
+                                                        self.condor_settings,
+                                                        additional_options=data_options)
 
         for cycle in self.cycle_list:
             if cycle == 0:
@@ -266,8 +273,11 @@ class AbstractLayerManager(abc.ABC):
     run_settings_dict: Dict[str, str]
     executable_file: str
     shared_condor_settings: Dict[str, str]
+    additional_options: List[Union[Option, Argument]] = None
 
     def __post_init__(self):
+        if self.additional_options is None:
+            self.additional_options = []
         self.layer = Layer(self.executable_file, name=self.method_name,
                            submit_description=self.condor_settings)
 
@@ -362,6 +372,8 @@ class RunSamplerLayerManager(AbstractLayerManager):
         :return:
         """
         run_options = [Option(key, value) for key, value in self.run_settings_dict.items()]
+        # add additional options not in run settings dict
+        run_options.extend(self.additional_options)
 
         if additional_options is not None:
             self.update_options_list(run_options, additional_options)
@@ -391,6 +403,7 @@ class RunSamplerLayerManager(AbstractLayerManager):
             arguments=run_options,
             inputs=inputs,
             outputs=outputs,
+            variables={'run_prefix': self.get_output_filename_prefix(run_mode, cycles)}
         )
 
 
