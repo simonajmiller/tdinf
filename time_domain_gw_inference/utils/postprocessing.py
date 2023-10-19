@@ -50,7 +50,7 @@ def get_dict_from_samples(samples, **kwargs):
     return samples_dict
 
 
-def postprocess_samples(sampler, getRidOfFixed=False): 
+def postprocess_samples(sampler, getRidOfFixed=False, **kwargs): 
     
     """
     Post-process emcee sample chains

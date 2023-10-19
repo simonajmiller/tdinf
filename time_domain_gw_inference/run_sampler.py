@@ -355,7 +355,7 @@ def main():
     print(sampler.get_chain().shape)
 
     # Postprocessing
-    df = utils.postprocess_samples(sampler)
+    df = utils.postprocess_samples(sampler, **kwargs)
 
     # Save
     sample_path = backend_path.replace('h5', 'dat')
