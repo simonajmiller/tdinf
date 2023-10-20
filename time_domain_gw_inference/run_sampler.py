@@ -26,7 +26,6 @@ def create_run_sampler_arg_parser():
     # Place where input data is stored
     p.add_argument('--pe-posterior-h5-file', default=None,
                    help='posterior file containing pe samples, used only if injected-parameters==None')
-
     p.add_argument('--data', default=None, required=True,
                    help='path to data formatted as --data {ifo}:path/To/psd', action='append')
     p.add_argument('--psd', default=None, required=True,
