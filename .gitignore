@@ -6,8 +6,6 @@
 **/*.out
 **/*.hdf5
 dev
-condor
-data
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
