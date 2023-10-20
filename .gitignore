@@ -5,18 +5,9 @@
 **/*.err
 **/*.out
 **/*.hdf5
-condor/sub_files/gw190521_tests
-condor/dag_files/
-!condor/dag_files/100923_gw190521_realData_m3_to_4.dag
-!condor/dag_files/100923_gw190521_maxP_injection_m3_to_4.dag
-!condor/dag_files/101223_gw190521_maxL_injection_m3_to_4.dag
-!data/input/GW190521_data/*.dat
-data/output/gw190521_tests/
-data/output/copy_from_hawk.py
-data/output/plot_results/
-!data/output/plot_results/101123_view_results_full_runs.ipynb
 dev
-condor/config_file/test
+condor
+data
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
