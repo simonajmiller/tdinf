@@ -9,8 +9,7 @@ import pandas as pd
 from multiprocessing import Pool
 from contextlib import closing
 import os
-from time_domain_gw_inference.utils import likelihood as ll
-import time_domain_gw_inference.utils.io as utils
+import time_domain_gw_inference.utils as utils
 
 
 def create_run_sampler_arg_parser():
