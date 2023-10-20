@@ -4,7 +4,6 @@ import argparse
 import numpy as np
 import emcee
 import scipy.linalg as sl
-from collections import OrderedDict
 import pandas as pd
 from multiprocessing import Pool
 from contextlib import closing
@@ -18,10 +17,16 @@ def create_run_sampler_arg_parser():
     """
     p = argparse.ArgumentParser()
 
-    # Required args: path to where to save data ...
+    # Path to where to save data 
     p.add_argument('-o', '--output-h5', help='h5 filename for emcee', required=True)
-    # ... and whether to run pre-Tcut, post-Tcut, or full (Tstart to Tend)?
+    
+    # Whether to run pre-Tcut, post-Tcut, or full (Tstart to Tend)?
     p.add_argument('-m', '--mode', required=True)
+    
+    # Args for cutoff (defined in # of cycles), start, & end times
+    p.add_argument('-t', '--Tcut-cycles', type=float, required=True)
+    p.add_argument('--Tstart', type=float, default=1242442966.9077148)
+    p.add_argument('--Tend', type=float, default=1242442967.607715)
 
     # Place where input data is stored
     p.add_argument('--pe-posterior-h5-file', default=None,
@@ -33,11 +38,6 @@ def create_run_sampler_arg_parser():
 
     # Option to do an injection instead of use real data;
     p.add_argument('--injected-parameters', default=None)
-
-    # Args for cutoff (defined in # of cycles), start, & end times
-    p.add_argument('-t', '--Tcut-cycles', type=float, required=True)
-    p.add_argument('--Tstart', type=float, default=1242442966.9077148)
-    p.add_argument('--Tend', type=float, default=1242442967.607715)
 
     # Optional args for waveform/data settings
     p.add_argument('--approx', default='NRSur7dq4')
@@ -64,38 +64,9 @@ def create_run_sampler_arg_parser():
     return p
 
 
-def parse_data_and_psds(args):
-    """
-    Convert command line arguments into dictionaries of paths to PSD and data.
-
-    :param args: Command line arguments parsed by argparse.
-    :return:
-        data_path_dict: Dictionary mapping interferometer names to corresponding data paths.
-        psd_path_dict: Dictionary mapping interferometer names to corresponding PSD paths.
-    """
-    def _split_ifo_from_arg_(argument, ifo, arg_name):
-        prefix = f'{ifo}:'
-        matching_paths = [path.replace(prefix, '') for path in argument if path.startswith(prefix)]
-        if not matching_paths:
-            raise ValueError(
-                f"Error: {ifo} {arg_name} not provided. "
-                f"Either exclude that ifo or add --{arg_name} {ifo}:path/to/{arg_name}")
-        if len(matching_paths) != 1:
-            raise ValueError(
-                f"Error: {ifo} {arg_name} was provided more than once! "
-                f"Please only add --{arg_name} {ifo}:path/to/{arg_name} once")
-        return matching_paths[0]
-
-    data_path_dict = {}
-    psd_path_dict = {}
-    for ifo in args.ifos:
-        data_path_dict[ifo] = _split_ifo_from_arg_(args.data, ifo, 'data')
-        psd_path_dict[ifo] = _split_ifo_from_arg_(args.psd, ifo, 'psd')
-
-    return data_path_dict, psd_path_dict
-
-
 def main():
+    
+    # Parse the commandline arguments
     p = create_run_sampler_arg_parser()
     args = p.parse_args()
 
@@ -105,11 +76,7 @@ def main():
 
     # Unpack some basic parameters
     ifos = args.ifos
-    print("about to load data")
-
-    data_path_dict, psd_path_dict = parse_data_and_psds(args)
-    print("successfully loaded data and psd")
-    print("data is", data_path_dict)
+    data_path_dict, psd_path_dict = utils.parse_data_and_psds(args)
     pe_posterior_h5_file = args.pe_posterior_h5_file
     backend_path = args.output_h5  # where emcee spits its output
     f_ref = args.fref
@@ -172,8 +139,7 @@ def main():
 
     ## tcut = cutoff time in waveform
     Ncycles = args.Tcut_cycles  # find truncation time in # number of cycles from peak
-    # if 0, cut = peak
-    if Ncycles == 0:
+    if Ncycles == 0: # if 0, cut = peak
         tcut_geocent = tpeak_geocent
     else:
         tcut_geocent = utils.get_Tcut_from_Ncycles(Ncycles, parameters=injected_parameters, time_dict=raw_time_dict,
@@ -196,7 +162,7 @@ def main():
     """
 
     # icut = index corresponding to cutoff time
-    time_dict, data_path_dict, icut_dict = utils.condition(raw_time_dict, raw_data_dict, tcut_dict, ds_factor, f_low)
+    time_dict, data_dict, icut_dict = utils.condition(raw_time_dict, raw_data_dict, tcut_dict, ds_factor, f_low)
 
     # Time spacing of data
     dt = time_dict['H1'][1] - time_dict['H1'][0]
@@ -214,9 +180,10 @@ def main():
     else:
         raise NotImplementedError(f'Run mode {run_mode} is not defined, please use one of pre post or full')
 
+    # Duration --> number of time samples to look at
     Npre = int(round(TPre / dt))
     Npost = int(round(TPost / dt)) + 1  # must add one so that the target time is actually included, even if Tpost = 0,
-    # otherwise WF placement gets messed up
+                                        # otherwise WF placement gets messed up
     Nanalyze = Npre + Npost
     Tanalyze = Nanalyze * dt
     print('\nWill analyze {:.3f} s of data at {:.1f} Hz\n'.format(Tanalyze, 1 / dt))
@@ -225,45 +192,13 @@ def main():
     for ifo, idx in icut_dict.items():
         # idx = sample closest to desired time
         time_dict[ifo] = time_dict[ifo][idx - Npre:idx + Npost]
-        data_path_dict[ifo] = data_path_dict[ifo][idx - Npre:idx + Npost]
+        data_dict[ifo] = data_dict[ifo][idx - Npre:idx + Npost]
 
-    """
-    Calculate ACF
-    """
-
-    # Condition PSDs
-    cond_psds = {}
-    for ifo, freq_psd in pe_psds.items():
-        freq, psd = freq_psd.copy().T
-
-        # lower freq cut
-        m = freq >= 11
-        psd[~m] = 100 * max(psd[m])  # set values below 11 Hz to be equal to 100*max(psd)
-
-        # upper freq cut
-        fmax = 0.5 / dt
-        m2 = freq <= fmax
-
-        cond_psds[ifo] = (freq[m2], psd[m2])
-
-    rho_dict = OrderedDict()  # stores acf
-    L_dict = OrderedDict()  # stores L such that cov matrix C = L^T L
-
-    for ifo in ifos:
-        # Get PSD
-        freq, psd = cond_psds[ifo]
-
-        # Make sure the max freq of PSD and dt correspond correctly
-        err_msg = f'time spacing ({dt}) not equal to 0.5 / max(freq) ({0.5 / round(freq.max())})'
-        assert dt == 0.5 / round(freq.max()), err_msg
-
-        # Computer ACF from PSD
-        rho = 0.5 * np.fft.irfft(psd) / dt  # dt comes from numpy fft conventions
-        rho_dict[ifo] = rho[:Nanalyze]
-
-        # compute covariance matrix  C and its Cholesky decomposition L (~sqrt of C)
-        C = sl.toeplitz(rho[:Nanalyze])
-        L_dict[ifo] = np.linalg.cholesky(C)
+    # Calculate ACF
+    rho_dict = utils.get_ACF(pe_psds, time_dict, f_low=f_low)
+    
+    for ifo,rho in rho_dict.items(): 
+        assert len(rho) == len(data_dict[ifo]), 'Length for ACF is not the same as for the data'
 
     """
     Arguments for the posterior function
@@ -289,7 +224,7 @@ def main():
 
         'rho_dict': rho_dict,
         'time_dict': time_dict,
-        'data_dict': data_path_dict,
+        'data_dict': data_dict,
         'ap_dict': ap_dict,
         'tpeak_dict': tpeak_dict
     }

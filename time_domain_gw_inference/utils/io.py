@@ -8,6 +8,37 @@ import json
 import os
 
 
+def parse_data_and_psds(args):
+    """
+    Convert command line arguments into dictionaries of paths to PSD and data.
+
+    :param args: Command line arguments parsed by argparse.
+    :return:
+        data_path_dict: Dictionary mapping interferometer names to corresponding data paths.
+        psd_path_dict: Dictionary mapping interferometer names to corresponding PSD paths.
+    """
+    def _split_ifo_from_arg_(argument, ifo, arg_name):
+        prefix = f'{ifo}:'
+        matching_paths = [path.replace(prefix, '') for path in argument if path.startswith(prefix)]
+        if not matching_paths:
+            raise ValueError(
+                f"Error: {ifo} {arg_name} not provided. "
+                f"Either exclude that ifo or add --{arg_name} {ifo}:path/to/{arg_name}")
+        if len(matching_paths) != 1:
+            raise ValueError(
+                f"Error: {ifo} {arg_name} was provided more than once! "
+                f"Please only add --{arg_name} {ifo}:path/to/{arg_name} once")
+        return matching_paths[0]
+
+    data_path_dict = {}
+    psd_path_dict = {}
+    for ifo in args.ifos:
+        data_path_dict[ifo] = _split_ifo_from_arg_(args.data, ifo, 'data')
+        psd_path_dict[ifo] = _split_ifo_from_arg_(args.psd, ifo, 'psd')
+
+    return data_path_dict, psd_path_dict
+
+
 def load_raw_data(path_dict, ifos=('H1', 'L1', 'V1'), verbose=True):
     """
     Load in raw interferometer timeseries strain data

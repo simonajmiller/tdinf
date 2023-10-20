@@ -6,6 +6,7 @@ from .spins_and_masses import *
 import scipy.signal as sig
 import json
 import os
+from collections import OrderedDict
 
 def condition(raw_time_dict, raw_data_dict, t_dict, ds_factor=16, f_low=11,
               scipy_decimate=True, verbose=True):
@@ -175,3 +176,39 @@ def get_Tcut_from_Ncycles(Ncycles, **kwargs):
     tcut_geo = tcut_H1-dt_H
     
     return tcut_geo
+
+
+
+def get_ACF(pe_psds, time_dict, f_low=11): 
+    
+    """
+    Get ACF from PSDs and the times
+    """
+    
+    rho_dict = OrderedDict()  # stores acf
+    
+    # Cycle through ifos
+    for ifo, freq_psd in pe_psds.items():
+                
+        # unpack psd
+        freq, psd = freq_psd.copy().T
+        
+        # Get dt
+        times = time_dict[ifo]
+        dt = times[1] - times[0]
+        Nanalyze = len(times)
+
+        # lower freq cut
+        m = freq >= f_low
+        psd[~m] = 100 * max(psd[m])  # set values below 11 Hz to be equal to 100*max(psd)
+
+        # upper freq cut
+        fmax = 0.5 / dt        
+        freq = freq[freq <= fmax]
+        psd = psd[freq <= fmax]
+
+        # Computer ACF from PSD
+        rho = 0.5 * np.fft.irfft(psd) / dt  # dt comes from numpy fft conventions
+        rho_dict[ifo] = rho[:Nanalyze]
+        
+    return rho_dict
