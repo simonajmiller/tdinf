@@ -56,7 +56,8 @@ def condition(raw_time_dict, raw_data_dict, t_dict, ds_factor=16, f_low=11,
         # Find the nearest sample in H to the designated time t
         i = np.argmin(np.abs(raw_time_dict[ifo] - t_dict[ifo]))
         ir = i % ds_factor
-        print('\nRolling {:s} by {:d} samples'.format(ifo, ir))
+        if verbose:
+            print('\nRolling {:s} by {:d} samples'.format(ifo, ir))
         raw_data = np.roll(raw_data_dict[ifo], -ir)
         raw_time = np.roll(raw_time_dict[ifo], -ir)
         
