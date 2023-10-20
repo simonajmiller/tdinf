@@ -9,26 +9,35 @@ import pandas as pd
 from multiprocessing import Pool
 from contextlib import closing
 import os
-import time_domain_gw_inference.utils as utils
+from time_domain_gw_inference.utils import likelihood as ll
+import time_domain_gw_inference.utils.io as utils
 
-def main():
-    
+
+def create_run_sampler_arg_parser():
     """
     Parse arguments
     """
     p = argparse.ArgumentParser()
 
     # Required args: path to where to save data ...
-    p.add_argument('-o', '--output', help='savename for emcee')
+    p.add_argument('-o', '--output-h5', help='h5 filename for emcee', required=True)
     # ... and whether to run pre-Tcut, post-Tcut, or full (Tstart to Tend)?
-    p.add_argument('-m', '--mode')
-    
+    p.add_argument('-m', '--mode', required=True)
+
     # Place where input data is stored
-    p.add_argument('--data-path', default='../data/input/GW190521_data/{}-{}_GWOSC_16KHZ_R2-1242442952-32.hdf5')
-    p.add_argument('--psd-path', default='../data/input/GW190521_data/glitch_median_PSD_for_LI_{}.dat')
+    p.add_argument('--pe-posterior-h5-file', default=None,
+                   help='posterior file containing pe samples, used only if injected-parameters==None')
+
+    p.add_argument('--data', default=None, required=True,
+                   help='path to data formatted as --data {ifo}:path/To/psd', action='append')
+    p.add_argument('--psd', default=None, required=True,
+                   help='path to data formatted as --psd {ifo}:path/To/psd', action='append')
+
+    # Option to do an injection instead of use real data;
+    p.add_argument('--injected-parameters', default=None)
 
     # Args for cutoff (defined in # of cycles), start, & end times
-    p.add_argument('-t', '--Tcut-cycles', type=float, default=0)  # defaults to the 0 as calculated from peak emission
+    p.add_argument('-t', '--Tcut-cycles', type=float, required=True)
     p.add_argument('--Tstart', type=float, default=1242442966.9077148)
     p.add_argument('--Tend', type=float, default=1242442967.607715)
 
@@ -38,15 +47,11 @@ def main():
     p.add_argument('--flow', type=float, default=11)
     p.add_argument('--fref', type=float, default=11)
     p.add_argument('--ifos', nargs='+', default=['H1', 'L1', 'V1'])
-    
-    # Optional args sampler settings
-    p.add_argument('--nwalkers', type=int, default=200)
-    p.add_argument('--nsteps', type=int, default=1000)
-    p.add_argument('--ncpu', type=int, default=4)
 
-    # Option to do an injection instead of use real data;
-    # if "REALDATA", do not do an injection, else file path to injected parameters
-    p.add_argument('--injected-parameters', default="REALDATA")
+    # Optional args sampler settings
+    p.add_argument('--nwalkers', type=int, default=512)
+    p.add_argument('--nsteps', type=int, default=50000)
+    p.add_argument('--ncpu', type=int, default=4)
 
     # Do we want to run with only the prior?
     p.add_argument('--only-prior', action='store_true')
@@ -58,6 +63,42 @@ def main():
     # Do we want to resume an old run?
     p.add_argument('--resume', action='store_true')
 
+    return p
+
+
+def parse_data_and_psds(args):
+    """
+    Convert command line arguments into dictionaries of paths to PSD and data.
+
+    :param args: Command line arguments parsed by argparse.
+    :return:
+        data_path_dict: Dictionary mapping interferometer names to corresponding data paths.
+        psd_path_dict: Dictionary mapping interferometer names to corresponding PSD paths.
+    """
+    def _split_ifo_from_arg_(argument, ifo, arg_name):
+        prefix = f'{ifo}:'
+        matching_paths = [path.replace(prefix, '') for path in argument if path.startswith(prefix)]
+        if not matching_paths:
+            raise ValueError(
+                f"Error: {ifo} {arg_name} not provided. "
+                f"Either exclude that ifo or add --{arg_name} {ifo}:path/to/{arg_name}")
+        if len(matching_paths) != 1:
+            raise ValueError(
+                f"Error: {ifo} {arg_name} was provided more than once! "
+                f"Please only add --{arg_name} {ifo}:path/to/{arg_name} once")
+        return matching_paths[0]
+
+    data_path_dict = {}
+    psd_path_dict = {}
+    for ifo in args.ifos:
+        data_path_dict[ifo] = _split_ifo_from_arg_(args.data, ifo, 'data')
+        psd_path_dict[ifo] = _split_ifo_from_arg_(args.psd, ifo, 'psd')
+
+    return data_path_dict, psd_path_dict
+
+
+def main():
+    p = create_run_sampler_arg_parser()
     args = p.parse_args()
 
     # Check that the given mode is allowed
@@ -66,27 +107,29 @@ def main():
 
     # Unpack some basic parameters
     ifos = args.ifos
-    psd_path = args.psd_path
-    data_path = args.data_path
-    backend_path = args.output  # where emcee spits its output
+    print("about to load data")
+
+    data_path_dict, psd_path_dict = parse_data_and_psds(args)
+    print("successfully loaded data and psd")
+    print("data is", data_path_dict)
+    pe_posterior_h5_file = args.pe_posterior_h5_file
+    backend_path = args.output_h5  # where emcee spits its output
     f_ref = args.fref
     f_low = args.flow
     ds_factor = args.downsample
 
-    print('')  
+    print('')
 
     """
     Load or generate data
     """
 
     # If real data ...
-    if args.injected_parameters == "REALDATA":
+    if args.injected_parameters is None:
 
         # Load data
-        raw_time_dict, raw_data_dict = utils.load_raw_data(ifos=ifos, path=data_path)
-        pe_input_path = os.path.join(*(data_path.split('/')[:-1]), 
-                                     'GW190521_posterior_samples.h5') ## TODO: change
-        pe_out = utils.get_pe(raw_time_dict, pe_input_path, verbose=False, psd_path=psd_path)
+        raw_time_dict, raw_data_dict = utils.load_raw_data(ifos=ifos, path_dict=data_path_dict)
+        pe_out = utils.get_pe(raw_time_dict, pe_posterior_h5_file, verbose=False, psd_path_dict=psd_path_dict)
         tpeak_geocent, pe_samples, log_prob, pe_psds, skypos = pe_out
 
         # "Injected parameters" = max(P) draw from the samples associated with this data
@@ -119,15 +162,15 @@ def main():
         # PSDs
         pe_psds = {}
         for ifo in ifos:
-            pe_psds[ifo] = np.genfromtxt(psd_path.format(ifo), dtype=float)
+            pe_psds[ifo] = np.genfromtxt(psd_path_dict[ifo], dtype=float)
 
         # Times
-        raw_time_dict = utils.load_raw_data(ifos=ifos, path=data_path)[0]
+        raw_time_dict = utils.load_raw_data(ifos=ifos, path_dict=data_path_dict)[0]
 
         # Injection
         raw_data_dict = utils.injectWaveform(parameters=injected_parameters, time_dict=raw_time_dict,
                                              tpeak_dict=tpeak_dict, ap_dict=ap_dict, skypos=skypos,
-                                             f_ref=f_ref, f_low=f_low)
+                                             f_ref=f_ref, f_low=f_low, approx=args.approx)
 
     ## tcut = cutoff time in waveform
     Ncycles = args.Tcut_cycles  # find truncation time in # number of cycles from peak
@@ -137,7 +180,7 @@ def main():
     else:
         tcut_geocent = utils.get_Tcut_from_Ncycles(Ncycles, parameters=injected_parameters, time_dict=raw_time_dict,
                                                    tpeak_dict=tpeak_dict, ap_dict=ap_dict, skypos=skypos, f_ref=f_ref,
-                                                   f_low=f_low)
+                                                   f_low=f_low, approx=args.approx)
 
     print('\nCutoff time:')
     tcut_dict, _ = utils.get_tgps_and_ap_dicts(tcut_geocent, ifos, skypos['ra'], skypos['dec'], skypos['psi'])
@@ -155,7 +198,7 @@ def main():
     """
 
     # icut = index corresponding to cutoff time
-    time_dict, data_dict, icut_dict = utils.condition(raw_time_dict, raw_data_dict, tcut_dict, ds_factor, f_low)
+    time_dict, data_path_dict, icut_dict = utils.condition(raw_time_dict, raw_data_dict, tcut_dict, ds_factor, f_low)
 
     # Time spacing of data
     dt = time_dict['H1'][1] - time_dict['H1'][0]
@@ -184,7 +227,7 @@ def main():
     for ifo, idx in icut_dict.items():
         # idx = sample closest to desired time
         time_dict[ifo] = time_dict[ifo][idx - Npre:idx + Npost]
-        data_dict[ifo] = data_dict[ifo][idx - Npre:idx + Npost]
+        data_path_dict[ifo] = data_path_dict[ifo][idx - Npre:idx + Npost]
 
     """
     Calculate ACF
@@ -229,28 +272,28 @@ def main():
     """
 
     kwargs = {
-        
+
         'mtot_lim': [200, 350],
         'q_lim': [0.17, 1],
         'chi_lim': [0, 0.99],
         'dist_lim': [1000, 10000],
-        
+
         'approx': args.approx,
         'f_ref': f_ref,
         'f_low': f_low,
         'only_prior': args.only_prior,
         'delta_t': dt,
-        
+
         'ra': skypos['ra'],  # default right ascension if not varied
         'dec': skypos['dec'],  # default declination if not varied
         'psi': skypos['psi'],  # default polarization if not varied
         'tgps_geocent': tpeak_geocent,  # default waveform placement time if not varied
-        
-        'rho_dict':rho_dict, 
-        'time_dict':time_dict, 
-        'data_dict':data_dict, 
-        'ap_dict':ap_dict, 
-        'tpeak_dict':tpeak_dict
+
+        'rho_dict': rho_dict,
+        'time_dict': time_dict,
+        'data_dict': data_path_dict,
+        'ap_dict': ap_dict,
+        'tpeak_dict': tpeak_dict
     }
 
     """
@@ -361,7 +404,7 @@ def main():
     sample_path = backend_path.replace('h5', 'dat')
     df.to_csv(sample_path, sep=' ', index=False)
     print("File saved: %r" % sample_path)
-    
+
 
 if __name__ == "__main__":
     main()
