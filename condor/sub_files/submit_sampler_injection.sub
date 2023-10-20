@@ -16,7 +16,7 @@ universe = vanilla
 arguments = $(Savename) $(RunMode) $(Cycles) $(Nproc) $(Nsteps) $(Nwalkers) $(InjectionPath) $(Fref) $(DataPath) $(PSDPath)
 
 request_cpus = $(Nproc)
-request_memory = 4 GB
+request_memory = 10 GB
 request_disk = 5000
 accounting_group = ligo.dev.o4.cbc.testgr.tiger
 

@@ -5,6 +5,20 @@ from gwpy.timeseries import TimeSeries
 from gwpy.signal import filter_design
 
 """
+Logit transformations, used in likelihood
+"""
+
+def logit(x, xmin=0, xmax=1):
+    return np.log(x - xmin) - np.log(xmax - x)
+
+def inv_logit(y, xmin=0, xmax=1):
+    return (np.exp(y)*xmax + xmin)/(1 + np.exp(y))
+
+def logit_jacobian(x, xmin=0, xmax=1):
+    return 1./(x-xmin) + 1./(xmax-x)
+
+
+"""
 Functions to calculate matched-filter SNR; 
 See Eqs. (50) through (53) of  https://arxiv.org/pdf/2107.05609.pdf
 """
