@@ -186,7 +186,7 @@ def parse_injected_parameters(filepath):
 
 
 def load_posterior_samples(date, run, start_cut, end_cut, pe_output_dir='../../data/output/',
-                          prior_fname='092123_test_prior.dat'): 
+                          prior_fname='prior.dat'): 
     
     """
     Function to load in posterior samples from one of our runs
