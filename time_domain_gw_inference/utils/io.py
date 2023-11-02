@@ -185,22 +185,28 @@ def parse_injected_parameters(filepath):
     return injected_parameters
 
 
-def load_posterior_samples(date, run, start_cut, end_cut, pe_output_dir='../../data/output/',
+def load_posterior_samples(run_name, start_cut, end_cut, pe_output_dir='../../data/output/',
                           prior_fname='prior.dat'): 
     
     """
-    Function to load in posterior samples from one of our runs
+    Function to load in posterior samples from one set of our runs
     """
-
-    # Template for loading 
-    path_template = pe_output_dir + f'{date}_{run}_' + '{0}_{1}cycles.dat'
-
+    
+    modes = ['pre', 'post']
+    
     # Arange all the time slices to load
     dx = 0.5
     cuts_float = np.arange(start_cut, end_cut + 0.5, 0.5)
-    cuts = [int(c) if c.is_integer() else c for c in cuts_float]
-
-    modes = ['pre', 'post']
+    
+    # Template for loading 
+    if run_name=='':
+        path_template = pe_output_dir + '{0}_{1}cycles.dat'
+        cuts = cuts_float
+        path_full = path_template.format('full', '0.0')
+    else:
+        path_template = pe_output_dir + f'{run_name}_' + '{0}_{1}cycles.dat'
+        cuts = [int(c) if c.is_integer() else c for c in cuts_float]
+        path_full = path_template.format('full', '0')
 
     # Dict for file paths 
     paths = {}
@@ -216,7 +222,7 @@ def load_posterior_samples(date, run, start_cut, end_cut, pe_output_dir='../../d
             paths[key] = fname
 
     # Samples from full duration (no time cut)
-    paths['full'] = path_template.format('full', '0')
+    paths['full'] = path_full
 
     # Prior samples
     paths['prior'] = pe_output_dir + prior_fname
