@@ -45,7 +45,7 @@ class AbstractPipelineDAG(abc.ABC):
     def default_condor_settings(self):
         condor_settings = {
             "universe": "vanilla",
-            "when_to_transfer_output": "ON_EXIT_OR_EVICT",
+            "when_to_transfer_output": "ON_EXIT",
             "success_exit_code": 0,
             "getenv": "True",
             "initialdir": os.path.abspath(self.output_directory),
@@ -348,7 +348,7 @@ class RunSamplerLayerManager(AbstractLayerManager):
             "request_memory": "4GB",
             "request_disk": "5000MB",
             "request_cpus": self.argument_parser.get_default('ncpu'),
-            "when_to_transfer_output": "ON_EXIT_OR_EVICT",
+            "when_to_transfer_output": "ON_EXIT",
         }
         run_options = self.get_run_options()
         N_cpu = get_option_from_list('ncpu', run_options)
