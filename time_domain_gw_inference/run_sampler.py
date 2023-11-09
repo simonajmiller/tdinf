@@ -204,13 +204,19 @@ def main():
     """
     Arguments for the posterior function
     """
+    
+    # configure distance prior
+    inj_dist_log = np.log10(injected_parameters['luminosity_distance'])
+    min_dist_prior = int(np.power(10, np.floor(inj_dist_log-1)))
+    max_dist_prior = min(10000, int(np.power(10, np.ceil(inj_dist_log+1)))) # cap max distance at 10000 MPc
 
+    # put all arguments into a dict
     kwargs = {
 
         'mtot_lim': [200, 350],
         'q_lim': [0.17, 1],
         'chi_lim': [0, 0.99],
-        'dist_lim': [1000, 10000],
+        'dist_lim': [min_dist_prior, max_dist_prior],
 
         'approx': args.approx,
         'f_ref': f_ref,
