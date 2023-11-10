@@ -259,8 +259,14 @@ def main():
 
     # Resume if we want
     if args.resume and os.path.isfile(backend_path):
+        
         # Load in last sample to use as the new starting walkers
         p0 = backend.get_last_sample()
+        
+        # adjust number of steps
+        nsteps_already_taken = backend.get_chain().shape[0]
+        nsteps = nsteps - nsteps_already_taken
+        
     else:
         # Reset the backend
         backend.reset(nwalkers, ndim)
@@ -300,7 +306,6 @@ def main():
     Run sampler
     """
 
-    # Now we'll sample for up to max_n steps
     print("Running with %i cores." % args.ncpu)
     with closing(Pool(processes=args.ncpu)) as pool:
 
@@ -308,26 +313,30 @@ def main():
                                         backend=backend, pool=pool,
                                         runtime_sortingfn=sort_on_runtime,
                                         kwargs=kwargs)
+        
+        # If there are still iterations left to run ... 
+        if nsteps > 0:
+            
+            # Cycle through remaining iterations
+            for sample in sampler.sample(p0, iterations=nsteps, progress=True):
 
-        for sample in sampler.sample(p0, iterations=nsteps, progress=True):
+                # Only check convergence every 100 steps
+                if sampler.iteration % 100:
+                    continue
 
-            # Only check convergence every 100 steps
-            if sampler.iteration % 100:
-                continue
+                # Compute the autocorrelation time so far
+                # Using tol=0 means that we'll always get an estimate even
+                # if it isn't trustworthy
+                tau = sampler.get_autocorr_time(tol=0)
+                autocorr[index] = np.mean(tau)
+                index += 1
 
-            # Compute the autocorrelation time so far
-            # Using tol=0 means that we'll always get an estimate even
-            # if it isn't trustworthy
-            tau = sampler.get_autocorr_time(tol=0)
-            autocorr[index] = np.mean(tau)
-            index += 1
-
-            # Check convergence
-            converged = np.all(tau * 100 < sampler.iteration)
-            converged &= np.all(np.abs(old_tau - tau) / tau < 0.01)
-            if converged:
-                break  # if convergence reached before nsteps, stop running
-            old_tau = tau
+                # Check convergence
+                converged = np.all(tau * 100 < sampler.iteration)
+                converged &= np.all(np.abs(old_tau - tau) / tau < 0.01)
+                if converged:
+                    break  # if convergence reached before nsteps, stop running
+                old_tau = tau
 
         pool.terminate()
 
