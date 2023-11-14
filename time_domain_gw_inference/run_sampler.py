@@ -141,10 +141,7 @@ def main():
 
     ## tcut = cutoff time in waveform
     Ncycles = args.Tcut_cycles  # find truncation time in # number of cycles from peak
-    if Ncycles == 0: # if 0, cut = peak
-        tcut_geocent = tpeak_geocent
-    else:
-        tcut_geocent = utils.get_Tcut_from_Ncycles(Ncycles, parameters=injected_parameters, time_dict=raw_time_dict,
+    tcut_geocent = utils.get_Tcut_from_Ncycles(Ncycles, parameters=injected_parameters, time_dict=raw_time_dict,
                                                    tpeak_dict=tpeak_dict, ap_dict=ap_dict, skypos=skypos, f_ref=f_ref,
                                                    f_low=f_low, approx=args.approx)
 
