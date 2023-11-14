@@ -9,6 +9,7 @@ import pandas as pd
 from multiprocessing import Pool
 from contextlib import closing
 import os
+import sys
 import time_domain_gw_inference.utils as utils
 
 
@@ -275,6 +276,23 @@ def main():
         # (code sees unit scale quantities; use logit transformations
         # to take boundaries to +/- infinity)
         p0_arr = np.asarray([[np.random.normal() for j in range(ndim)] for i in range(nwalkers)])
+        
+        # replace some parameters (masses, spin mag, distance) in tight balls around their injected values
+        for p, param_kw, lim_kw in zip(range(5), ['mtot', 'q', 'a_1', 'a_2', 'luminosity_distance'], 
+                                    ['mtot_lim', 'q_lim', 'chi_lim', 'chi_lim', 'dist_lim']):
+            # get physical parameter
+            if param_kw=='mtot': 
+                param_phys = injected_parameters['mass_1'] + injected_parameters['mass_2']
+            elif param_kw=='q': 
+                param_phys = injected_parameters['mass_2'] / injected_parameters['mass_1']
+            else:
+                param_phys = injected_parameters[param_kw]
+            
+            # transform into logistic space
+            param_logit = utils.logit(param_phys, * kwargs[lim_kw])
+            
+            # draw gaussian ball in logistic space
+            p0_arr[:,p] = np.asarray([np.random.normal(loc=param_logit, scale=0.05) for i in range(nwalkers)])
 
         # if time of coalescence sampled over need to include this separately since it isn't a unit scaled quantity
         if args.vary_time:

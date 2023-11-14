@@ -18,6 +18,7 @@ def logit_jacobian(x, xmin=0, xmax=1):
     return 1./(x-xmin) + 1./(xmax-x)
 
 
+
 """
 Functions to calculate matched-filter SNR; 
 See Eqs. (50) through (53) of  https://arxiv.org/pdf/2107.05609.pdf
@@ -86,35 +87,6 @@ def unit_vector(v):
 """
 Other miscellaneous functions
 """
-
-
-# def get_pycbc_PSD(filename, f_low, delta_f, sampling_freq=1024):
-
-#     """
-#     Load in power spectral density from a file
-
-#     Parameters
-#     ----------
-#     filename : string
-#         path to the text file containing the psd
-#     f_low : float
-#         the lower frequency of the psd
-#     delta_f : float
-#         the frequency spacing of the psd
-#     sampling_freq : float (optional)
-#         the sampling frequency of the data the psd is for; defaults to 1024 Hz
-
-#     Returns
-#     -------
-#     psd : pycbc.types.frequencyseries.FrequencySeries
-#         the power spectral density as a pycbc frequency series 
-#     """
-
-#     # The PSD will be interpolated to the requested frequency spacing
-#     length = int(sampling_freq / delta_f)
-#     psd = pycbc.psd.from_txt(filename, length, delta_f, f_low, is_asd_file=False)
-#     return psd
-
 
 def bandpass(h, times, fmin, fmax):
     """

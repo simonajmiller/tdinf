@@ -12,9 +12,8 @@ except:
     from . import reconstructwf as rwf
     from .spins_and_masses import m1m2_from_mtotq
     from .misc import logit, inv_logit, logit_jacobian
-
-
-
+    
+    
 def samp_to_phys(x, **kws):
     if len(x) == 14:
         # default
@@ -75,6 +74,7 @@ def samp_to_phys(x, **kws):
     phi_ref = np.arctan2(phi_y, phi_x)
 
     return mtot, q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, dist_mpc, phi_ref, iota, ra, dec, psi, tgps_geocent
+
 
 
 '''
