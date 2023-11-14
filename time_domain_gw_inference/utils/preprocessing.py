@@ -161,13 +161,28 @@ def get_Tcut_from_Ncycles(Ncycles, **kwargs):
     t_cycles_H1 = times[idxs]
     
     # Get the cycle we care about
-    i0 = np.argmax(np.abs(h_H1[idxs])) # index corresponding to merger (absolute peak time)
+    i0 = np.argmax(np.abs(h_H1[idxs])) # index corresponding to tcut=0 (absolute peak time)
     n_i = 2*Ncycles                    # one index = 1/2 cycle
-    assert(n_i.is_integer()), '# of half cycles does not correspond to an integer value'
-    icut = i0 + int(n_i)               # index corresponding to the cycle we care about
+
+    # If the desired cycle cut is at a peak/trough ...
+    if n_i.is_integer():
+        
+        icut = i0 + int(n_i)           # index corresponding to the cycle we care about
+
+        # Get time in H1
+        tcut_H1 = t_cycles_H1[icut]
     
-    # Get time in H1
-    tcut_H1 = t_cycles_H1[icut]
+    # Otherwise, linearly interpolate between nearest peak and trough  
+    else: 
+        # Our desired cut sits between these two times 
+        tcut_H1_min = t_cycles_H1[i0 + int(np.floor(n_i))]
+        tcut_H1_max = t_cycles_H1[i0 + int(np.ceil(n_i))]
+
+        # How far between the extrema?
+        frac_between = n_i - np.floor(n_i)
+
+        # Interpolate
+        tcut_H1 = tcut_H1_min + frac_between*(tcut_H1_max - tcut_H1_min)
     
     # Get geocenter time
     skypos = kwargs['skypos']
