@@ -134,7 +134,7 @@ def injectWaveform(**kwargs):
         # Time align 
         h = rwf.generate_lal_waveform(hplus=hp, hcross=hc, times=time_dict[ifo], triggertime=tpeak_dict[ifo])
 
-        # Project onto H1
+        # Project using antenna partterns
         Fp, Fc = ap_dict[ifo]
         h_ifo = Fp*h.real - Fc*h.imag
         
