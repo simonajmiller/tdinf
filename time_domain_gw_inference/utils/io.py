@@ -185,7 +185,7 @@ def parse_injected_parameters(filepath):
     return injected_parameters
 
 
-def load_posterior_samples(run_name, start_cut, end_cut, pe_output_dir='../../data/output/',
+def load_posterior_samples(run_name, start_cut, end_cut, dx=0.5, pe_output_dir='../../data/output/',
                           prior_fname='prior.dat'): 
     
     """
@@ -195,8 +195,7 @@ def load_posterior_samples(run_name, start_cut, end_cut, pe_output_dir='../../da
     modes = ['pre', 'post']
     
     # Arange all the time slices to load
-    dx = 0.5
-    cuts_float = np.arange(start_cut, end_cut + 0.5, 0.5)
+    cuts_float = np.arange(start_cut, end_cut + dx, dx)
     
     # Template for loading 
     if run_name=='':
