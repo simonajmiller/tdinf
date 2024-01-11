@@ -25,8 +25,9 @@ def create_run_sampler_arg_parser():
     # Whether to run pre-Tcut, post-Tcut, or full (Tstart to Tend)?
     p.add_argument('-m', '--mode', required=True)
     
-    # Args for cutoff (defined in # of cycles), start, & end times
-    p.add_argument('-t', '--Tcut-cycles', type=float, required=True)
+    # Args for cutoff (defined in # of cycles OR seconds; up to user), start, & end times
+    p.add_argument('-t', '--Tcut-cycles', type=float, required=False)
+    p.add_argument('-ts', '--Tcut-seconds', type=float, required=False)
     p.add_argument('--Tstart', type=float, default=1242442966.9077148)
     p.add_argument('--Tend', type=float, default=1242442967.607715)
 
@@ -71,6 +72,9 @@ def main():
     # Parse the commandline arguments
     p = create_run_sampler_arg_parser()
     args = p.parse_args()
+    
+    # Check that a cutoff time is given either in seconds or cycles 
+    assert args.Tcut_cycles is not None or args.Tcut_seconds is not None, "must give a cutoff time"
 
     # Check that the given mode is allowed
     run_mode = args.mode
@@ -140,10 +144,15 @@ def main():
                                              f_ref=f_ref, f_low=f_low, approx=args.approx)
 
     ## tcut = cutoff time in waveform
-    Ncycles = args.Tcut_cycles  # find truncation time in # number of cycles from peak
-    tcut_geocent = utils.get_Tcut_from_Ncycles(Ncycles, parameters=injected_parameters, time_dict=raw_time_dict,
-                                                   tpeak_dict=tpeak_dict, ap_dict=ap_dict, skypos=skypos, f_ref=f_ref,
-                                                   f_low=f_low, approx=args.approx)
+    if args.Tcut_seconds is not None: 
+        # option 1: truncation time given in seconds already
+        tcut_geocent = args.Tcut_seconds
+    else: 
+        # option 2: find truncation time based off of # number of cycles from peak
+        Ncycles = args.Tcut_cycles 
+        tcut_geocent = utils.get_Tcut_from_Ncycles(Ncycles, parameters=injected_parameters, time_dict=raw_time_dict,
+                                                       tpeak_dict=tpeak_dict, ap_dict=ap_dict, skypos=skypos, f_ref=f_ref,
+                                                       f_low=f_low, approx=args.approx) 
 
     print('\nCutoff time:')
     tcut_dict, _ = utils.get_tgps_and_ap_dicts(tcut_geocent, ifos, skypos['ra'], skypos['dec'], skypos['psi'])
