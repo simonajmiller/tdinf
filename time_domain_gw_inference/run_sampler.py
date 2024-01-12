@@ -25,9 +25,11 @@ def create_run_sampler_arg_parser():
     # Whether to run pre-Tcut, post-Tcut, or full (Tstart to Tend)?
     p.add_argument('-m', '--mode', required=True)
     
-    # Args for cutoff (defined in # of cycles OR seconds; up to user), start, & end times
-    p.add_argument('-t', '--Tcut-cycles', type=float, required=False)
-    p.add_argument('-ts', '--Tcut-seconds', type=float, required=False)
+    # Args for cutoff (defined in # of cycles OR seconds from merger; up to user)
+    p.add_argument('-t', '--Tcut-cycles', type=float, default=None)
+    p.add_argument('-ts', '--Tcut-seconds', type=float, default=None)
+    
+    # Start & end times for segment of data to analyze
     p.add_argument('--Tstart', type=float, default=1242442966.9077148)
     p.add_argument('--Tend', type=float, default=1242442967.607715)
 
@@ -73,7 +75,7 @@ def main():
     p = create_run_sampler_arg_parser()
     args = p.parse_args()
     
-    # Check that a cutoff time is given either in seconds or cycles 
+    # Check that a cutoff time is given
     assert args.Tcut_cycles is not None or args.Tcut_seconds is not None, "must give a cutoff time"
 
     # Check that the given mode is allowed
@@ -146,7 +148,7 @@ def main():
     ## tcut = cutoff time in waveform
     if args.Tcut_seconds is not None: 
         # option 1: truncation time given in seconds already
-        tcut_geocent = args.Tcut_seconds
+        tcut_geocent = tpeak_geocent + args.Tcut_seconds
     else: 
         # option 2: find truncation time based off of # number of cycles from peak
         Ncycles = args.Tcut_cycles 
