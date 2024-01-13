@@ -102,7 +102,8 @@ def main():
 
         # Load data
         raw_time_dict, raw_data_dict = utils.load_raw_data(ifos=ifos, path_dict=data_path_dict)
-        pe_out = utils.get_pe(raw_time_dict, pe_posterior_h5_file, verbose=False, psd_path_dict=psd_path_dict)
+        pe_out = utils.get_pe(raw_time_dict, pe_posterior_h5_file, verbose=False, psd_path_dict=psd_path_dict, 
+                             f_ref=f_ref, f_low=f_low)
         tpeak_geocent, pe_samples, log_prob, pe_psds, skypos = pe_out
 
         # "Injected parameters" = max(P) draw from the samples associated with this data
@@ -219,10 +220,15 @@ def main():
     min_dist_prior = int(np.power(10, np.floor(inj_dist_log-1)))
     max_dist_prior = min(10000, int(np.power(10, np.ceil(inj_dist_log+1)))) # cap max distance at 10000 MPc
 
+    # configure mass prior 
+    inj_mtot = injected_parameters['mass_1'] + injected_parameters['mass_1']
+    min_mass = inj_mtot - 50
+    max_mass = inj_mtot + 50 ## TO DO: change this 
+
     # put all arguments into a dict
     kwargs = {
 
-        'mtot_lim': [200, 350],
+        'mtot_lim': [min_mass, max_mass],
         'q_lim': [0.17, 1],
         'chi_lim': [0, 0.99],
         'dist_lim': [min_dist_prior, max_dist_prior],
@@ -284,6 +290,8 @@ def main():
         # (code sees unit scale quantities; use logit transformations
         # to take boundaries to +/- infinity)
         p0_arr = np.asarray([[np.random.normal() for j in range(ndim)] for i in range(nwalkers)])
+
+        print(p0_arr)
         
         # replace some parameters (masses, spin mag, distance) in tight balls around their injected values
         for p, param_kw, lim_kw in zip(range(5), ['mtot', 'q', 'a_1', 'a_2', 'luminosity_distance'], 

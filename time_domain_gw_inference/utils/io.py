@@ -39,6 +39,16 @@ def parse_data_and_psds(args):
     return data_path_dict, psd_path_dict
 
 
+def hdf5_to_dict(hdf5_group):
+    result_dict = {}
+    for key, item in hdf5_group.items():
+        if isinstance(item, h5py.Group):
+            result_dict[key] = hdf5_to_dict(item)
+        else:
+            result_dict[key] = item[()]  # Convert dataset to NumPy array
+    return result_dict
+
+
 def load_raw_data(path_dict, ifos=('H1', 'L1', 'V1'), verbose=True):
     """
     Load in raw interferometer timeseries strain data
@@ -65,12 +75,21 @@ def load_raw_data(path_dict, ifos=('H1', 'L1', 'V1'), verbose=True):
     raw_data_dict = {}
 
     for ifo in ifos:
-        # for real data downloaded from gwosc...
-        with h5py.File(path_dict[ifo], 'r') as f:
-            strain = np.array(f['strain/Strain'])
-            T0 = f['meta/GPSstart'][()]
-            ts = T0 + np.arange(len(strain)) * f['meta/Duration'][()] / len(strain)
 
+        try: 
+            # for real data downloaded from gwosc...
+            with h5py.File(path_dict[ifo], 'r') as f:
+                strain = np.array(f['strain/Strain'])
+                T0 = f['meta/GPSstart'][()]
+                ts = T0 + np.arange(len(strain)) * f['meta/Duration'][()] / len(strain)
+        except: 
+            # for other data 
+            with h5py.File(path_dict[ifo], 'r') as f:
+                # Convert the HDF5 file to a dictionary
+                data = hdf5_to_dict(f)
+                strain = data['strain']
+                ts = data['times']
+                
         raw_time_dict[ifo] = ts
         raw_data_dict[ifo] = strain
 
@@ -119,12 +138,23 @@ def get_pe(raw_time_dict, path, psd_path_dict=None, verbose=True, f_ref=11, f_lo
         posterior sample
     """
 
+    
     # Interferometer names 
     ifos = list(raw_time_dict.keys())
 
+    ## ------------------------------------------------------------------
+    ## TO DO: Standardize this function instead of using if else statements 
+
     # Load in posterior samples
     with h5py.File(path, 'r') as f:
-        pe_samples = f['NRSur7dq4']['posterior_samples'][()]
+        try:
+            pe_samples = f['NRSur7dq4']['posterior_samples'][()]
+        except: 
+            # hdf5 --> dict
+            pe_samples_dict = hdf5_to_dict(f)['posterior']
+            # dict --> a structured array with labels
+            pe_samples = np.rec.fromarrays([pe_samples_dict[key] for key in pe_samples_dict],
+                                           names=list(pe_samples_dict.keys()))
 
     # Load in PSDs
     pe_psds = {}
@@ -135,6 +165,7 @@ def get_pe(raw_time_dict, path, psd_path_dict=None, verbose=True, f_ref=11, f_lo
     else:
         for ifo in ifos:
             pe_psds[ifo] = np.genfromtxt(psd_path_dict[ifo], dtype=float)
+    ## ------------------------------------------------------------------
 
     # Find sample where posterior is maximized
     log_prob = pe_samples['log_likelihood'] + pe_samples['log_prior']
