@@ -202,6 +202,11 @@ def main():
     """
     Arguments for the posterior function
     """
+
+    # configure mass prior
+    inj_mtot = injected_parameters['mass_1'] + injected_parameters['mass_2']
+    max_mass_prior = np.ceil(inj_mtot + 100)
+    min_mass_prior = np.maximum(np.floor(inj_mtot - 100), 5)
     
     # configure distance prior
     inj_dist_log = np.log10(injected_parameters['luminosity_distance'])
@@ -211,7 +216,7 @@ def main():
     # put all arguments into a dict
     kwargs = {
 
-        'mtot_lim': [200, 350],
+        'mtot_lim': [min_mass_prior, max_mass_prior],
         'q_lim': [0.17, 1],
         'chi_lim': [0, 0.99],
         'dist_lim': [min_dist_prior, max_dist_prior],
