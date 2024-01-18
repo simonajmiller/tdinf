@@ -187,11 +187,7 @@ class AbstractPipelineDAG(abc.ABC):
 @dataclass
 class RunSamplerDag(AbstractPipelineDAG):
     cycle_list: List[float]
-    """
-    A class for creating a DAG for a single event BayesWave pipeline where the data
-    does not depend on the model settings
-    Will not matter if the data is real or simulated
-    """
+    times_list: List[float]
 
     @staticmethod
     def _copy_file_to_directory_and_return_new_name_(file, target_directory, relative_path=None):
@@ -255,16 +251,26 @@ class RunSamplerDag(AbstractPipelineDAG):
                                                         self.executables['run_sampler'],
                                                         self.condor_settings,
                                                         additional_options=data_options)
+        if len(self.cycle_list) > 0:
+            for cycle in self.cycle_list:
+                if cycle == 0:
+                    run_modes = ['full', 'pre', 'post']
+                else:
+                    run_modes = ['pre', 'post']
 
-        for cycle in self.cycle_list:
-            if cycle == 0:
-                run_modes = ['full', 'pre', 'post']
-            else:
-                run_modes = ['pre', 'post']
+                for run_mode in run_modes:
+                    runSamplerLayerManager.add_job(run_mode, cycle, 'cycles')
+                    
+        if len(self.times_list) > 0:
+            for time in self.times_list:
+                if time == 0:
+                    run_modes = ['full', 'pre', 'post']
+                else:
+                    run_modes = ['pre', 'post']
 
-            for run_mode in run_modes:
-                runSamplerLayerManager.add_job(run_mode, cycle)
-
+                for run_mode in run_modes:
+                    runSamplerLayerManager.add_job(run_mode, time, 'times') 
+             
         dag.attach(runSamplerLayerManager.layer)
 
 
@@ -363,8 +369,8 @@ class RunSamplerLayerManager(AbstractLayerManager):
         return create_run_sampler_arg_parser()
 
     @staticmethod
-    def get_output_filename_prefix(run_mode, cycles):
-        return f'{run_mode}_{cycles}cycles'
+    def get_output_filename_prefix(run_mode, cutoff, unit):
+        return f'{run_mode}_{cutoff}{unit}'
 
     def get_run_options(self, additional_options=None, **kwargs) -> List[Option]:
         """
@@ -386,28 +392,40 @@ class RunSamplerLayerManager(AbstractLayerManager):
         # Since we have already transferred the input into the data_directory, we just need to pass data_directory
         return [Option('data-directory', 'data_directory', suppress=True)]
 
-    def get_outputs(self, run_mode, cycles):
-        dat_file = f'{self.get_output_filename_prefix(run_mode, cycles)}.dat'
-        h5_file = f'{self.get_output_filename_prefix(run_mode, cycles)}.h5'
+    def get_outputs(self, run_mode, cutoff, unit):
+        dat_file = f'{self.get_output_filename_prefix(run_mode, cutoff, unit)}.dat'
+        h5_file = f'{self.get_output_filename_prefix(run_mode, cutoff, unit)}.h5'
         return [Option('dat_file', dat_file, suppress=True), Option('output-h5', h5_file)]
 
-    def add_job(self, run_mode, cycles, additional_options=None) -> None:
+    def add_job(self, run_mode, cutoff, cutoff_mode, additional_options=None) -> None:
         run_options = self.get_run_options(additional_options)
         run_options.append(Option('mode', run_mode))
-        run_options.append(Option('Tcut-cycles', cycles))
+        
+        if cutoff_mode=='cycles':
+            run_options.append(Option('Tcut-cycles', cutoff))
+            unit = 'cycles'
+            
+        elif cutoff_mode=='times':
+            run_options.append(Option('Tcut-seconds', cutoff))
+            unit = 'seconds'
+            
+        else: 
+            raise AssertionError("cutoff mode must be either 'cycles' or 'times'")
 
         inputs = self.get_inputs()
-        outputs = self.get_outputs(run_mode, cycles)
+        outputs = self.get_outputs(run_mode, cutoff, unit)
 
         self.layer += Node(
             arguments=run_options,
             inputs=inputs,
             outputs=outputs,
-            variables={'run_prefix': self.get_output_filename_prefix(run_mode, cycles)}
+            variables={'run_prefix': self.get_output_filename_prefix(run_mode, cutoff, unit)}
         )
 
 
 if __name__ == "__main__":
+    
+    # Set up arg parser
     parser = argparse.ArgumentParser(description="Generate and optionally submit a Condor DAG for the "
                                                  "time_domain_gw_inference pipeline "
                                                  "pipeline.")
@@ -415,16 +433,25 @@ if __name__ == "__main__":
     parser.add_argument("--output_directory", required=True,
                         help="The path to the output directory that contains the dag files, config file, submit "
                              "script, and run_sampler output files")
-    parser.add_argument("--cycle_list", required=True, nargs='+', type=float,
-                        help="Cycles before merger to cut data at, e.g. --cycle_list -3 0 1")  # TODO describe better
-
+    parser.add_argument("--cycle_list", required=False, nargs='+', type=float,
+                        help="Cycles before merger to cut data at, e.g. --cycle_list -3 0 1") 
+    parser.add_argument("--times_list", required=False, nargs='+', type=float,
+                        help="Times in seconds before merger to cut data at, e.g. --times_list -0.001 0 0.2")
     parser.add_argument("--submit", action="store_true", help="Submit the DAG to Condor (NOT IMPLEMENTED YET))")
     args = parser.parse_args()
+    
+    # Check that inputs are right
+    assert args.cycle_list is not None or args.times_list is not None, "must give a list of cutoffs"
 
     if not os.path.isfile(args.config_file):
         raise FileNotFoundError(f"Config file '{args.config_file}' not found.")
-
+    
+    # Format cutoff times and/or cycles
+    cutoff_cycles = args.cycle_list if args.cycle_list is not None else []
+    cutoff_times = args.times_list if args.times_list is not None else []
+    
+    # Create dag file
     pipeline_dag = RunSamplerDag(args.output_directory, args.config_file, args.submit,
-                                 cycle_list=args.cycle_list)
+                                 cycle_list=cutoff_cycles, times_list=cutoff_times)
 
     pipeline_dag.create_pipeline_dag()

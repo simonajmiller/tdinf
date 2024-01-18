@@ -1,8 +1,8 @@
 import numpy as np
 from scipy.stats import gaussian_kde
-# import pycbc.psd
 from gwpy.timeseries import TimeSeries
 from gwpy.signal import filter_design
+import scipy.linalg as sl
 
 """
 Logit transformations, used in likelihood

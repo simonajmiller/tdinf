@@ -25,8 +25,11 @@ def create_run_sampler_arg_parser():
     # Whether to run pre-Tcut, post-Tcut, or full (Tstart to Tend)?
     p.add_argument('-m', '--mode', required=True)
     
-    # Args for cutoff (defined in # of cycles), start, & end times
-    p.add_argument('-t', '--Tcut-cycles', type=float, required=True)
+    # Args for cutoff (defined in # of cycles OR seconds from merger; up to user)
+    p.add_argument('-t', '--Tcut-cycles', type=float, default=None)
+    p.add_argument('-ts', '--Tcut-seconds', type=float, default=None)
+    
+    # Start & end times for segment of data to analyze
     p.add_argument('--Tstart', type=float, default=1242442966.9077148)
     p.add_argument('--Tend', type=float, default=1242442967.607715)
 
@@ -71,6 +74,9 @@ def main():
     # Parse the commandline arguments
     p = create_run_sampler_arg_parser()
     args = p.parse_args()
+    
+    # Check that a cutoff time is given
+    assert args.Tcut_cycles is not None or args.Tcut_seconds is not None, "must give a cutoff time"
 
     # Check that the given mode is allowed
     run_mode = args.mode
@@ -96,7 +102,8 @@ def main():
 
         # Load data
         raw_time_dict, raw_data_dict = utils.load_raw_data(ifos=ifos, path_dict=data_path_dict)
-        pe_out = utils.get_pe(raw_time_dict, pe_posterior_h5_file, verbose=False, psd_path_dict=psd_path_dict)
+        pe_out = utils.get_pe(raw_time_dict, pe_posterior_h5_file, verbose=False, psd_path_dict=psd_path_dict, 
+                             f_ref=f_ref, f_low=f_low)
         tpeak_geocent, pe_samples, log_prob, pe_psds, skypos = pe_out
 
         # "Injected parameters" = max(P) draw from the samples associated with this data
@@ -140,10 +147,15 @@ def main():
                                              f_ref=f_ref, f_low=f_low, approx=args.approx)
 
     ## tcut = cutoff time in waveform
-    Ncycles = args.Tcut_cycles  # find truncation time in # number of cycles from peak
-    tcut_geocent = utils.get_Tcut_from_Ncycles(Ncycles, parameters=injected_parameters, time_dict=raw_time_dict,
-                                                   tpeak_dict=tpeak_dict, ap_dict=ap_dict, skypos=skypos, f_ref=f_ref,
-                                                   f_low=f_low, approx=args.approx)
+    if args.Tcut_seconds is not None: 
+        # option 1: truncation time given in seconds already
+        tcut_geocent = tpeak_geocent + args.Tcut_seconds
+    else: 
+        # option 2: find truncation time based off of # number of cycles from peak
+        Ncycles = args.Tcut_cycles 
+        tcut_geocent = utils.get_Tcut_from_Ncycles(Ncycles, parameters=injected_parameters, time_dict=raw_time_dict,
+                                                       tpeak_dict=tpeak_dict, ap_dict=ap_dict, skypos=skypos, f_ref=f_ref,
+                                                       f_low=f_low, approx=args.approx) 
 
     print('\nCutoff time:')
     tcut_dict, _ = utils.get_tgps_and_ap_dicts(tcut_geocent, ifos, skypos['ra'], skypos['dec'], skypos['psi'])
@@ -213,10 +225,19 @@ def main():
     min_dist_prior = int(np.power(10, np.floor(inj_dist_log-1)))
     max_dist_prior = min(10000, int(np.power(10, np.ceil(inj_dist_log+1)))) # cap max distance at 10000 MPc
 
+    # configure mass prior 
+    inj_mtot = injected_parameters['mass_1'] + injected_parameters['mass_1']
+    min_mass = inj_mtot - 50
+    max_mass = inj_mtot + 50 ## TO DO: change this 
+
     # put all arguments into a dict
     kwargs = {
 
+<<<<<<< HEAD
         'mtot_lim': [min_mass_prior, max_mass_prior],
+=======
+        'mtot_lim': [min_mass, max_mass],
+>>>>>>> a798fa156e536747813d5a25682075ac33d2bf4f
         'q_lim': [0.17, 1],
         'chi_lim': [0, 0.99],
         'dist_lim': [min_dist_prior, max_dist_prior],
@@ -278,6 +299,8 @@ def main():
         # (code sees unit scale quantities; use logit transformations
         # to take boundaries to +/- infinity)
         p0_arr = np.asarray([[np.random.normal() for j in range(ndim)] for i in range(nwalkers)])
+
+        print(p0_arr)
         
         # replace some parameters (masses, spin mag, distance) in tight balls around their injected values
         for p, param_kw, lim_kw in zip(range(5), ['mtot', 'q', 'a_1', 'a_2', 'luminosity_distance'], 
