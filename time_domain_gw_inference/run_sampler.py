@@ -225,19 +225,9 @@ def main():
     min_dist_prior = int(np.power(10, np.floor(inj_dist_log-1)))
     max_dist_prior = min(10000, int(np.power(10, np.ceil(inj_dist_log+1)))) # cap max distance at 10000 MPc
 
-    # configure mass prior 
-    inj_mtot = injected_parameters['mass_1'] + injected_parameters['mass_1']
-    min_mass = inj_mtot - 50
-    max_mass = inj_mtot + 50 ## TO DO: change this 
-
     # put all arguments into a dict
     kwargs = {
-
-<<<<<<< HEAD
         'mtot_lim': [min_mass_prior, max_mass_prior],
-=======
-        'mtot_lim': [min_mass, max_mass],
->>>>>>> a798fa156e536747813d5a25682075ac33d2bf4f
         'q_lim': [0.17, 1],
         'chi_lim': [0, 0.99],
         'dist_lim': [min_dist_prior, max_dist_prior],
