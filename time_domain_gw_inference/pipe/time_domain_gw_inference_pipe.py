@@ -351,7 +351,7 @@ class RunSamplerLayerManager(AbstractLayerManager):
     def condor_settings(self):
         condor_settings = self.shared_condor_settings
         additional_settings = {
-            "request_memory": "4GB",
+            "request_memory": "8GB",
             "request_disk": "5000MB",
             "request_cpus": self.argument_parser.get_default('ncpu'),
             "when_to_transfer_output": "ON_EXIT",
