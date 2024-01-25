@@ -4,7 +4,6 @@ import lal
 import lalsimulation
 import os
 
-os.environ["LAL_DATA_PATH"] = os.path.join(os.environ['HOME'], 'lalsuite-extra/data/lalsimulation')
 import scipy.signal as sig
 import sys
 
