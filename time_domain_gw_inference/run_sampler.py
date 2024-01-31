@@ -69,6 +69,184 @@ def create_run_sampler_arg_parser():
     return p
 
 
+def initialize_kwargs(args):
+    # Check that a cutoff time is given
+    assert args.Tcut_cycles is not None or args.Tcut_seconds is not None, "must give a cutoff time"
+
+    # Check that the given mode is allowed
+    run_mode = args.mode
+    assert run_mode in ['full', 'pre', 'post'], f"mode must be 'full', 'pre', or 'post'. given mode = '{run_mode}'."
+
+    # Unpack some basic parameters
+    ifos = args.ifos
+    data_path_dict, psd_path_dict = utils.parse_data_and_psds(args)
+    pe_posterior_h5_file = args.pe_posterior_h5_file
+    backend_path = args.output_h5  # where emcee spits its output
+    f_ref = args.fref
+    f_low = args.flow
+    ds_factor = args.downsample
+
+    print('')
+
+    """
+    Load or generate data
+    """
+
+    # If real data ...
+    if args.injected_parameters is None:
+
+        # Load data
+        raw_time_dict, raw_data_dict = utils.load_raw_data(ifos=ifos, path_dict=data_path_dict)
+        pe_out = utils.get_pe(raw_time_dict, pe_posterior_h5_file, verbose=False, psd_path_dict=psd_path_dict,
+                              f_ref=f_ref, f_low=f_low)
+        tpeak_geocent, pe_samples, log_prob, pe_psds, skypos = pe_out
+
+        # "Injected parameters" = max(P) draw from the samples associated with this data
+        injected_parameters = pe_samples[np.argmax(log_prob)]
+
+        ## tpeak = placement of waveform
+        print('\nWaveform placement time:')
+        tpeak_dict, ap_dict = utils.get_tgps_and_ap_dicts(tpeak_geocent, ifos, skypos['ra'], skypos['dec'],
+                                                          skypos['psi'])
+
+    # Else, generate an injection (currently, only set up for no noise case)
+    else:
+
+        # Load in injected parameters
+        injected_parameters = utils.parse_injected_parameters(args.injected_parameters)
+
+        # Check that the reference freqs line up
+        err_msg = f"Injection fref={injected_parameters['f_ref']} does not equal sampler fref={f_ref}"
+        assert injected_parameters['f_ref'] == f_ref, err_msg
+
+        # Triggertime and sky position
+        tpeak_geocent = injected_parameters['geocent_time']
+        skypos = {k: injected_parameters[k] for k in ['ra', 'dec', 'psi']}
+
+        ## tpeak = placement of waveform
+        print('\nWaveform placement time:')
+        tpeak_dict, ap_dict = utils.get_tgps_and_ap_dicts(tpeak_geocent, ifos, skypos['ra'], skypos['dec'],
+                                                          skypos['psi'])
+
+        # PSDs
+        pe_psds = {}
+        for ifo in ifos:
+            pe_psds[ifo] = np.genfromtxt(psd_path_dict[ifo], dtype=float)
+
+        # Times
+        raw_time_dict = utils.load_raw_data(ifos=ifos, path_dict=data_path_dict)[0]
+
+        # Injection
+        raw_data_dict = utils.injectWaveform(parameters=injected_parameters, time_dict=raw_time_dict,
+                                             tpeak_dict=tpeak_dict, ap_dict=ap_dict, skypos=skypos,
+                                             f_ref=f_ref, f_low=f_low, approx=args.approx)
+
+    ## tcut = cutoff time in waveform
+    if args.Tcut_seconds is not None:
+        # option 1: truncation time given in seconds already
+        tcut_geocent = tpeak_geocent + args.Tcut_seconds
+    else:
+        # option 2: find truncation time based off of # number of cycles from peak
+        Ncycles = args.Tcut_cycles
+        tcut_geocent = utils.get_Tcut_from_Ncycles(Ncycles, parameters=injected_parameters, time_dict=raw_time_dict,
+                                                   tpeak_dict=tpeak_dict, ap_dict=ap_dict, skypos=skypos, f_ref=f_ref,
+                                                   f_low=f_low, approx=args.approx)
+
+    print('\nCutoff time:')
+    tcut_dict, _ = utils.get_tgps_and_ap_dicts(tcut_geocent, ifos, skypos['ra'], skypos['dec'], skypos['psi'])
+
+    # If we are varying skyposition
+    if args.vary_skypos:
+        ap_dict = None  # don't want fixed antenna patterns
+
+    # If we are varying over time of coalescence
+    if args.vary_time:
+        tpeak_dict = None  # don't want fixed time of arrival at detectors
+
+    """
+    Condition data
+    """
+
+    # icut = index corresponding to cutoff time
+    time_dict, data_dict, icut_dict = utils.condition(raw_time_dict, raw_data_dict, tcut_dict, ds_factor, f_low)
+
+    # Time spacing of data
+    dt = time_dict['H1'][1] - time_dict['H1'][0]
+
+    # Decide how much data to analyze based of off run mode
+    if run_mode == 'full':
+        TPre = tcut_geocent - args.Tstart
+        TPost = args.Tend - tcut_geocent
+    elif run_mode == 'pre':
+        TPre = tcut_geocent - args.Tstart
+        TPost = 0
+    elif run_mode == 'post':
+        TPre = 0
+        TPost = args.Tend - tcut_geocent
+    else:
+        raise NotImplementedError(f'Run mode {run_mode} is not defined, please use one of pre post or full')
+
+    # Duration --> number of time samples to look at
+    Npre = int(round(TPre / dt))
+    Npost = int(round(TPost / dt)) + 1  # must add one so that the target time is actually included, even if Tpost = 0,
+    # otherwise WF placement gets messed up
+    Nanalyze = Npre + Npost
+    Tanalyze = Nanalyze * dt
+    print('\nWill analyze {:.3f} s of data at {:.1f} Hz\n'.format(Tanalyze, 1 / dt))
+
+    # Crop analysis data to specified duration.
+    for ifo, idx in icut_dict.items():
+        # idx = sample closest to desired time
+        time_dict[ifo] = time_dict[ifo][idx - Npre:idx + Npost]
+        data_dict[ifo] = data_dict[ifo][idx - Npre:idx + Npost]
+
+    # Calculate ACF
+    rho_dict = utils.get_ACF(pe_psds, time_dict, f_low=f_low)
+
+    for ifo, rho in rho_dict.items():
+        assert len(rho) == len(data_dict[ifo]), 'Length for ACF is not the same as for the data'
+
+    """
+    Arguments for the posterior function
+    """
+
+    # configure mass prior
+    inj_mtot = injected_parameters['mass_1'] + injected_parameters['mass_2']
+    max_mass_prior = np.ceil(inj_mtot + 100)
+    min_mass_prior = np.maximum(np.floor(inj_mtot - 100), 5)
+
+    # configure distance prior
+    inj_dist_log = np.log10(injected_parameters['luminosity_distance'])
+    min_dist_prior = int(np.power(10, np.floor(inj_dist_log - 1)))
+    max_dist_prior = min(10000, int(np.power(10, np.ceil(inj_dist_log + 1))))  # cap max distance at 10000 MPc
+
+    # put all arguments into a dict
+    kwargs = {
+        'mtot_lim': [min_mass_prior, max_mass_prior],
+        'q_lim': [0.17, 1],
+        'chi_lim': [0, 0.99],
+        'dist_lim': [min_dist_prior, max_dist_prior],
+
+        'approx': args.approx,
+        'f_ref': f_ref,
+        'f_low': f_low,
+        'only_prior': args.only_prior,
+        'delta_t': dt,
+
+        'ra': skypos['ra'],  # default right ascension if not varied
+        'dec': skypos['dec'],  # default declination if not varied
+        'psi': skypos['psi'],  # default polarization if not varied
+        'tgps_geocent': tpeak_geocent,  # default waveform placement time if not varied
+
+        'rho_dict': rho_dict,
+        'time_dict': time_dict,
+        'data_dict': data_dict,
+        'ap_dict': ap_dict,
+        'tpeak_dict': tpeak_dict
+    }
+    return kwargs
+
+
 def main():
     
     # Parse the commandline arguments
@@ -250,6 +428,14 @@ def main():
         'tpeak_dict': tpeak_dict
     }
 
+    print(f"kwargs are:")
+    print(kwargs)
+    """
+    Set up likelihood 
+    """
+    likelihood_manager = utils.LnLikelihoodManager(
+        vary_time=args.vary_time, vary_skypos=args.vary_skypos, **kwargs)
+
     """
     Set up sampler
     """
@@ -342,7 +528,7 @@ def main():
     print("Running with %i cores." % args.ncpu)
     with closing(Pool(processes=args.ncpu)) as pool:
 
-        sampler = emcee.EnsembleSampler(nwalkers, ndim, utils.get_lnprob,
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, likelihood_manager.get_lnprob,
                                         backend=backend, pool=pool,
                                         runtime_sortingfn=sort_on_runtime,
                                         kwargs=kwargs)
@@ -380,7 +566,9 @@ def main():
     print(sampler.get_chain().shape)
 
     # Postprocessing
-    df = utils.postprocess_samples(sampler, **kwargs)
+    df = utils.postprocess_samples(sampler,
+                                   likelihood_manager.log_prior,
+                                   **kwargs)
 
     # Save
     sample_path = backend_path.replace('h5', 'dat')
