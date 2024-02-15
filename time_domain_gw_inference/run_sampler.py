@@ -444,14 +444,7 @@ def main():
     nsteps = args.nsteps
     nwalkers = args.nwalkers
     # Default num dimensions (fixed time and sky position) = 14
-    ndim = 14
-    # If we want to vary time ...
-    if args.vary_time:
-        ndim += 1
-    # If we want to vary sky position ...
-    if args.vary_skypos:
-        ndim += 5  # add ra_x, ra_y, sin_dec, psi_x, psi_y
-
+    ndim = likelihood_manager.num_parameters
     print("Sampling %i parameters." % ndim)
 
     # Where to save samples while sampler running
@@ -471,38 +464,7 @@ def main():
         # Reset the backend
         backend.reset(nwalkers, ndim)
 
-        # Initialize walkers
-        # (code sees unit scale quantities; use logit transformations
-        # to take boundaries to +/- infinity)
-        p0_arr = np.asarray([[np.random.normal() for j in range(ndim)] for i in range(nwalkers)])
-
-        print(p0_arr)
-        
-        # replace some parameters (masses, spin mag, distance) in tight balls around their injected values
-        for p, param_kw, lim_kw in zip(range(5), ['mtot', 'q', 'a_1', 'a_2', 'luminosity_distance'], 
-                                    ['mtot_lim', 'q_lim', 'chi_lim', 'chi_lim', 'dist_lim']):
-            # get physical parameter
-            if param_kw=='mtot': 
-                param_phys = injected_parameters['mass_1'] + injected_parameters['mass_2']
-            elif param_kw=='q': 
-                param_phys = injected_parameters['mass_2'] / injected_parameters['mass_1']
-            else:
-                param_phys = injected_parameters[param_kw]
-            
-            # transform into logistic space
-            param_logit = utils.logit(param_phys, * kwargs[lim_kw])
-            
-            # draw gaussian ball in logistic space
-            p0_arr[:,p] = np.asarray([np.random.normal(loc=param_logit, scale=0.05) for i in range(nwalkers)])
-
-        # if time of coalescence sampled over need to include this separately since it isn't a unit scaled quantity
-        if args.vary_time:
-            dt_1M = 0.00127
-            sigma_time = dt_1M * 2.5  # time prior from LVK has width of ~2.5M
-            initial_t_walkers = np.random.normal(loc=tpeak_geocent, scale=sigma_time, size=nwalkers)
-            p0_arr[:, ndim - 1] = initial_t_walkers  # time always saved as the final param
-
-        p0 = p0_arr.tolist()
+        p0 = likelihood_manager.log_prior.initialize_walkers(nwalkers, injected_parameters)
 
     # Deactivate numpy default number of cores to avoid using too many
     if args.ncpu > 1:
