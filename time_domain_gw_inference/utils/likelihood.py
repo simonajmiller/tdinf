@@ -172,8 +172,8 @@ class LnPriorManager(LogisticParameterManager):
             else:
                 try:
                     param_phys = injected_parameters[param_kw]
-                    print(param_phys, param_kw)
-                except ValueError:
+                    print('injected', param_phys, param_kw)
+                except ValueError or KeyError:
                     print(f"{param_kw} not in injected_parameters dict, continuing anyways")
                     continue
             # transform into logistic space
