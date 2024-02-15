@@ -69,7 +69,7 @@ def create_run_sampler_arg_parser():
     return p
 
 
-def initialize_kwargs(args):
+def initialize_kwargs(args, initial_run_dir=''):
     # Check that a cutoff time is given
     assert args.Tcut_cycles is not None or args.Tcut_seconds is not None, "must give a cutoff time"
 
@@ -79,9 +79,9 @@ def initialize_kwargs(args):
 
     # Unpack some basic parameters
     ifos = args.ifos
-    data_path_dict, psd_path_dict = utils.parse_data_and_psds(args)
-    pe_posterior_h5_file = args.pe_posterior_h5_file
-    backend_path = args.output_h5  # where emcee spits its output
+    data_path_dict, psd_path_dict = utils.parse_data_and_psds(args, initial_run_dir)
+    pe_posterior_h5_file = os.path.join(initial_run_dir, args.pe_posterior_h5_file)
+    backend_path = os.path.join(initial_run_dir, args.output_h5)  # where emcee spits its output
     f_ref = args.fref
     f_low = args.flow
     ds_factor = args.downsample

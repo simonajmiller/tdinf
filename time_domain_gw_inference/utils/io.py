@@ -8,7 +8,7 @@ import json
 import os
 
 
-def parse_data_and_psds(args):
+def parse_data_and_psds(args, initial_dir_path=''):
     """
     Convert command line arguments into dictionaries of paths to PSD and data.
 
@@ -19,7 +19,7 @@ def parse_data_and_psds(args):
     """
     def _split_ifo_from_arg_(argument, ifo, arg_name):
         prefix = f'{ifo}:'
-        matching_paths = [path.replace(prefix, '') for path in argument if path.startswith(prefix)]
+        matching_paths = [os.path.join(initial_dir_path, path.replace(prefix, '')) for path in argument if path.startswith(prefix)]
         if not matching_paths:
             raise ValueError(
                 f"Error: {ifo} {arg_name} not provided. "
