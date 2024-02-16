@@ -141,7 +141,8 @@ def get_tgps_and_ap_dicts(tgps_geocent, ifos, ra, dec, psi, verbose=True):
 
 
 def generate_lal_hphc(approximant_key, m1_msun, m2_msun, chi1, chi2, dist_mpc=1,
-                      dt=None, f_low=20, f_ref=11, inclination=0, phi_ref=0., epoch=0, eccentricity=0):
+                      dt=None, f_low=20, f_ref=11, inclination=0, phi_ref=0., epoch=0, eccentricity=0,
+                      mean_anomaly_periastron=0):
     """
     Generate the plus and cross polarizations for given waveform parameters and approximant
     """
@@ -159,7 +160,7 @@ def generate_lal_hphc(approximant_key, m1_msun, m2_msun, chi1, chi2, dist_mpc=1,
                                                 chi1[0], chi1[1], chi1[2],
                                                 chi2[0], chi2[1], chi2[2],
                                                 distance, inclination,
-                                                phi_ref, 0., eccentricity, 0.,
+                                                phi_ref, 0., eccentricity, mean_anomaly_periastron,
                                                 dt, f_low, f_ref,
                                                 param_dict,
                                                 approximant)
