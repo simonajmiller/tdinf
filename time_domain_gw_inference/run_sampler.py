@@ -117,7 +117,10 @@ def initialize_kwargs(args, initial_run_dir=''):
     # Unpack some basic parameters
     ifos = args.ifos
     data_path_dict, psd_path_dict = utils.parse_data_and_psds(args, initial_run_dir)
-    pe_posterior_h5_file = os.path.join(initial_run_dir, args.pe_posterior_h5_file)
+    try:
+        pe_posterior_h5_file = os.path.join(initial_run_dir, args.pe_posterior_h5_file)
+    except TypeError:
+        pe_posterior_h5_file = None
     f_ref = args.fref
     f_low = args.flow
     ds_factor = args.downsample
