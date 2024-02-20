@@ -97,7 +97,7 @@ def get_injected_parameters(args, initial_run_dir=''):
     # Else, generate an injection (currently, only set up for no noise case)
     else:
         # Load in injected parameters
-        injected_parameters = utils.parse_injected_parameters(args.injected_parameters)
+        injected_parameters = utils.parse_injected_parameters(args.injected_parameters, initial_run_dir=initial_run_dir)
 
         # Check that the reference freqs line up
         err_msg = f"Injection fref={injected_parameters['f_ref']} does not equal sampler fref={args.fref}"

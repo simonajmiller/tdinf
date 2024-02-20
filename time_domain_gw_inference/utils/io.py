@@ -194,15 +194,17 @@ def get_pe(raw_time_dict, path, psd_path_dict=None, verbose=True, f_ref=11, f_lo
     return tpeak_geocent, pe_samples, log_prob, pe_psds, maxP_skypos
 
 
-def parse_injected_parameters(filepath):
+def parse_injected_parameters(filepath, initial_run_dir=None):
     """
     Function to load in the parameters for an injection
     """
     # Make sure we're passed a json file
     assert filepath[-4:] == 'json', 'File type not supported'
 
+    json_file = os.path.join(initial_run_dir, filepath)
+
     # Load file 
-    with open(filepath, 'r') as jf:
+    with open(json_file, 'r') as jf:
         inj_file = json.load(jf)
 
     # 15D gravitational-wave parameter space
