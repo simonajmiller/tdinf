@@ -237,6 +237,65 @@ class LnLikelihoodManager(LogisticParameterManager):
 
         super().__init__(vary_time=vary_time, vary_skypos=vary_skypos, **kwargs)
 
+    def get_projected_waveform(self, x_phys, ifos, time_dict, f_low=11, f_ref=11,
+                     delta_t=None,
+                     ap_dict=None, tpeak_dict=None,
+                     approx=None):
+
+        # get complex-valued waveform at geocenter
+        m1, m2 = m1m2_from_mtotq(x_phys['total_mass'], x_phys['mass_ratio'])
+        chi1 = [x_phys['spin1_x'], x_phys['spin1_y'], x_phys['spin1_z']]
+        chi2 = [x_phys['spin2_x'], x_phys['spin2_y'], x_phys['spin2_z']]
+
+        hp, hc = rwf.generate_lal_hphc(approx, m1, m2, chi1, chi2,
+                                       dist_mpc=x_phys['distance_mpc'], dt=delta_t,
+                                       f_low=f_low, f_ref=f_ref,
+                                       inclination=x_phys['inclination'],
+                                       phi_ref=x_phys['phase'],
+                                       eccentricity=x_phys['eccentricity'])
+
+        # If we are sampling over sky position and/or time ...
+        if self.vary_skypos and self.vary_time:
+            TP_dict, AP_dict = rwf.get_tgps_and_ap_dicts(
+                x_phys['geocenter_time'],
+                ifos,
+                x_phys['right_ascension'], x_phys['declination'], x_phys['polarization'],
+                verbose=False)
+        elif self.vary_skypos:  # just skypos
+            _, AP_dict = rwf.get_tgps_and_ap_dicts(
+                self.reference_time, ifos,
+                x_phys['right_ascension'], x_phys['declination'], x_phys['polarization'],
+                verbose=False)
+            TP_dict = tpeak_dict.copy()
+        elif tpeak_dict is None:  # just time
+            TP_dict, _ = rwf.get_tgps_and_ap_dicts(
+                x_phys['geocenter_time'], ifos,
+                self.fixed['right_ascension'], self.fixed['declination'], self.fixed['polarization'],
+                verbose=False)
+            AP_dict = ap_dict.copy()
+        else:  # neither
+            TP_dict = tpeak_dict.copy()
+            AP_dict = ap_dict.copy()
+
+        # Cycle through ifos
+        projected_waveform_dict = {}
+        for ifo in ifos:
+            # Antenna patterns and tpeak
+            Fp, Fc = AP_dict[ifo]
+            tt = TP_dict[ifo]  # triggertime = peak time, NOT tcut (cutoff time)
+
+            # Generate waveform
+            h = rwf.generate_lal_waveform(hplus=hp, hcross=hc,
+                                          times=time_dict[ifo],
+                                          triggertime=tt)
+
+            # Project onto detector
+            h_ifo = Fp * h.real - Fc * h.imag
+
+            projected_waveform_dict[ifo] = h_ifo
+
+        return projected_waveform_dict
+
     def get_lnprob(self, x, f_low=11, f_ref=11, return_wf=False, return_params=False,
                    only_prior=False, approx='NRSur7dq4',
                    rho_dict=None, time_dict=None, delta_t=None, data_dict=None,
