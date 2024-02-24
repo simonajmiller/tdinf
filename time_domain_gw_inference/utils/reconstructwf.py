@@ -6,6 +6,7 @@ import os
 
 import scipy.signal as sig
 import sys
+import gwpy
 
 try:
     from spins_and_masses import transform_spins
@@ -184,8 +185,12 @@ def generate_lal_waveform(*args, **kwargs):
 
     hplus = kwargs.pop('hplus', None)
     hcross = kwargs.pop('hcross', None)
+    # TODO make this a function of our waveform generator so that we can pass any waveform
     if (hplus is None) or (hcross is None):
         hplus, hcross = generate_lal_hphc(*args, **kwargs)
+    new_generator = False
+    if isinstance(hplus, gwpy.timeseries.timeseries.TimeSeries):
+        new_generator = True
 
     # align waveform, based on LALInferenceTemplate
     # https://git.ligo.org/lscsoft/lalsuite/blob/master/lalinference/lib/LALInferenceTemplate.c#L1124
@@ -197,12 +202,19 @@ def generate_lal_waveform(*args, **kwargs):
     # t_c lands, i.e. the nearest time in the buffer
     injTc = tStart + tcSample * delta_t
 
+    if new_generator:
+        hplus_epoch = hplus.epoch.value
+    else:
+        hplus_epoch = hplus.epoch.gpsSeconds + hplus.epoch.gpsNanoSeconds * 1E-9
     # The sample at which the waveform reaches t_c
-    hplus_epoch = hplus.epoch.gpsSeconds + hplus.epoch.gpsNanoSeconds * 1E-9
     waveTcSample = round(-hplus_epoch / delta_t)
 
     # 1 + (number of samples post - t_c in waveform)
-    wavePostTc = hplus.data.length - waveTcSample
+    if new_generator:
+        data_length = len(hplus)
+    else:
+        data_length = hplus.data.length
+    wavePostTc = data_length - waveTcSample
 
     # Start and end indices for the buffer
     bufStartIndex = int(tcSample - waveTcSample if tcSample >= waveTcSample else 0)
@@ -224,7 +236,11 @@ def generate_lal_waveform(*args, **kwargs):
 
     h_td = np.zeros(bufLength, dtype=complex)
 
-    # Place waveform 
-    h_td[bufStartIndex:bufEndIndex] = window * hplus.data.data[waveStartIndex:waveStartIndex + bufWaveLength] - \
-                                      1j * window * hcross.data.data[waveStartIndex:waveStartIndex + bufWaveLength]
+    # Place waveform
+    if new_generator:
+        h_td[bufStartIndex:bufEndIndex] = window * hplus[waveStartIndex:waveStartIndex + bufWaveLength].value - \
+                                      1j * window * hcross[waveStartIndex:waveStartIndex + bufWaveLength].value
+    else:
+        h_td[bufStartIndex:bufEndIndex] = window * hplus.data.data[waveStartIndex:waveStartIndex + bufWaveLength] - \
+                                          1j * window * hcross.data.data[waveStartIndex:waveStartIndex + bufWaveLength]
     return h_td
