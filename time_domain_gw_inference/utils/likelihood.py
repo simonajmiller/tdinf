@@ -14,6 +14,39 @@ except:
     from .misc import logit, inv_logit, logit_jacobian
 
 from .parameter import LogisticParameter, CartesianAngle, TrigLogisticParameter
+import astropy.units as u
+try:
+    import gwsignal
+    from gwsignal.models.teobresums import TEOBResumSDALI
+    from gwsignal.core import waveform as wfm
+except ImportError:
+    print("Warning! Will not be able to use TEOBResumSDALI approximation")
+
+
+def check_spin_settings_of_approx(approx_name):
+    aligned_spins = False
+    no_spins = False
+
+    if approx_name == 'TEOBResumSDALI':
+        aligned_spins = True
+        return aligned_spins, no_spins
+
+    approx = lalsim.GetApproximantFromString(approx_name)
+
+    if not lalsim.SimInspiralImplementedTDApproximants(approx):
+        raise ValueError(f"ERROR: {approx_name} is not available as a time domain waveform")
+
+    spin_enum = lalsim.SimInspiralGetSpinSupportFromApproximant(approx)
+
+    if spin_enum == lalsim.SIM_INSPIRAL_PRECESSINGSPIN:
+        aligned_spins = False
+    elif spin_enum == lalsim.SIM_INSPIRAL_ALIGNEDSPIN:
+        aligned_spins = True
+    elif spin_enum == lalsim.SIM_INSPIRAL_SPINLESS:
+        no_spins = True
+    else:
+        print("WARNING, UNSURE IF WAVEFORM HAS SPINS")
+    return aligned_spins, no_spins
 
 
 class LogisticParameterManager:
@@ -23,7 +56,7 @@ class LogisticParameterManager:
         self.vary_skypos = vary_skypos
 
         # get allowed spin settings of waveform model
-        self.aligned_spins, self.no_spins = self.check_spin_settings_of_approx(kwargs['approx'])
+        self.aligned_spins, self.no_spins = check_spin_settings_of_approx(kwargs['approx'])
 
         self.vary_eccentricity = vary_eccentricity
 
@@ -109,7 +142,6 @@ class LogisticParameterManager:
         spin_z = c_z * chi_norm
         return spin_x, spin_y, spin_z
 
-
     def samp_to_phys(self, x):
         # Implementation of samp_to_phys
         # logistic dict
@@ -127,6 +159,28 @@ class LogisticParameterManager:
             physical_dict['geocenter_time'] = x_dict['geocenter_time']
 
         return physical_dict
+
+    def physical_dict_to_waveform_dict(self, physical_dict):
+        """
+        Take in the physical dictionary and return one that has units for astropy
+        :return:
+        """
+        m1, m2 = m1m2_from_mtotq(physical_dict['total_mass'], physical_dict['mass_ratio'])
+        return {
+            'mass1': m1 * u.Msun,
+            'mass2': m2 * u.Msun,
+            'spin1x': physical_dict['spin1_x'] * u.dimensionless_unscaled,
+            'spin1y': physical_dict['spin1_y'] * u.dimensionless_unscaled,
+            'spin1z': physical_dict['spin1_z'] * u.dimensionless_unscaled,
+            'spin2x': physical_dict['spin2_x'] * u.dimensionless_unscaled,
+            'spin2y': physical_dict['spin2_y'] * u.dimensionless_unscaled,
+            'spin2z': physical_dict['spin2_z'] * u.dimensionless_unscaled,
+            'phi_ref': physical_dict['phase'] * u.rad,
+            'distance': physical_dict['distance_mpc'] * u.Mpc,
+            'inclination': physical_dict['inclination'] * u.rad,
+            'eccentricity': physical_dict['eccentricity'] * u.dimensionless_unscaled,
+            'meanPerAno': physical_dict['mean_anomaly'] * u.rad,
+        }
 
 
 class LnPriorManager(LogisticParameterManager):
@@ -213,28 +267,60 @@ class LnPriorManager(LogisticParameterManager):
         return lnprior
 
 
-class LnLikelihoodManager(LogisticParameterManager):
-    def __init__(self, vary_time=False, vary_skypos=False, **kwargs):
-        self.log_prior = LnPriorManager(vary_time=vary_time, vary_skypos=vary_skypos, **kwargs)
+class WaveformManager(LogisticParameterManager):
+    def __init__(self, *args, **kwargs):
+        super(WaveformManager, self).__init__(*args, **kwargs)
+        self.approx_name = kwargs['approx']
+        self.approximant = lalsim.SimInspiralGetApproximantFromString(self.approx_name)
 
-        super().__init__(vary_time=vary_time, vary_skypos=vary_skypos, **kwargs)
+        return
 
-    def get_projected_waveform(self, x_phys, ifos, time_dict, f_low=11, f_ref=11,
-                     delta_t=None,
-                     ap_dict=None, tpeak_dict=None,
-                     approx=None):
+    def generate_lal_hphc(self, m1_msun, m2_msun, chi1, chi2, dist_mpc=1,
+                          dt=None, f_low=20, f_ref=11, inclination=0, phi_ref=0., eccentricity=0,
+                          mean_anomaly_periastron=0):
+        """
+        Generate the plus and cross polarizations for given waveform parameters and approximant
+        """
 
-        # get complex-valued waveform at geocenter
+        m1_kg = m1_msun * lal.MSUN_SI
+        m2_kg = m2_msun * lal.MSUN_SI
+
+        distance = dist_mpc * 1e6 * lal.PC_SI
+
+        param_dict = lal.CreateDict()
+
+        hp, hc = lalsim.SimInspiralChooseTDWaveform(m1_kg, m2_kg,
+                                                    chi1[0], chi1[1], chi1[2],
+                                                    chi2[0], chi2[1], chi2[2],
+                                                    distance, inclination,
+                                                    phi_ref, 0., eccentricity, mean_anomaly_periastron,
+                                                    dt, f_low, f_ref,
+                                                    param_dict,
+                                                    self.approximant)
+        return hp, hc
+
+    def get_hplus_hcross(self, x_phys, f_low=11, f_ref=11, delta_t=None):
+        """
+        get complex waveform at geocenter
+        """
         m1, m2 = m1m2_from_mtotq(x_phys['total_mass'], x_phys['mass_ratio'])
         chi1 = [x_phys['spin1_x'], x_phys['spin1_y'], x_phys['spin1_z']]
         chi2 = [x_phys['spin2_x'], x_phys['spin2_y'], x_phys['spin2_z']]
 
-        hp, hc = rwf.generate_lal_hphc(approx, m1, m2, chi1, chi2,
+        hp, hc = self.generate_lal_hphc(m1, m2, chi1, chi2,
                                        dist_mpc=x_phys['distance_mpc'], dt=delta_t,
                                        f_low=f_low, f_ref=f_ref,
                                        inclination=x_phys['inclination'],
                                        phi_ref=x_phys['phase'],
-                                       eccentricity=x_phys['eccentricity'])
+                                       eccentricity=x_phys['eccentricity'],
+                                       mean_anomaly_periastron=x_phys['mean_anomaly'])
+        return hp, hc
+
+    def get_projected_waveform(self, x_phys, ifos, time_dict, f_low=11, f_ref=11,
+                               delta_t=None,
+                               ap_dict=None, tpeak_dict=None):
+
+        hp, hc = self.get_hplus_hcross(x_phys, f_low=f_low, f_ref=f_ref, delta_t=delta_t)
 
         # If we are sampling over sky position and/or time ...
         if self.vary_skypos and self.vary_time:
@@ -278,77 +364,118 @@ class LnLikelihoodManager(LogisticParameterManager):
 
         return projected_waveform_dict
 
-    def get_lnprob(self, x, f_low=11, f_ref=11, return_wf=False, return_params=False,
+
+class NewWaveformManager(LogisticParameterManager):
+    def __init__(self, *args, **kwargs):
+        super(NewWaveformManager, self).__init__(*args, **kwargs)
+
+        self.approx_name = kwargs['approx']
+        if self.approx_name == 'TEOBResumSDALI':
+            self.generator = TEOBResumSDALI(modes_to_use=[[2, 2]])
+        else:
+            self.generator = gwsignal.core.waveform.LALCompactBinaryCoalescenceGenerator(self.approx_name)
+        return
+
+    def get_hplus_hcross(self, x_phys, f_low=11, f_ref=11, delta_t=None):
+        """
+        get complex waveform at geocenter
+        """
+        params = self.physical_dict_to_waveform_dict(x_phys)
+        params['f22_start'] = f_low * u.Hz
+        params['deltaT'] = delta_t * u.s
+        params['f22_ref'] = f_ref * u.Hz
+        params['condition'] = 0
+
+        return wfm.GenerateTDWaveform(params, self.generator)
+
+    def get_projected_waveform(self, x_phys, ifos, time_dict, f_low=11, f_ref=11,
+                               delta_t=None,
+                               ap_dict=None, tpeak_dict=None):
+
+        hp, hc = self.get_hplus_hcross(x_phys, f_low=f_low, f_ref=f_ref, delta_t=delta_t)
+
+        # If we are sampling over sky position and/or time ...
+        if self.vary_skypos and self.vary_time:
+            TP_dict, AP_dict = rwf.get_tgps_and_ap_dicts(
+                x_phys['geocenter_time'],
+                ifos,
+                x_phys['right_ascension'], x_phys['declination'], x_phys['polarization'],
+                verbose=False)
+        elif self.vary_skypos:  # just skypos
+            _, AP_dict = rwf.get_tgps_and_ap_dicts(
+                self.reference_time, ifos,
+                x_phys['right_ascension'], x_phys['declination'], x_phys['polarization'],
+                verbose=False)
+            TP_dict = tpeak_dict.copy()
+        elif tpeak_dict is None:  # just time
+            TP_dict, _ = rwf.get_tgps_and_ap_dicts(
+                x_phys['geocenter_time'], ifos,
+                self.fixed['right_ascension'], self.fixed['declination'], self.fixed['polarization'],
+                verbose=False)
+            AP_dict = ap_dict.copy()
+        else:  # neither
+            TP_dict = tpeak_dict.copy()
+            AP_dict = ap_dict.copy()
+
+        # Cycle through ifos
+        projected_waveform_dict = {}
+        for ifo in ifos:
+            # Antenna patterns and tpeak
+            Fp, Fc = AP_dict[ifo]
+            tt = TP_dict[ifo]  # triggertime = peak time, NOT tcut (cutoff time)
+
+            # Generate waveform
+            h = rwf.generate_lal_waveform(hplus=hp, hcross=hc,
+                                          times=time_dict[ifo],
+                                          triggertime=tt)
+
+            # Project onto detector
+            h_ifo = Fp * h.real - Fc * h.imag
+
+            projected_waveform_dict[ifo] = h_ifo
+
+        return projected_waveform_dict
+
+
+class LnLikelihoodManager(LogisticParameterManager):
+    def __init__(self, *args, **kwargs):
+        try:
+            self.waveform_manager = NewWaveformManager(*args, **kwargs)
+        except Exception as e:
+            print(e)
+            print("warning, new waveform manager has failed to be created, using old waveform manager")
+            self.waveform_manager = WaveformManager(*args, **kwargs)
+        self.log_prior = LnPriorManager(*args, **kwargs)
+
+        super().__init__(*args, **kwargs)
+
+    def get_lnprob(self, x, f_low=11, f_ref=11, return_wf=False,
                    only_prior=False, approx='NRSur7dq4',
                    rho_dict=None, time_dict=None, delta_t=None, data_dict=None,
                    ap_dict=None, tpeak_dict=None, **kwargs):
         # get physical parameters
         x_phys = self.samp_to_phys(x)
 
-        # Intialize posterior to 0
+        # Initialize posterior to 0
         lnprob = 0
 
         # Calculate posterior
         if not only_prior:
-            # get complex-valued waveform at geocenter
-            m1, m2 = m1m2_from_mtotq(x_phys['total_mass'], x_phys['mass_ratio'])
-            chi1 = [x_phys['spin1_x'], x_phys['spin1_y'], x_phys['spin1_z']]
-            chi2 = [x_phys['spin2_x'], x_phys['spin2_y'], x_phys['spin2_z']]
-
-            hp, hc = rwf.generate_lal_hphc(approx, m1, m2, chi1, chi2,
-                                           dist_mpc=x_phys['distance_mpc'], dt=delta_t,
-                                           f_low=f_low, f_ref=f_ref,
-                                           inclination=x_phys['inclination'],
-                                           phi_ref=x_phys['phase'],
-                                           eccentricity=x_phys['eccentricity'])
-
-            # Which interferometers are we sampling over?
-            ifos = data_dict.keys()
-
-            # If we are sampling over sky position and/or time ...
-            if self.vary_skypos and self.vary_time:
-                TP_dict, AP_dict = rwf.get_tgps_and_ap_dicts(
-                    x_phys['geocenter_time'],
-                    ifos,
-                    x_phys['right_ascension'], x_phys['declination'], x_phys['polarization'],
-                    verbose=False)
-            elif self.vary_skypos:  # just skypos
-                _, AP_dict = rwf.get_tgps_and_ap_dicts(
-                    self.reference_time, ifos,
-                    x_phys['right_ascension'], x_phys['declination'], x_phys['polarization'],
-                    verbose=False)
-                TP_dict = tpeak_dict.copy()
-            elif tpeak_dict is None:  # just time
-                TP_dict, _ = rwf.get_tgps_and_ap_dicts(
-                    x_phys['geocenter_time'], ifos,
-                    self.fixed['right_ascension'], self.fixed['declination'], self.fixed['polarization'],
-                    verbose=False)
-                AP_dict = ap_dict.copy()
-            else:  # neither
-                TP_dict = tpeak_dict.copy()
-                AP_dict = ap_dict.copy()
+            projected_wf_dict = self.waveform_manager.get_projected_waveform(
+                x_phys, data_dict.keys(), time_dict, f_low=f_low, f_ref=f_ref,
+                delta_t=delta_t,
+                ap_dict=ap_dict, tpeak_dict=tpeak_dict
+            )
 
             # Cycle through ifos
             for ifo, data in data_dict.items():
 
-                # Antenna patterns and tpeak
-                Fp, Fc = AP_dict[ifo]
-                tt = TP_dict[ifo]  # triggertime = peak time, NOT tcut (cutoff time)
-
-                # Generate waveform
-                h = rwf.generate_lal_waveform(hplus=hp, hcross=hc,
-                                              times=time_dict[ifo],
-                                              triggertime=tt)
-
-                # Project onto detector
-                h_ifo = Fp * h.real - Fc * h.imag
-
                 # for debugging purporses
                 if return_wf == ifo:
-                    return h_ifo
+                    return projected_wf_dict[ifo]
 
                 # Truncate and compute residuals
-                r = data - h_ifo
+                r = data - projected_wf_dict[ifo]
 
                 # "Over whiten" residuals
                 rwt = solve_toeplitz(rho_dict[ifo], r)
