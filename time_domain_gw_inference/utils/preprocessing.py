@@ -101,7 +101,9 @@ def injectWaveform(**kwargs):
     tpeak_dict = kwargs.pop('tpeak_dict')
     ap_dict = kwargs.pop('ap_dict')
     skypos = kwargs.pop('skypos')
-    approx = kwargs.pop('approx', 'NRSur7dq4')
+    # TODO temporary fix so that we can use new wf generator
+    # should change this so that it depends on the waveform generator function
+    approx = "NRSur7dq4" #kwargs.pop('approx', 'NRSur7dq4')
     f_low = kwargs.pop('f_low')
     f_ref = kwargs.pop('f_ref')
     ifos = kwargs.pop('ifos', ['H1', 'L1', 'V1'])
