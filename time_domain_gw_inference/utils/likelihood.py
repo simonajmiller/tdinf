@@ -450,7 +450,7 @@ class LnLikelihoodManager(LogisticParameterManager):
         super().__init__(*args, **kwargs)
 
     def get_lnprob(self, x, f_low=11, f_ref=11, return_wf=False,
-                   only_prior=False, approx='NRSur7dq4',
+                   only_prior=False,
                    rho_dict=None, time_dict=None, delta_t=None, data_dict=None,
                    ap_dict=None, tpeak_dict=None, **kwargs):
         # get physical parameters
