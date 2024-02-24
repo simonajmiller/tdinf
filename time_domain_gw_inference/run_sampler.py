@@ -62,6 +62,7 @@ def create_run_sampler_arg_parser():
     # Do we want to sample in time and/or sky position?
     p.add_argument('--vary-time', action='store_true')
     p.add_argument('--vary-skypos', action='store_true')
+    p.add_argument('--vary-eccentricity',  action='store_true')
 
     # Do we want to resume an old run?
     p.add_argument('--resume', action='store_true')
@@ -293,7 +294,9 @@ def main():
     Set up likelihood 
     """
     likelihood_manager = utils.LnLikelihoodManager(
-        vary_time=args.vary_time, vary_skypos=args.vary_skypos, **kwargs)
+        vary_time=args.vary_time, vary_skypos=args.vary_skypos,
+        vary_eccentricity=args.vary_eccentricity,
+        **kwargs)
 
     """
     Set up sampler

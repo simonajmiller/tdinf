@@ -39,7 +39,7 @@ class LogisticParameterManager:
                 LogisticParameter('spin2_magnitude', kwargs['chi_lim'], None)])
 
         if self.vary_eccentricity:
-            self.logistic_parameters.append(LogisticParameter('eccentricity', [0, 1e-3], None))
+            self.logistic_parameters.append(LogisticParameter('eccentricity', [0, 0.3], None))
 
         if self.vary_skypos:
             self.logistic_parameters.append(TrigLogisticParameter('declination', 'sin', [-1, 1], None))
@@ -63,6 +63,8 @@ class LogisticParameterManager:
                 CartesianAngle('right_ascension', phase_offset=np.pi),
                 CartesianAngle('polarization')
             ])
+        if self.vary_eccentricity:
+            self.cartesian_angles.append(CartesianAngle('mean_anomaly'))
 
         for cartesian_angle in self.cartesian_angles:
             self.sampled_keys.extend([cartesian_angle.x_name, cartesian_angle.y_name])
@@ -81,27 +83,7 @@ class LogisticParameterManager:
 
         if not self.vary_eccentricity:
             self.fixed['eccentricity'] = 0
-
-    @staticmethod
-    def check_spin_settings_of_approx(approx_name):
-        aligned_spins = False
-        no_spins = False
-        approx = lalsim.GetApproximantFromString(approx_name)
-
-        if not lalsim.SimInspiralImplementedTDApproximants(approx):
-            raise ValueError(f"ERROR: {approx_name} is not available as a time domain waveform")
-
-        spin_enum = lalsim.SimInspiralGetSpinSupportFromApproximant(approx)
-
-        if spin_enum == lalsim.SIM_INSPIRAL_PRECESSINGSPIN:
-            aligned_spins = False
-        elif spin_enum == lalsim.SIM_INSPIRAL_ALIGNEDSPIN:
-            aligned_spins = True
-        elif spin_enum == lalsim.SIM_INSPIRAL_SPINLESS:
-            no_spins = True
-        else:
-            print("WARNING, UNSURE IF WAVEFORM HAS SPINS")
-        return aligned_spins, no_spins
+            self.fixed['mean_anomaly'] = 0
 
     def get_logistic_dict(self, x):
         return {self.sampled_keys[i]: x[i] for i in range(self.num_parameters)}
