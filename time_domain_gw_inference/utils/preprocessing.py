@@ -93,17 +93,15 @@ def condition(raw_time_dict, raw_data_dict, t_dict, ds_factor=16, f_low=11,
     return time_dict, data_dict, i_dict
 
 
-def injectWaveform(**kwargs): 
-    
+def injectWaveform(injection_approx, **kwargs):
+    # TODO modify this function so that it directly invokes the waveformManager we wrote before
+    # Also, this currently does not depend on skypos and i think it maybe should? something to look into
     # Unpack inputs
     p = kwargs.pop('parameters')
     time_dict = kwargs.pop('time_dict')
     tpeak_dict = kwargs.pop('tpeak_dict')
     ap_dict = kwargs.pop('ap_dict')
     skypos = kwargs.pop('skypos')
-    # TODO temporary fix so that we can use new wf generator
-    # should change this so that it depends on the waveform generator function
-    approx = "NRSur7dq4" #kwargs.pop('approx', 'NRSur7dq4')
     f_low = kwargs.pop('f_low')
     f_ref = kwargs.pop('f_ref')
     ifos = kwargs.pop('ifos', ['H1', 'L1', 'V1'])
@@ -117,7 +115,7 @@ def injectWaveform(**kwargs):
                                           f_ref, p['phase'])
 
     # Get strain
-    hp, hc = rwf.generate_lal_hphc(approx, 
+    hp, hc = rwf.generate_lal_hphc(injection_approx,
                                    p['mass_1'], p['mass_2'],
                                    [s1x, s1y, s1z], 
                                    [s2x, s2y, s2z],

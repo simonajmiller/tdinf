@@ -46,6 +46,9 @@ def create_run_sampler_arg_parser():
 
     # Optional args for waveform/data settings
     p.add_argument('--approx', default='NRSur7dq4')
+    p.add_argument('--injection-approx', default=None,
+                   help='approximant to use for the injection, same as approx unless otherwise specified')
+
     p.add_argument('--downsample', type=int, default=8)
     p.add_argument('--flow', type=float, default=11)
     p.add_argument('--fref', type=float, default=11)
@@ -171,7 +174,7 @@ def initialize_kwargs(args, initial_run_dir=''):
         # Injection
         raw_data_dict = utils.injectWaveform(parameters=injected_parameters, time_dict=raw_time_dict,
                                              tpeak_dict=tpeak_dict, ap_dict=ap_dict, skypos=skypos,
-                                             f_ref=f_ref, f_low=f_low, approx=args.approx)
+                                             f_ref=f_ref, f_low=f_low, injection_approx=args.injection_approx)
 
     ## tcut = cutoff time in waveform
     if args.Tcut_seconds is not None:
@@ -284,6 +287,11 @@ def main():
     # Parse the commandline arguments
     p = create_run_sampler_arg_parser()
     args = p.parse_args()
+
+    if args.injection_approx is None:
+        args.injection_approx = args.approx
+    if args.injection_approx != args.approx:
+        print('Warning! running with different approx than was used for the injection')
 
     backend_path = args.output_h5 # where emcee spits its output
 
