@@ -145,7 +145,7 @@ def injectWaveform(injection_approx, **kwargs):
     return h_ifos
 
 
-def get_Tcut_from_Ncycles(Ncycles, **kwargs): 
+def get_Tcut_from_Ncycles(Ncycles, injection_approx, **kwargs):
     
     """
     Calculate the cutoff time given the cutoff cycle and the parameters of the 
@@ -153,7 +153,7 @@ def get_Tcut_from_Ncycles(Ncycles, **kwargs):
     """
     
     # Get waveform in H1
-    h_H1 = injectWaveform(**kwargs)['H1']
+    h_H1 = injectWaveform(injection_approx, **kwargs)['H1']
     
     # Get indices of extrema 
     idxs, _ = sig.find_peaks(np.abs(h_H1), height=0)
@@ -193,7 +193,6 @@ def get_Tcut_from_Ncycles(Ncycles, **kwargs):
     tcut_geo = tcut_H1-dt_H
     
     return tcut_geo
-
 
 
 def get_ACF(pe_psds, time_dict, f_low=11): 

@@ -90,7 +90,8 @@ def get_injected_parameters(args, initial_run_dir=''):
         # Load data
         raw_time_dict, raw_data_dict = utils.load_raw_data(ifos=args.ifos,
                                                            path_dict=data_path_dict)
-        pe_out = utils.get_pe(raw_time_dict, pe_posterior_h5_file, verbose=False,
+        # TODO should this be injection or approx?
+        pe_out = utils.get_pe(raw_time_dict, pe_posterior_h5_file, approx=args.injection_approx, verbose=False,
                               psd_path_dict=psd_path_dict,
                               f_ref=args.fref, f_low=args.flow)
         tpeak_geocent, pe_samples, log_prob, pe_psds, skypos = pe_out
@@ -143,7 +144,8 @@ def initialize_kwargs(args, initial_run_dir=''):
 
         # Load data
         raw_time_dict, raw_data_dict = utils.load_raw_data(ifos=ifos, path_dict=data_path_dict)
-        pe_out = utils.get_pe(raw_time_dict, pe_posterior_h5_file, verbose=False, psd_path_dict=psd_path_dict,
+        # TODO should this be injection or approx?
+        pe_out = utils.get_pe(raw_time_dict, pe_posterior_h5_file, approx=args.injection_approx, verbose=False, psd_path_dict=psd_path_dict,
                               f_ref=f_ref, f_low=f_low)
         tpeak_geocent, pe_samples, log_prob, pe_psds, skypos = pe_out
 
@@ -183,9 +185,10 @@ def initialize_kwargs(args, initial_run_dir=''):
     else:
         # option 2: find truncation time based off of # number of cycles from peak
         Ncycles = args.Tcut_cycles
-        tcut_geocent = utils.get_Tcut_from_Ncycles(Ncycles, parameters=injected_parameters, time_dict=raw_time_dict,
+        tcut_geocent = utils.get_Tcut_from_Ncycles(Ncycles, injection_approx=args.injection_approx,
+                                                   parameters=injected_parameters, time_dict=raw_time_dict,
                                                    tpeak_dict=tpeak_dict, ap_dict=ap_dict, skypos=skypos, f_ref=f_ref,
-                                                   f_low=f_low, approx=args.approx)
+                                                   f_low=f_low)
 
     print('\nCutoff time:')
     tcut_dict, _ = utils.get_tgps_and_ap_dicts(tcut_geocent, ifos, skypos['ra'], skypos['dec'], skypos['psi'])
@@ -228,6 +231,11 @@ def initialize_kwargs(args, initial_run_dir=''):
     Nanalyze = Npre + Npost
     Tanalyze = Nanalyze * dt
     print('\nWill analyze {:.3f} s of data at {:.1f} Hz\n'.format(Tanalyze, 1 / dt))
+    print('Nanalyze is ', Npre + Npost)
+    print('tcut_geocent is', tcut_geocent)
+    print('dt is', dt)
+    print('Tpre is', TPre)
+    print('Tpos is', TPost)
 
     # Crop analysis data to specified duration.
     for ifo, idx in icut_dict.items():

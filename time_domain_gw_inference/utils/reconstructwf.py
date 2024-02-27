@@ -19,7 +19,7 @@ lalsim = lalsimulation
 Functions to generate waveform reconstructions
 """
 
-def get_trigger_times(*args, **kwargs):
+def get_trigger_times(approx, *args, **kwargs):
     """
     Get the trigger time: time at which the Hanford strain is loudest (peak time)
     at geocenter and each inferometer
@@ -29,7 +29,6 @@ def get_trigger_times(*args, **kwargs):
     p = kwargs.pop('parameters')
     times = kwargs.pop('times')
     ifos = kwargs.pop('ifos', ['H1', 'L1', 'V1'])
-    approx = kwargs.pop('approx', 'NRSur7dq4')
 
     # Get delta t and length of timeseries
     delta_t = times[1] - times[0]

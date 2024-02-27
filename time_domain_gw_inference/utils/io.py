@@ -100,11 +100,11 @@ def load_raw_data(path_dict, ifos=('H1', 'L1', 'V1'), verbose=True):
     return raw_time_dict, raw_data_dict
 
 
-def get_pe(raw_time_dict, path, psd_path_dict=None, verbose=True, f_ref=11, f_low=11):
+def get_pe(raw_time_dict, path, approx, psd_path_dict=None, verbose=True, f_ref=11, f_low=11):
     """
     Load in parameter estimation (pe) samples from LVC GW190521 analysis, and calculate
     the peak strain time at geocenter and each detector, the detector antenna patterns, 
-    the psds, and the maximum posterior sky position    
+    the psds, and the maximum posterior sky position
     
     Parameters
     ----------
@@ -117,6 +117,7 @@ def get_pe(raw_time_dict, path, psd_path_dict=None, verbose=True, f_ref=11, f_lo
         the file path in this dict
     verbose : boolean (optional)
         whether or not to print out information as the data is loaded
+    approx : waveform approximant to use to get the peak times
     
     Returns
     -------
@@ -180,7 +181,7 @@ def get_pe(raw_time_dict, path, psd_path_dict=None, verbose=True, f_ref=11, f_lo
     # Set truncation time
     amporder = 1
     fstart = f_low * 2. / (amporder + 2)
-    trigger_times = rwf.get_trigger_times(parameters=pe_samples[imax], times=raw_time_dict[ifos[0]],
+    trigger_times = rwf.get_trigger_times(approx=approx, parameters=pe_samples[imax], times=raw_time_dict[ifos[0]],
                                     f_ref=f_ref, f_low=fstart, lal_amporder=1)
 
     # Get peak time of the signal in LIGO Hanford
