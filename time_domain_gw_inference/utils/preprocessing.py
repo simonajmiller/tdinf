@@ -113,6 +113,8 @@ def injectWaveform(injection_approx, **kwargs):
     iota, s1x, s1y, s1z, s2x, s2y, s2z = transform_spins(p['theta_jn'], p['phi_jl'], p['tilt_1'], p['tilt_2'],
                                           p['phi_12'], p['a_1'], p['a_2'], p['mass_1'], p['mass_2'],
                                           f_ref, p['phase'])
+    if p['phi_jl'] == 0:
+        s1x, s1y, s2x, s2y = 0, 0, 0, 0
 
     # Get strain
     hp, hc = rwf.generate_lal_hphc(injection_approx,
