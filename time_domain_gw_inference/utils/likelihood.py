@@ -267,13 +267,44 @@ class LnPriorManager(LogisticParameterManager):
         return lnprior
 
 
+class AntennaAndTimeManager(LogisticParameterManager):
+    def __init__(self, ifos, *args, **kwargs):
+        super(AntennaAndTimeManager, self).__init__(*args, **kwargs)
+        # If we are sampling over sky position and/or time ...
+        self.peak_time_dict = None
+        self.antenna_pattern_dict = None
+        if not self.vary_skypos:
+            # antenna pattern is fixed if sky location is fixed
+            # (it will vary a tiny amount over different geocenter times)
+            self.antenna_pattern_dict = rwf.get_antenna_pattern_dict(self.reference_time, ifos,
+                        self.fixed['right_ascension'], self.fixed['declination'], self.fixed['polarization'])
+
+            if not self.vary_time:
+                # tpeak dict is only fixed if both sky location and time are fixed
+                self.peak_time_dict = rwf.get_tgps_dict(
+                            self.reference_time, ifos,
+                            self.fixed['right_ascension'], self.fixed['declination'])
+        return
+
+    def get_tpeak_dict(self, x_phys, ifos):
+        if self.peak_time_dict is not None:
+            return self.peak_time_dict
+        return rwf.get_tgps_dict(x_phys['geocenter_time'], ifos, x_phys['right_ascension'], x_phys['declination'])
+
+    def get_antenna_pattern_dict(self, x_phys, ifos):
+        if self.antenna_pattern_dict is not None:
+            return self.antenna_pattern_dict
+        return rwf.get_antenna_pattern_dict(x_phys['geocenter_time'], ifos,
+                                            x_phys['right_ascension'], x_phys['declination'], x_phys['polarization'])
+
+
 class WaveformManager(LogisticParameterManager):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, ifos, *args, **kwargs):
         super(WaveformManager, self).__init__(*args, **kwargs)
         self.approx_name = kwargs['approx']
         self.approximant = lalsim.SimInspiralGetApproximantFromString(self.approx_name)
 
-        return
+        self.antenna_and_time_manager = AntennaAndTimeManager(ifos, *args, **kwargs)
 
     def generate_lal_hphc(self, m1_msun, m2_msun, chi1, chi2, dist_mpc=1,
                           dt=None, f_low=20, f_ref=11, inclination=0, phi_ref=0., eccentricity=0,
@@ -317,33 +348,12 @@ class WaveformManager(LogisticParameterManager):
         return hp, hc
 
     def get_projected_waveform(self, x_phys, ifos, time_dict, f_low=11, f_ref=11,
-                               delta_t=None,
-                               ap_dict=None, tpeak_dict=None):
+                               delta_t=None):
 
         hp, hc = self.get_hplus_hcross(x_phys, f_low=f_low, f_ref=f_ref, delta_t=delta_t)
 
-        # If we are sampling over sky position and/or time ...
-        if self.vary_skypos and self.vary_time:
-            TP_dict, AP_dict = rwf.get_tgps_and_ap_dicts(
-                x_phys['geocenter_time'],
-                ifos,
-                x_phys['right_ascension'], x_phys['declination'], x_phys['polarization'],
-                verbose=False)
-        elif self.vary_skypos:  # just skypos
-            _, AP_dict = rwf.get_tgps_and_ap_dicts(
-                self.reference_time, ifos,
-                x_phys['right_ascension'], x_phys['declination'], x_phys['polarization'],
-                verbose=False)
-            TP_dict = tpeak_dict.copy()
-        elif tpeak_dict is None:  # just time
-            TP_dict, _ = rwf.get_tgps_and_ap_dicts(
-                x_phys['geocenter_time'], ifos,
-                self.fixed['right_ascension'], self.fixed['declination'], self.fixed['polarization'],
-                verbose=False)
-            AP_dict = ap_dict.copy()
-        else:  # neither
-            TP_dict = tpeak_dict.copy()
-            AP_dict = ap_dict.copy()
+        TP_dict = self.antenna_and_time_manager.get_tpeak_dict(x_phys, ifos)
+        AP_dict = self.antenna_and_time_manager.get_antenna_pattern_dict(x_phys, ifos)
 
         # Cycle through ifos
         projected_waveform_dict = {}
@@ -366,7 +376,7 @@ class WaveformManager(LogisticParameterManager):
 
 
 class NewWaveformManager(LogisticParameterManager):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, ifos, *args, **kwargs):
         super(NewWaveformManager, self).__init__(*args, **kwargs)
 
         self.approx_name = kwargs['approx']
@@ -374,6 +384,9 @@ class NewWaveformManager(LogisticParameterManager):
             self.generator = TEOBResumSDALI(modes_to_use=[[2, 2]])
         else:
             self.generator = gwsignal.core.waveform.LALCompactBinaryCoalescenceGenerator(self.approx_name)
+
+        self.antenna_and_time_manager = AntennaAndTimeManager(ifos, *args, **kwargs)
+
         return
 
     def get_hplus_hcross(self, x_phys, f_low=11, f_ref=11, delta_t=None):
@@ -389,33 +402,12 @@ class NewWaveformManager(LogisticParameterManager):
         return wfm.GenerateTDWaveform(params, self.generator)
 
     def get_projected_waveform(self, x_phys, ifos, time_dict, f_low=11, f_ref=11,
-                               delta_t=None,
-                               ap_dict=None, tpeak_dict=None):
+                               delta_t=None):
 
         hp, hc = self.get_hplus_hcross(x_phys, f_low=f_low, f_ref=f_ref, delta_t=delta_t)
 
-        # If we are sampling over sky position and/or time ...
-        if self.vary_skypos and self.vary_time:
-            TP_dict, AP_dict = rwf.get_tgps_and_ap_dicts(
-                x_phys['geocenter_time'],
-                ifos,
-                x_phys['right_ascension'], x_phys['declination'], x_phys['polarization'],
-                verbose=False)
-        elif self.vary_skypos:  # just skypos
-            _, AP_dict = rwf.get_tgps_and_ap_dicts(
-                self.reference_time, ifos,
-                x_phys['right_ascension'], x_phys['declination'], x_phys['polarization'],
-                verbose=False)
-            TP_dict = tpeak_dict.copy()
-        elif tpeak_dict is None:  # just time
-            TP_dict, _ = rwf.get_tgps_and_ap_dicts(
-                x_phys['geocenter_time'], ifos,
-                self.fixed['right_ascension'], self.fixed['declination'], self.fixed['polarization'],
-                verbose=False)
-            AP_dict = ap_dict.copy()
-        else:  # neither
-            TP_dict = tpeak_dict.copy()
-            AP_dict = ap_dict.copy()
+        TP_dict = self.antenna_and_time_manager.get_tpeak_dict(x_phys, ifos)
+        AP_dict = self.antenna_and_time_manager.get_antenna_pattern_dict(x_phys, ifos)
 
         # Cycle through ifos
         projected_waveform_dict = {}
@@ -440,11 +432,11 @@ class NewWaveformManager(LogisticParameterManager):
 class LnLikelihoodManager(LogisticParameterManager):
     def __init__(self, *args, **kwargs):
         try:
-            self.waveform_manager = NewWaveformManager(*args, **kwargs)
+            self.waveform_manager = NewWaveformManager(kwargs['data_dict'].keys(), *args, **kwargs)
         except Exception as e:
             print(e)
             print("warning, new waveform manager has failed to be created, using old waveform manager")
-            self.waveform_manager = WaveformManager(*args, **kwargs)
+            self.waveform_manager = WaveformManager(kwargs['data_dict'].keys(), *args, **kwargs)
         self.log_prior = LnPriorManager(*args, **kwargs)
 
         super().__init__(*args, **kwargs)
@@ -452,7 +444,7 @@ class LnLikelihoodManager(LogisticParameterManager):
     def get_lnprob(self, x, f_low=11, f_ref=11, return_wf=False,
                    only_prior=False,
                    rho_dict=None, time_dict=None, delta_t=None, data_dict=None,
-                   ap_dict=None, tpeak_dict=None, **kwargs):
+                   **kwargs):
         # get physical parameters
         x_phys = self.samp_to_phys(x)
 
@@ -464,7 +456,6 @@ class LnLikelihoodManager(LogisticParameterManager):
             projected_wf_dict = self.waveform_manager.get_projected_waveform(
                 x_phys, data_dict.keys(), time_dict, f_low=f_low, f_ref=f_ref,
                 delta_t=delta_t,
-                ap_dict=ap_dict, tpeak_dict=tpeak_dict
             )
 
             # Cycle through ifos
