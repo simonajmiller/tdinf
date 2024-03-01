@@ -46,8 +46,6 @@ def create_run_sampler_arg_parser():
 
     # Optional args for waveform/data settings
     p.add_argument('--approx', default='NRSur7dq4')
-    p.add_argument('--injection-approx', default=None,
-                   help='approximant to use for the injection, same as approx unless otherwise specified')
 
     p.add_argument('--sampling-rate', type=int, default=2048)
 
@@ -335,11 +333,6 @@ def main():
     # Parse the commandline arguments
     p = create_run_sampler_arg_parser()
     args = p.parse_args()
-
-    if args.injection_approx is None:
-        args.injection_approx = args.approx
-    if args.injection_approx != args.approx:
-        print('Warning! running with different approx than was used for the injection')
 
     backend_path = args.output_h5  # where emcee spits its output
 
