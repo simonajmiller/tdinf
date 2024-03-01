@@ -45,41 +45,29 @@ def get_trigger_times(approx, *args, **kwargs):
     chi1 = [s1x, s1y, s1z]
     chi2 = [s2x, s2y, s2z]
 
+    # TODO replace this function entirely
+    hplus, hcross = generate_lal_hphc(approx, p['mass_1'], p['mass_2'], chi1, chi2, dist_mpc=p['luminosity_distance'],
+                                      dt=delta_t, f_low=f_start, f_ref=fp['f_ref'], inclination=iota,
+                                      phi_ref=p['phase']
+                                      )
+
     # Get time-domain strain
-    h_td = generate_lal_waveform(approx, p['mass_1'], p['mass_2'], chi1, chi2, dist_mpc=p['luminosity_distance'],
-                                 dt=delta_t, f_low=f_start, f_ref=fp['f_ref'], inclination=iota,
-                                 phi_ref=p['phase'], times=times, triggertime=p['geocent_time'])
-    # FFT
-    hp_td = h_td.real
-    hc_td = -h_td.imag
-    fft_norm = delta_t
-    hp_fd = np.fft.rfft(hp_td) * fft_norm
-    hc_fd = np.fft.rfft(hc_td) * fft_norm
-    frequencies = np.fft.rfftfreq(tlen) / fft_norm
+    h_td = generate_lal_waveform(hplus, hcross, times, p['geocent_time'], **kwargs)
 
     # get peak time
     tp_geo_loc = np.argmax(np.abs(h_td))
     tp_geo = times[tp_geo_loc]
 
     geo_gps_time = lal.LIGOTimeGPS(p['geocent_time'])
-    gmst = lal.GreenwichMeanSiderealTime(geo_gps_time)
 
     # Cycle through ifos
     tp_dict = {'geo': tp_geo}
     for ifo in ifos:
         detector = lal.cached_detector_by_prefix[ifo]
 
-        # get antenna patterns
-        Fp, Fc = lal.ComputeDetAMResponse(detector.response, p['ra'], p['dec'], p['psi'], gmst)
-
         # get time delay and align waveform
         # assume reference time corresponds to envelope peak
         timedelay = lal.TimeDelayFromEarthCenter(detector.location, p['ra'], p['dec'], geo_gps_time)
-
-        fancy_timedelay = lal.LIGOTimeGPS(timedelay)
-        timeshift = fancy_timedelay.gpsSeconds + 1e-9 * fancy_timedelay.gpsNanoSeconds
-
-        timeshift_vector = np.exp(-2. * 1j * np.pi * timeshift * frequencies)
 
         tp_dict[ifo] = tp_geo + timedelay
 
@@ -196,7 +184,7 @@ def generate_lal_hphc(approximant_key, m1_msun, m2_msun, chi1, chi2, dist_mpc=1,
     """
     Generate the plus and cross polarizations for given waveform parameters and approximant
     """
-
+    print('approximant is ', approximant_key)
     approximant = lalsim.SimInspiralGetApproximantFromString(approximant_key)
 
     m1_kg = m1_msun * lal.MSUN_SI
@@ -217,26 +205,23 @@ def generate_lal_hphc(approximant_key, m1_msun, m2_msun, chi1, chi2, dist_mpc=1,
     return hp, hc
 
 
-def generate_lal_waveform(*args, **kwargs):
+def generate_lal_waveform(hplus, hcross, times, triggertime, **kwargs):
     """
     Generate a waveform in a detector with time of coalescence 'triggertime' for given parameters 
     and approximant; if 'hplus' and 'hcross' not passed, uses the generate_lal_hphc function above to 
     generate a waveform. Then aligns places the waveform at the desired time. 
     """
 
-    times = kwargs.pop('times')
-    triggertime_geo = kwargs.pop('triggertime')
+    # times = kwargs.pop('times')
+    # triggertime_geo = kwargs.pop('triggertime')
+    triggertime_geo = triggertime
 
     bufLength = len(times)
     delta_t = times[1] - times[0]
     tStart = times[0]
     tEnd = tStart + delta_t * bufLength
 
-    hplus = kwargs.pop('hplus', None)
-    hcross = kwargs.pop('hcross', None)
-    # TODO make this a function of our waveform generator so that we can pass any waveform
-    if (hplus is None) or (hcross is None):
-        hplus, hcross = generate_lal_hphc(*args, **kwargs)
+
     new_generator = False
     if isinstance(hplus, gwpy.timeseries.timeseries.TimeSeries):
         new_generator = True

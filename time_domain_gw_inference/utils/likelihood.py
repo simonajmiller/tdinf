@@ -14,6 +14,8 @@ except:
     from .misc import logit, inv_logit, logit_jacobian
 
 from .parameter import LogisticParameter, CartesianAngle, TrigLogisticParameter
+from .preprocessing import get_ACF
+
 import astropy.units as u
 try:
     import gwsignal
@@ -166,7 +168,7 @@ class LogisticParameterManager:
         :return:
         """
         m1, m2 = m1m2_from_mtotq(physical_dict['total_mass'], physical_dict['mass_ratio'])
-        return {
+        param_dict = {
             'mass1': m1 * u.Msun,
             'mass2': m2 * u.Msun,
             'spin1x': physical_dict['spin1_x'] * u.dimensionless_unscaled,
@@ -178,9 +180,12 @@ class LogisticParameterManager:
             'phi_ref': physical_dict['phase'] * u.rad,
             'distance': physical_dict['distance_mpc'] * u.Mpc,
             'inclination': physical_dict['inclination'] * u.rad,
-            'eccentricity': physical_dict['eccentricity'] * u.dimensionless_unscaled,
-            'meanPerAno': physical_dict['mean_anomaly'] * u.rad,
         }
+        # TODO, maybe it should check if we have an eccentric waveform?
+        if 'eccentricity' in physical_dict:
+            param_dict['eccentricity'] = physical_dict['eccentricity'] * u.dimensionless_unscaled
+            param_dict['meanPerAno'] = physical_dict['mean_anomaly'] * u.rad
+        return param_dict
 
 
 class LnPriorManager(LogisticParameterManager):
@@ -194,28 +199,15 @@ class LnPriorManager(LogisticParameterManager):
         for param in self.logistic_parameters:
             p = self.sampled_keys.index(param.logistic_name)
             param_kw = param.physical_name
-            # get physical parameter
-            if param_kw == 'total_mass':
-                param_phys = injected_parameters['mass_1'] + injected_parameters['mass_2']
-            elif param_kw == 'mass_ratio':
-                param_phys = injected_parameters['mass_2'] / injected_parameters['mass_1']
-            elif param_kw == 'spin1_magnitude':
-                param_phys = injected_parameters['a_1']
-            elif param_kw == 'spin2_magnitude':
-                param_phys = injected_parameters['a_2']
-            elif param_kw == 'distance_mpc':
-                param_phys = injected_parameters['luminosity_distance']
-            else:
-                try:
-                    param_phys = injected_parameters[param_kw]
-                    print('injected', param_phys, param_kw)
-                except ValueError:
-                    print(f"{param_kw} not in injected_parameters dict, continuing anyways")
-                    continue
-                except KeyError:
-                    print(f"{param_kw} not in injected_parameters dict, continuing anyways")
-                    continue
-
+            try:
+                param_phys = injected_parameters[param_kw]
+                print('injected', param_phys, param_kw)
+            except ValueError:
+                print(f"{param_kw} not in injected_parameters dict, continuing anyways")
+                continue
+            except KeyError:
+                print(f"{param_kw} not in injected_parameters dict, continuing anyways")
+                continue
             # transform into logistic space
             param_logit = param.physical_to_logistic(param_phys)
 
@@ -233,12 +225,13 @@ class LnPriorManager(LogisticParameterManager):
         p0 = p0_arr.tolist()
         return p0
 
-    def get_lnprior(self, x, **kwargs):
+    def get_lnprior(self, x, phys_dict=None):
 
         x_dict = self.get_logistic_dict(x)
 
         # If x_phys passed in kws, return it, if not, calculate it with samp_to_phys
-        phys_dict = kwargs.pop('x_phys', self.samp_to_phys(x))
+        if phys_dict is None:
+            phys_dict = self.samp_to_phys(x)
 
         lnprior = 0
         # Logistic jacobians
@@ -306,8 +299,8 @@ class WaveformManager(LogisticParameterManager):
 
         self.antenna_and_time_manager = AntennaAndTimeManager(ifos, *args, **kwargs)
 
-    def generate_lal_hphc(self, m1_msun, m2_msun, chi1, chi2, dist_mpc=1,
-                          dt=None, f_low=20, f_ref=11, inclination=0, phi_ref=0., eccentricity=0,
+    def generate_lal_hphc(self, m1_msun, m2_msun, chi1, chi2, delta_t, dist_mpc=1,
+                          f_low=20, f_ref=11, inclination=0, phi_ref=0., eccentricity=0,
                           mean_anomaly_periastron=0):
         """
         Generate the plus and cross polarizations for given waveform parameters and approximant
@@ -325,12 +318,12 @@ class WaveformManager(LogisticParameterManager):
                                                     chi2[0], chi2[1], chi2[2],
                                                     distance, inclination,
                                                     phi_ref, 0., eccentricity, mean_anomaly_periastron,
-                                                    dt, f_low, f_ref,
+                                                    delta_t, f_low, f_ref,
                                                     param_dict,
                                                     self.approximant)
         return hp, hc
 
-    def get_hplus_hcross(self, x_phys, f_low=11, f_ref=11, delta_t=None):
+    def get_hplus_hcross(self, x_phys, delta_t, f_low=11, f_ref=11):
         """
         get complex waveform at geocenter
         """
@@ -338,8 +331,8 @@ class WaveformManager(LogisticParameterManager):
         chi1 = [x_phys['spin1_x'], x_phys['spin1_y'], x_phys['spin1_z']]
         chi2 = [x_phys['spin2_x'], x_phys['spin2_y'], x_phys['spin2_z']]
 
-        hp, hc = self.generate_lal_hphc(m1, m2, chi1, chi2,
-                                       dist_mpc=x_phys['distance_mpc'], dt=delta_t,
+        hp, hc = self.generate_lal_hphc(m1, m2, chi1, chi2, delta_t=delta_t,
+                                       dist_mpc=x_phys['distance_mpc'],
                                        f_low=f_low, f_ref=f_ref,
                                        inclination=x_phys['inclination'],
                                        phi_ref=x_phys['phase'],
@@ -347,10 +340,10 @@ class WaveformManager(LogisticParameterManager):
                                        mean_anomaly_periastron=x_phys['mean_anomaly'])
         return hp, hc
 
-    def get_projected_waveform(self, x_phys, ifos, time_dict, f_low=11, f_ref=11,
-                               delta_t=None):
+    def get_projected_waveform(self, x_phys, ifos, time_dict, f_low=11, f_ref=11):
+        delta_t = time_dict[ifos[0]][1] - time_dict[ifos[0]][0]
 
-        hp, hc = self.get_hplus_hcross(x_phys, f_low=f_low, f_ref=f_ref, delta_t=delta_t)
+        hp, hc = self.get_hplus_hcross(x_phys, delta_t, f_low=f_low, f_ref=f_ref)
 
         TP_dict = self.antenna_and_time_manager.get_tpeak_dict(x_phys, ifos)
         AP_dict = self.antenna_and_time_manager.get_antenna_pattern_dict(x_phys, ifos)
@@ -378,7 +371,6 @@ class WaveformManager(LogisticParameterManager):
 class NewWaveformManager(LogisticParameterManager):
     def __init__(self, ifos, *args, **kwargs):
         super(NewWaveformManager, self).__init__(*args, **kwargs)
-
         self.approx_name = kwargs['approx']
         if self.approx_name == 'TEOBResumSDALI':
             self.generator = TEOBResumSDALI(modes_to_use=[[2, 2]])
@@ -389,7 +381,7 @@ class NewWaveformManager(LogisticParameterManager):
 
         return
 
-    def get_hplus_hcross(self, x_phys, f_low=11, f_ref=11, delta_t=None):
+    def get_hplus_hcross(self, x_phys, delta_t, f_low=11, f_ref=11):
         """
         get complex waveform at geocenter
         """
@@ -401,10 +393,11 @@ class NewWaveformManager(LogisticParameterManager):
 
         return wfm.GenerateTDWaveform(params, self.generator)
 
-    def get_projected_waveform(self, x_phys, ifos, time_dict, f_low=11, f_ref=11,
-                               delta_t=None):
+    def get_projected_waveform(self, x_phys, ifos, time_dict, f_low=11, f_ref=11):
 
-        hp, hc = self.get_hplus_hcross(x_phys, f_low=f_low, f_ref=f_ref, delta_t=delta_t)
+        delta_t = time_dict[ifos[0]][1] - time_dict[ifos[0]][0]
+
+        hp, hc = self.get_hplus_hcross(x_phys, delta_t, f_low=f_low, f_ref=f_ref)
 
         TP_dict = self.antenna_and_time_manager.get_tpeak_dict(x_phys, ifos)
         AP_dict = self.antenna_and_time_manager.get_antenna_pattern_dict(x_phys, ifos)
@@ -430,20 +423,30 @@ class NewWaveformManager(LogisticParameterManager):
 
 
 class LnLikelihoodManager(LogisticParameterManager):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, psd_dict, time_dict, data_dict, f_low, f_ref, only_prior=False, *args, **kwargs):
+        self.time_dict = time_dict
+        self.data_dict = data_dict
+        self.f_low = f_low
+        self.f_ref = f_ref
+        self.psd_dict = psd_dict
+        self.rho_dict = self._make_autocorrolation_dict()
+        for ifo, rho in self.rho_dict.items():
+            assert len(rho) == len(self.data_dict[ifo]), 'Length for ACF is not the same as for the data'
+        self.only_prior = only_prior
         try:
-            self.waveform_manager = NewWaveformManager(kwargs['data_dict'].keys(), *args, **kwargs)
+            self.waveform_manager = NewWaveformManager(self.data_dict.keys(), *args, **kwargs)
         except Exception as e:
             print(e)
             print("warning, new waveform manager has failed to be created, using old waveform manager")
-            self.waveform_manager = WaveformManager(kwargs['data_dict'].keys(), *args, **kwargs)
+            self.waveform_manager = WaveformManager(self.data_dict.keys(), *args, **kwargs)
         self.log_prior = LnPriorManager(*args, **kwargs)
 
         super().__init__(*args, **kwargs)
 
-    def get_lnprob(self, x, f_low=11, f_ref=11, return_wf=False,
-                   only_prior=False,
-                   rho_dict=None, time_dict=None, delta_t=None, data_dict=None,
+    def _make_autocorrolation_dict(self):
+        return get_ACF(self.psd_dict, self.time_dict, f_low=self.f_low)
+
+    def get_lnprob(self, x,
                    **kwargs):
         # get physical parameters
         x_phys = self.samp_to_phys(x)
@@ -452,30 +455,27 @@ class LnLikelihoodManager(LogisticParameterManager):
         lnprob = 0
 
         # Calculate posterior
-        if not only_prior:
+        if not self.only_prior:
             projected_wf_dict = self.waveform_manager.get_projected_waveform(
-                x_phys, data_dict.keys(), time_dict, f_low=f_low, f_ref=f_ref,
-                delta_t=delta_t,
+                x_phys, self.data_dict.keys(), self.time_dict,
+                f_low=self.f_low,
+                f_ref=self.f_ref
             )
 
             # Cycle through ifos
-            for ifo, data in data_dict.items():
-
-                # for debugging purporses
-                if return_wf == ifo:
-                    return projected_wf_dict[ifo]
+            for ifo, data in self.data_dict.items():
 
                 # Truncate and compute residuals
                 r = data - projected_wf_dict[ifo]
 
                 # "Over whiten" residuals
-                rwt = solve_toeplitz(rho_dict[ifo], r)
+                rwt = solve_toeplitz(self.rho_dict[ifo], r)
 
                 # Compute log likelihood for ifo
                 lnprob -= 0.5 * np.dot(r, rwt)
 
         # Calculate prior
-        lnprob += self.log_prior.get_lnprior(x, x_phys=x_phys, **kwargs)
+        lnprob += self.log_prior.get_lnprior(x, phys_dict=x_phys)
 
         # Check for NaN
         if lnprob != lnprob:
