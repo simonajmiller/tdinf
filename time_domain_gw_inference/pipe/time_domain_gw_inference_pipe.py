@@ -45,7 +45,8 @@ class AbstractPipelineDAG(abc.ABC):
     def default_condor_settings(self):
         condor_settings = {
             "universe": "vanilla",
-            "when_to_transfer_output": "ON_EXIT",
+            "when_to_transfer_output": "ON_EXIT_OR_EVICT",
+            "retries": 1,
             "success_exit_code": 0,
             "getenv": "True",
             "initialdir": os.path.abspath(self.output_directory),
