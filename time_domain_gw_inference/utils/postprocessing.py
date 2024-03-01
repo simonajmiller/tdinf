@@ -45,10 +45,14 @@ def postprocess_samples(sampler, log_prior, getRidOfFixed=False, **kwargs):
     
     # Get autocorrelation time
     tau = sampler.get_autocorr_time(quiet=True)
+    if np.isnan(tau):
+        burnin = 0
+        thin = 1
+    else:
+        # Calculate amonut to burn in and thin by based off of autocorr time
+        burnin = max(int(5 * np.max(tau)), 0)
+        thin = max(int(0.5 * np.min(tau)), 1)
 
-    # Calculate amonut to burn in and thin by based off of autocorr time
-    burnin = max(int(5 * np.max(tau)), 0)
-    thin = max(int(0.5 * np.min(tau)), 1)
     samples = sampler.get_chain(discard=burnin, flat=True, thin=thin)
     
     # Convert samples into their physical quantities
