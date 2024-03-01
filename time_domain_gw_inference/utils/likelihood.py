@@ -447,6 +447,25 @@ class LnLikelihoodManager(LogisticParameterManager):
     def _make_autocorrolation_dict(self):
         return get_ACF(self.psd_dict, self.time_dict, f_low=self.f_low)
 
+    def waveform_has_error(self, phys_dict, waveform_ifo, residual):
+        # check for various errors before continuing
+        if np.all(waveform_ifo == 0):
+            print('waveform falls outside allowed window for:')
+            print(phys_dict)
+            return True
+
+        if sum(np.isnan(residual)) > 0:
+            print('NaNs in residuals for:')
+            print(phys_dict)
+            return True
+
+        if sum(np.isinf(residual)) > 0:
+            print('infinities in residuals for:')
+            print(phys_dict)
+            return True
+
+        return False
+
     def get_lnprob(self, x,
                    **kwargs):
         # get physical parameters
@@ -468,6 +487,9 @@ class LnLikelihoodManager(LogisticParameterManager):
 
                 # Truncate and compute residuals
                 r = data - projected_wf_dict[ifo]
+
+                if self.waveform_has_error(x_phys, projected_wf_dict[ifo], r):
+                    return -np.inf
 
                 # "Over whiten" residuals
                 rwt = solve_toeplitz(self.rho_dict[ifo], r)
