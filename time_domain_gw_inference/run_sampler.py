@@ -300,6 +300,11 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
     else:
         raise NotImplementedError(f'Run mode {run_mode} is not defined, please use one of pre post or full')
 
+    if TPre < 0:
+        print(f"Warning! Seconds analyzed before cut is less than 0!: {TPre} from {args.Tstart} to {tcut_geocent}")
+    if TPost < 0:
+        print(f"Warning! Seconds analyzed after cut is less than 0!: {TPost} from {tcut_geocent} to {args.Tend}")
+
     # Duration --> number of time samples to look at
     Npre = int(round(TPre / dt))
     Npost = int(
@@ -308,6 +313,8 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
     Nanalyze = Npre + Npost
     Tanalyze = Nanalyze * dt
     print('\nWill analyze {:.3f} s of data at {:.1f} Hz\n'.format(Tanalyze, 1 / dt))
+    assert Tanalyze > 0, "Geocenter cut time must be between Tstart and Tend. Please Modify your run settings." \
+                         f" Start to end: {args.Tstart}, {args.Tend} with cut at {tcut_geocent}"
 
     # Crop analysis data to specified duration.
     for ifo, idx in icut_dict.items():
