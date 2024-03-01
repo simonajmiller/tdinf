@@ -250,15 +250,30 @@ def generate_lal_waveform(hplus, hcross, times, triggertime, **kwargs):
         data_length = hplus.data.length
     wavePostTc = data_length - waveTcSample
 
-    # Start and end indices for the buffer
+    # Start and end indices for placing the waveform for the buffer:
+    # - If the waveform "touches" the beginning of the buffer, set start index to 0, else shift by difference
+    # between tc indices in buffer and waveform
     bufStartIndex = int(tcSample - waveTcSample if tcSample >= waveTcSample else 0)
+    # - If waveform "touches" the end of the buffer, set end index to the end of the buffer, else truncated
+    # where the waveform will naturally end
     bufEndIndex = int(tcSample + wavePostTc if tcSample + wavePostTc <= bufLength else bufLength)
 
-    # Length of buffer
+    # Number of samples in the buffer taken up by the of waveform
     bufWaveLength = bufEndIndex - bufStartIndex
 
-    # Start indec for the waveform 
+    # Start index for the waveform
     waveStartIndex = int(0 if tcSample >= waveTcSample else waveTcSample - tcSample)
+    waveEndIndex = waveStartIndex + bufWaveLength
+
+    # Generate the buffer we're storing the waveform
+    h_td = np.zeros(bufLength, dtype=complex)
+
+    # Make sure the waveform actually fits in the buffer; if it doesn't, just return a
+    # list of zeros with no waveform a
+    if bufWaveLength <= 0:
+        print("Warning! time asked to analyze is non-existant! between indices : {bufStartIndex} {bufEndIndex} ")
+        return h_td
+
 
     # Window if we want
     if kwargs.get('window', True) and tcSample >= waveTcSample:
@@ -272,9 +287,9 @@ def generate_lal_waveform(hplus, hcross, times, triggertime, **kwargs):
 
     # Place waveform
     if new_generator:
-        h_td[bufStartIndex:bufEndIndex] = window * hplus[waveStartIndex:waveStartIndex + bufWaveLength].value - \
-                                      1j * window * hcross[waveStartIndex:waveStartIndex + bufWaveLength].value
+        h_td[bufStartIndex:bufEndIndex] = window * hplus[waveStartIndex:waveEndIndex].value - \
+                                      1j * window * hcross[waveStartIndex:waveEndIndex].value
     else:
-        h_td[bufStartIndex:bufEndIndex] = window * hplus.data.data[waveStartIndex:waveStartIndex + bufWaveLength] - \
-                                          1j * window * hcross.data.data[waveStartIndex:waveStartIndex + bufWaveLength]
+        h_td[bufStartIndex:bufEndIndex] = window * hplus.data.data[waveStartIndex:waveEndIndex] - \
+                                          1j * window * hcross.data.data[waveStartIndex:waveEndIndex]
     return h_td
