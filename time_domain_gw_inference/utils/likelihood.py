@@ -108,13 +108,13 @@ class LogisticParameterManager:
 
         self.fixed = {}
         if not self.vary_skypos:
-            self.fixed['right_ascension'] = kwargs['ra']
-            self.fixed['declination'] = kwargs['dec']
-            self.fixed['polarization'] = kwargs['psi']
+            self.fixed['right_ascension'] = kwargs['right_ascension']
+            self.fixed['declination'] = kwargs['declination']
+            self.fixed['polarization'] = kwargs['polarization']
 
         if not self.vary_time:
-            self.fixed['geocenter_time'] = kwargs['tgps_geocent']
-        self.reference_time = kwargs['tgps_geocent']
+            self.fixed['geocenter_time'] = kwargs['geocenter_time']
+        self.reference_time = kwargs['geocenter_time']
 
         if not self.vary_eccentricity:
             self.fixed['eccentricity'] = 0

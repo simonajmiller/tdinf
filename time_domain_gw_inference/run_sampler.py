@@ -99,8 +99,6 @@ def modify_parameters(data, args):
                 dataframe[wanted_key] = dataframe[maybe_key]
             else:
                 print(f'warning! neither {wanted_key} nor {maybe_key} in df.columns!')
-        else:
-            dataframe[maybe_key] = dataframe[wanted_key]
 
     # Common operations for both DataFrames and dictionaries
     equivocate_columns(df, 'geocenter_time', 'geocent_time')
@@ -184,10 +182,6 @@ def initialize_kwargs(args, reference_parameters):
     run_mode = args.mode
     assert run_mode in ['full', 'pre', 'post'], f"mode must be 'full', 'pre', or 'post'. given mode = '{run_mode}'."
 
-    # If real data ...
-    tpeak_geocent = reference_parameters['geocent_time']
-    skypos = {k: reference_parameters[k] for k in ['ra', 'dec', 'psi']}
-
     """
     Arguments for the posterior function
     """
@@ -214,11 +208,10 @@ def initialize_kwargs(args, reference_parameters):
         'f_low': args.flow,
         'delta_t': 1 / args.sampling_rate,
 
-        'ra': skypos['ra'],  # default right ascension if not varied
-        'dec': skypos['dec'],  # default declination if not varied
-        'psi': skypos['psi'],  # default polarization if not varied
-        'tgps_geocent': tpeak_geocent,  # default waveform placement time if not varied
-
+        'right_ascension': reference_parameters['right_ascension'],
+        'declination': reference_parameters['declination'],
+        'polarization': reference_parameters['polarization'],
+        'geocenter_time': reference_parameters['geocenter_time'],
     }
     return kwargs
 
@@ -240,8 +233,7 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
     """
 
     # Either reads injection file or finds maxL parameters from
-    tpeak_geocent = reference_parameters['geocent_time']
-    skypos = {k: reference_parameters[k] for k in ['ra', 'dec', 'psi']}
+    tpeak_geocent = reference_parameters['geocenter_time']
 
     # PSDs
     pe_psds = {}
@@ -277,10 +269,13 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
 
         tcut_geocent = utils.get_Tcut_from_Ncycles(projected_waveform_dict, raw_time_dict,
                                                    ifo="H1", Ncycles=Ncycles,
-                                                   ra=reference_parameters['ra'], dec=reference_parameters['dec'])
+                                                   ra=reference_parameters['right_ascension'],
+                                                   dec=reference_parameters['declination'])
 
     print('\nCutoff time:')
-    tcut_dict, _ = utils.get_tgps_and_ap_dicts(tcut_geocent, ifos, skypos['ra'], skypos['dec'], skypos['psi'])
+    tcut_dict, _ = utils.get_tgps_and_ap_dicts(tcut_geocent, ifos,
+                                               reference_parameters['right_ascension'],
+                                               reference_parameters['declination'], reference_parameters['polarization'])
 
     """
     Condition data
