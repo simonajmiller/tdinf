@@ -100,6 +100,35 @@ def load_raw_data(path_dict, ifos=('H1', 'L1', 'V1'), verbose=True):
     return raw_time_dict, raw_data_dict
 
 
+def get_pe_samples(path):
+    """
+    Load in parameter estimation (pe) samples from LVC GW190521 analysis, and calculate
+    the peak strain time at geocenter and each detector, the detector antenna patterns,
+    the psds, and the maximum posterior sky position
+
+    Parameters
+    ----------
+    path : string (optional)
+        file path for pe samples
+    Returns
+    -------
+    pe_samples : dictionary
+        parameter estimation samples released by the LVC
+    """
+    # Load in posterior samples
+    with h5py.File(path, 'r') as f:
+        try:
+            pe_samples = f['NRSur7dq4']['posterior_samples'][()]
+        except:
+            # hdf5 --> dict
+            pe_samples_dict = hdf5_to_dict(f)['posterior']
+            # dict --> a structured array with labels
+            pe_samples = np.rec.fromarrays([pe_samples_dict[key] for key in pe_samples_dict],
+                                           names=list(pe_samples_dict.keys()))
+
+    return pe_samples
+
+
 def get_pe(raw_time_dict, path, approx, psd_path_dict=None, verbose=True, f_ref=11, f_low=11):
     """
     Load in parameter estimation (pe) samples from LVC GW190521 analysis, and calculate
@@ -181,7 +210,8 @@ def get_pe(raw_time_dict, path, approx, psd_path_dict=None, verbose=True, f_ref=
     # Set truncation time
     amporder = 1
     fstart = f_low * 2. / (amporder + 2)
-    trigger_times = rwf.get_trigger_times(approx=approx, parameters=pe_samples[imax], times=raw_time_dict[ifos[0]],
+    parameters = {field: pe_samples[field][imax] for field in pe_samples.dtype.names}
+    trigger_times = rwf.get_trigger_times(approx=approx, parameters=parameters, times=raw_time_dict[ifos[0]],
                                     f_ref=f_ref, f_low=fstart, lal_amporder=1)
 
     # Get peak time of the signal in LIGO Hanford
@@ -208,13 +238,8 @@ def parse_injected_parameters(filepath, initial_run_dir=None):
     with open(json_file, 'r') as jf:
         inj_file = json.load(jf)
 
-    # 15D gravitational-wave parameter space
-    params = ['mass_1', 'mass_2', 'a_1', 'a_2', 'tilt_1', 'tilt_2', 'phi_12', 'phi_jl',
-              'theta_jn', 'luminosity_distance', 'ra', 'dec', 'psi', 'phase', 'geocent_time',
-              'f_ref']
-
     # Format correctly
-    injected_parameters = {p: inj_file[p] for p in params}
+    injected_parameters = {p: inj_file[p] for p in inj_file.keys()}
 
     return injected_parameters
 
