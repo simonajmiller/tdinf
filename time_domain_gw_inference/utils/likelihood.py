@@ -208,6 +208,11 @@ class LnPriorManager(LogisticParameterManager):
             except KeyError:
                 print(f"{param_kw} not in injected_parameters dict, continuing anyways")
                 continue
+            if param_phys in param.limit:
+                print(f'reference value of {param_kw} is on boundary of acceptable range,'
+                      f' drawing random value from within range, '
+                      f"We are not going to draw around that value because we'll get infs!")
+                continue
             # transform into logistic space
             param_logit = param.physical_to_logistic(param_phys)
 
