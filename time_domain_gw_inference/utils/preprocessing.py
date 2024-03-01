@@ -222,15 +222,13 @@ def get_ACF(pe_psds, time_dict, f_low=11):
         dt = times[1] - times[0]
         Nanalyze = len(times)
 
-        # lower freq cut
-        m = freq >= f_low
-        psd[~m] = 100 * max(psd[m])  # set values below 11 Hz to be equal to 100*max(psd)
+        # set values outside of upper and lower bound to 100xmaxPSD value
+        fmax = 0.5 / dt   # upper freq cut (nyquist)
+        m = (freq >= f_low) & (freq <= fmax)  # Combine conditions for both lower and upper frequency cuts
+        psd[~m] = 100 * max(psd[m])  # set values outside the desired frequency range to be equal to 100*max(psd)
 
-        # upper freq cut
-        fmax = 0.5 / dt        
         freq = freq[freq <= fmax]
         psd = psd[freq <= fmax]
-
         # Computer ACF from PSD
         rho = 0.5 * np.fft.irfft(psd) / dt  # dt comes from numpy fft conventions
         rho_dict[ifo] = rho[:Nanalyze]
