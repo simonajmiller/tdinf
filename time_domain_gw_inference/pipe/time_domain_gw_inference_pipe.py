@@ -355,7 +355,7 @@ class RunSamplerLayerManager(AbstractLayerManager):
             "request_memory": "8GB",
             "request_disk": "5000MB",
             "request_cpus": self.argument_parser.get_default('ncpu'),
-            "when_to_transfer_output": "ON_EXIT",
+            "when_to_transfer_output": "ON_EXIT_OR_EVICT",
         }
         run_options = self.get_run_options()
         N_cpu = get_option_from_list('ncpu', run_options)
