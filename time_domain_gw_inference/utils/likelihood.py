@@ -218,7 +218,8 @@ class LnPriorManager(LogisticParameterManager):
         if self.vary_time:
             index = self.sampled_keys.index('geocenter_time')
             dt_1M = 0.00127
-            sigma_time = dt_1M * 2.5  # time prior from LVK has width of ~2.5M
+            #sigma_time = dt_1M * 2.5  # time prior from LVK has width of ~2.5M
+            sigma_time = 0.01
             initial_t_walkers = np.random.normal(loc=self.reference_time, scale=sigma_time, size=nwalkers)
             p0_arr[:, index] = initial_t_walkers  # time always saved as the final param
 
@@ -245,7 +246,7 @@ class LnPriorManager(LogisticParameterManager):
         if self.vary_time:
             # gaussian
             dt_1M = 0.00127
-            sigma_time = dt_1M * 2.5  # time prior from LVK has width of ~2.5M
+            sigma_time = 0.01 #dt_1M * 2.5  # time prior from LVK has width of ~2.5M
             lnprior -= 0.5 * ((phys_dict['geocenter_time'] - self.reference_time) ** 2) / (sigma_time ** 2)
 
         # Spins
