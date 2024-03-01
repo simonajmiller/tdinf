@@ -193,7 +193,7 @@ def initialize_kwargs(args, reference_parameters):
 
     # configure distance prior
     inj_dist_log = np.log10(reference_parameters['luminosity_distance'])
-    min_dist_prior = int(np.power(10, np.floor(inj_dist_log - 1)))
+    min_dist_prior = max(100, int(np.power(10, np.floor(inj_dist_log-1))))  # cap min distance at 100 MPc
     max_dist_prior = min(10000, int(np.power(10, np.ceil(inj_dist_log + 1))))  # cap max distance at 10000 MPc
 
     # put all arguments into a dict
