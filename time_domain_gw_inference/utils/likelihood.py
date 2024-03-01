@@ -430,15 +430,16 @@ class LnLikelihoodManager(LogisticParameterManager):
         self.f_ref = f_ref
         self.psd_dict = psd_dict
         self.rho_dict = self._make_autocorrolation_dict()
+        self.ifos = list(self.data_dict.keys())
         for ifo, rho in self.rho_dict.items():
             assert len(rho) == len(self.data_dict[ifo]), 'Length for ACF is not the same as for the data'
         self.only_prior = only_prior
         try:
-            self.waveform_manager = NewWaveformManager(self.data_dict.keys(), *args, **kwargs)
+            self.waveform_manager = NewWaveformManager(self.ifos, *args, **kwargs)
         except Exception as e:
             print(e)
             print("warning, new waveform manager has failed to be created, using old waveform manager")
-            self.waveform_manager = WaveformManager(self.data_dict.keys(), *args, **kwargs)
+            self.waveform_manager = WaveformManager(self.ifos, *args, **kwargs)
         self.log_prior = LnPriorManager(*args, **kwargs)
 
         super().__init__(*args, **kwargs)
@@ -457,7 +458,7 @@ class LnLikelihoodManager(LogisticParameterManager):
         # Calculate posterior
         if not self.only_prior:
             projected_wf_dict = self.waveform_manager.get_projected_waveform(
-                x_phys, self.data_dict.keys(), self.time_dict,
+                x_phys, self.ifos, self.time_dict,
                 f_low=self.f_low,
                 f_ref=self.f_ref
             )
