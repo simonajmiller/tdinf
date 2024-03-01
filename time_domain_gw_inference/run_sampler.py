@@ -188,8 +188,8 @@ def initialize_kwargs(args, reference_parameters):
 
     # configure mass prior
     inj_mtot = reference_parameters['mass_1'] + reference_parameters['mass_2']
-    max_mass_prior = np.ceil(inj_mtot + 100)
-    min_mass_prior = np.maximum(np.floor(inj_mtot - 100), 5)
+    max_mass_prior = np.ceil(inj_mtot + 50)
+    min_mass_prior = np.maximum(np.floor(inj_mtot - 50), 60)  ## min total mass for f_low=20 hz is 60 Msun
 
     # configure distance prior
     inj_dist_log = np.log10(reference_parameters['luminosity_distance'])
