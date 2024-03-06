@@ -289,7 +289,7 @@ class AbstractLayerManager(abc.ABC):
         if self.additional_options is None:
             self.additional_options = []
         print('transfer files is ', self.transfer_files)
-        self.layer = Layer(self.executable_file, name=self.method_name, retries=1, transfer_files=self.transfer_files,
+        self.layer = Layer(self.executable_file, name=self.method_name, retries=0, transfer_files=self.transfer_files,
                            submit_description=self.condor_settings)
 
     def get_job_index(self):
