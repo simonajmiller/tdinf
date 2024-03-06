@@ -53,6 +53,7 @@ class AbstractPipelineDAG(abc.ABC):
     output_directory: str
     config_file: str
     submit: bool
+    transfer_files: bool
 
     def __post_init__(self):
         self.executables, self.condor_settings, self.time_domain_gw_inference_settings = \
@@ -61,7 +62,6 @@ class AbstractPipelineDAG(abc.ABC):
     def default_condor_settings(self):
         condor_settings = {
             "universe": "vanilla",
-            "when_to_transfer_output": "ON_EXIT_OR_EVICT",
             "success_exit_code": 0,
             "getenv": "True",
             "initialdir": os.path.abspath(self.output_directory),
@@ -70,25 +70,11 @@ class AbstractPipelineDAG(abc.ABC):
             "error": "$(log_dir)/$(run_prefix)-$(nodename)-$(cluster)-$(process).err",
             "log": "$(log_dir)/$(run_prefix)-$(nodename)-$(cluster)-$(process).log",
         }
+        if self.transfer_files:
+            condor_settings["when_to_transfer_output"] = "ON_EXIT_OR_EVICT"
+
         return condor_settings
 
-    @staticmethod
-    def check_and_create_directory(directory_path):
-        """
-        Check if directory exists. If no, create it, if yes, ask if should continue
-        :param directory_path:
-        :return:
-        """
-        if not os.path.exists(directory_path):
-            os.makedirs(directory_path)
-        else:
-            continue_existing = input(
-                f"The directory {directory_path} already exists."
-                "This may overwrite a previous run and is not guaranteed to work"
-                f" Do you want to continue? (yes/no): ").lower()
-            if continue_existing not in {'yes', 'y'}:
-                print("You chose wisely, exiting program.")
-                exit()
 
     @staticmethod
     def find_executable_path(script_name):
@@ -266,6 +252,7 @@ class RunSamplerDag(AbstractPipelineDAG):
         runSamplerLayerManager = RunSamplerLayerManager(self.time_domain_gw_inference_settings,
                                                         self.executables['run_sampler'],
                                                         self.condor_settings,
+                                                        transfer_files=self.transfer_files,
                                                         additional_options=data_options)
         if len(self.cycle_list) > 0:
             for cycle in self.cycle_list:
@@ -275,7 +262,7 @@ class RunSamplerDag(AbstractPipelineDAG):
                     run_modes = ['pre', 'post']
 
                 for run_mode in run_modes:
-                    runSamplerLayerManager.add_job(run_mode, cycle, 'cycles')
+                    runSamplerLayerManager.add_job(self.output_directory, run_mode, cycle, 'cycles')
                     
         if len(self.times_list) > 0:
             for time in self.times_list:
@@ -285,7 +272,7 @@ class RunSamplerDag(AbstractPipelineDAG):
                     run_modes = ['pre', 'post']
 
                 for run_mode in run_modes:
-                    runSamplerLayerManager.add_job(run_mode, time, 'times') 
+                    runSamplerLayerManager.add_job(self.output_directory, run_mode, time, 'times')
              
         dag.attach(runSamplerLayerManager.layer)
 
@@ -295,12 +282,14 @@ class AbstractLayerManager(abc.ABC):
     run_settings_dict: Dict[str, str]
     executable_file: str
     shared_condor_settings: Dict[str, str]
+    transfer_files: bool = True
     additional_options: List[Union[Option, Argument]] = None
 
     def __post_init__(self):
         if self.additional_options is None:
             self.additional_options = []
-        self.layer = Layer(self.executable_file, name=self.method_name,
+        print('transfer files is ', self.transfer_files)
+        self.layer = Layer(self.executable_file, name=self.method_name, retries=1, transfer_files=self.transfer_files,
                            submit_description=self.condor_settings)
 
     def get_job_index(self):
@@ -402,21 +391,21 @@ class RunSamplerLayerManager(AbstractLayerManager):
 
         self.raise_option_exists_error("output-h5", run_options)
         self.raise_option_exists_error("mode", run_options)
+
         return run_options
 
-    def get_inputs(self):
+    def get_inputs(self, relative_output_dir_name):
         # Since we have already transferred the input into the data_directory, we just need to pass data_directory
-        return [Option('data-directory', 'data_directory', suppress=True)]
+        return [Option('data-directory', 'data_directory', suppress=True),
+                Option('output-directory', relative_output_dir_name, suppress=True)
+                ]
 
-    def get_outputs(self, run_mode, cutoff, unit):
-        dat_file = f'{self.get_output_filename_prefix(run_mode, cutoff, unit)}.dat'
-        h5_file = f'{self.get_output_filename_prefix(run_mode, cutoff, unit)}.h5'
-        return [Option('dat_file', dat_file, suppress=True), Option('output-h5', h5_file)]
+    def get_outputs(self, relative_output_dir_name):
+        return [Option('output-directory', relative_output_dir_name, suppress=True)]
 
-    def add_job(self, run_mode, cutoff, cutoff_mode, additional_options=None) -> None:
+    def add_job(self, output_directory, run_mode, cutoff, cutoff_mode, additional_options=None) -> None:
         run_options = self.get_run_options(additional_options)
         run_options.append(Option('mode', run_mode))
-        
         if cutoff_mode=='cycles':
             run_options.append(Option('Tcut-cycles', cutoff))
             unit = 'cycles'
@@ -424,12 +413,17 @@ class RunSamplerLayerManager(AbstractLayerManager):
         elif cutoff_mode=='times':
             run_options.append(Option('Tcut-seconds', cutoff))
             unit = 'seconds'
-            
         else: 
             raise AssertionError("cutoff mode must be either 'cycles' or 'times'")
 
-        inputs = self.get_inputs()
-        outputs = self.get_outputs(run_mode, cutoff, unit)
+        relative_output_dir_name = self.get_output_filename_prefix(run_mode, cutoff, unit)
+        check_and_create_directory(os.path.join(output_directory, relative_output_dir_name))
+
+        h5_file = f'{relative_output_dir_name}/{relative_output_dir_name}.h5'
+        run_options.append(Option('output-h5', h5_file))
+
+        inputs = self.get_inputs(relative_output_dir_name)
+        outputs = self.get_outputs(relative_output_dir_name)
 
         self.layer += Node(
             arguments=run_options,
@@ -454,6 +448,9 @@ if __name__ == "__main__":
     parser.add_argument("--times_list", required=False, nargs='+', type=float,
                         help="Times in seconds before merger to cut data at, e.g. --times_list -0.001 0 0.2")
     parser.add_argument("--submit", action="store_true", help="Submit the DAG to Condor (NOT IMPLEMENTED YET))")
+    parser.add_argument("--run_in_place", action="store_true",
+                        help="Skip condor file transfer and bank on a shared file system")
+
     args = parser.parse_args()
     
     # Check that inputs are right
@@ -468,6 +465,7 @@ if __name__ == "__main__":
     
     # Create dag file
     pipeline_dag = RunSamplerDag(args.output_directory, args.config_file, args.submit,
+                                 transfer_files=not args.run_in_place,
                                  cycle_list=cutoff_cycles, times_list=cutoff_times)
 
     pipeline_dag.create_pipeline_dag()
