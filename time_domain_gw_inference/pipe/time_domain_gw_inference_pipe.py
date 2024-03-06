@@ -72,6 +72,8 @@ class AbstractPipelineDAG(abc.ABC):
         }
         if self.transfer_files:
             condor_settings["when_to_transfer_output"] = "ON_EXIT_OR_EVICT"
+        else:
+            condor_settings["should_transfer_files"] = "NO"
 
         return condor_settings
 
@@ -359,7 +361,6 @@ class RunSamplerLayerManager(AbstractLayerManager):
             "request_memory": "14GB",
             "request_disk": "5000MB",
             "request_cpus": self.argument_parser.get_default('ncpu'),
-            "when_to_transfer_output": "ON_EXIT_OR_EVICT",
         }
         run_options = self.get_run_options()
         N_cpu = get_option_from_list('ncpu', run_options)
