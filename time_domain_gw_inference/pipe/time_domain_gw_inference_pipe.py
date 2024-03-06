@@ -31,6 +31,22 @@ def set_option_in_list(option_list: list[Option], new_option: Option) -> None:
         option_list.append(new_option)
     return
 
+def check_and_create_directory(directory_path):
+    """
+    Check if directory exists. If no, create it, if yes, ask if should continue
+    :param directory_path:
+    :return:
+    """
+    if not os.path.exists(directory_path):
+        os.makedirs(directory_path)
+    else:
+        continue_existing = input(
+            f"The directory {directory_path} already exists."
+            "This may overwrite a previous run and is not guaranteed to work"
+            f" Do you want to continue? (yes/no): ").lower()
+        if continue_existing not in {'yes', 'y'}:
+            print("You chose wisely, exiting program.")
+            exit()
 
 @dataclass
 class AbstractPipelineDAG(abc.ABC):
@@ -46,7 +62,6 @@ class AbstractPipelineDAG(abc.ABC):
         condor_settings = {
             "universe": "vanilla",
             "when_to_transfer_output": "ON_EXIT_OR_EVICT",
-            "retries": 1,
             "success_exit_code": 0,
             "getenv": "True",
             "initialdir": os.path.abspath(self.output_directory),
@@ -163,7 +178,7 @@ class AbstractPipelineDAG(abc.ABC):
 
     def create_pipeline_dag(self):
         # Create the output directory if it doesn't exist
-        self.check_and_create_directory(self.output_directory)
+        check_and_create_directory(self.output_directory)
 
         # Create the DAG
         dag = DAG(formatter=SimpleFormatter())
