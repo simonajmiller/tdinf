@@ -35,8 +35,7 @@ def get_trigger_times(approx, *args, **kwargs):
     tlen = len(times)
 
     # Frequency parameters
-    fp = {k: kwargs[k] if k in kwargs else p[k] for k in ['f_ref', 'f_low', 'lal_amporder']}
-    f_start = fp['f_low'] * 2 / (fp['lal_amporder'] + 2.)
+    fp = {k: kwargs[k] if k in kwargs else p[k] for k in ['f_ref', 'f_low', 'f22_start', 'lal_amporder']}
 
     # Change spin convention
     iota, s1x, s1y, s1z, s2x, s2y, s2z = transform_spins(p['theta_jn'], p['phi_jl'], p['tilt_1'], p['tilt_2'],
@@ -47,7 +46,7 @@ def get_trigger_times(approx, *args, **kwargs):
 
     # TODO replace this function entirely
     hplus, hcross = generate_lal_hphc(approx, p['mass_1'], p['mass_2'], chi1, chi2, dist_mpc=p['luminosity_distance'],
-                                      dt=delta_t, f_low=f_start, f_ref=fp['f_ref'], inclination=iota,
+                                      dt=delta_t, f22_start=fp['f22_start'], f_ref=fp['f_ref'], inclination=iota,
                                       phi_ref=p['phase']
                                       )
 
@@ -179,7 +178,7 @@ def get_tgps_and_ap_dicts(tgps_geocent, ifos, ra, dec, psi):
 
 
 def generate_lal_hphc(approximant_key, m1_msun, m2_msun, chi1, chi2, dist_mpc=1,
-                      dt=None, f_low=20, f_ref=11, inclination=0, phi_ref=0., epoch=0, eccentricity=0,
+                      dt=None, f22_start=20, f_ref=11, inclination=0, phi_ref=0., epoch=0, eccentricity=0,
                       mean_anomaly_periastron=0):
     """
     Generate the plus and cross polarizations for given waveform parameters and approximant
@@ -199,7 +198,7 @@ def generate_lal_hphc(approximant_key, m1_msun, m2_msun, chi1, chi2, dist_mpc=1,
                                                 chi2[0], chi2[1], chi2[2],
                                                 distance, inclination,
                                                 phi_ref, 0., eccentricity, mean_anomaly_periastron,
-                                                dt, f_low, f_ref,
+                                                dt, f22_start, f_ref,
                                                 param_dict,
                                                 approximant)
     return hp, hc

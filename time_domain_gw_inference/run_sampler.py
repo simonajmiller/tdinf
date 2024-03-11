@@ -49,7 +49,10 @@ def create_run_sampler_arg_parser():
 
     p.add_argument('--sampling-rate', type=int, default=2048)
 
-    p.add_argument('--flow', type=float, default=11)
+    p.add_argument('--flow', type=float, default=11,
+                   help="lower frequency bound for data conditioning and likelihood function (ACF)")
+    p.add_argument('--f22-start', type=float, default=11,
+                   help="frequency at which to start generating 22 mode for waveforms")
     p.add_argument('--fref', type=float, default=11)
     p.add_argument('--ifos', nargs='+', default=['H1', 'L1', 'V1'])
 
@@ -189,7 +192,7 @@ def initialize_kwargs(args, reference_parameters):
     # configure mass prior
     inj_mtot = reference_parameters['mass_1'] + reference_parameters['mass_2']
     max_mass_prior = np.ceil(inj_mtot + 50)
-    min_mass_prior = np.maximum(np.floor(inj_mtot - 50), 60)  ## min total mass for f_low=20 hz is 60 Msun
+    min_mass_prior = np.maximum(np.floor(inj_mtot - 50), 60)  ## min total mass for f22_start=20 hz is 60 Msun
 
     # configure distance prior
     inj_dist_log = np.log10(reference_parameters['luminosity_distance'])
@@ -206,6 +209,7 @@ def initialize_kwargs(args, reference_parameters):
         'approx': args.approx,
         'f_ref': args.fref,
         'f_low': args.flow,
+        'f22_start': args.f22_start,
         'delta_t': 1 / args.sampling_rate,
 
         'right_ascension': reference_parameters['right_ascension'],
@@ -252,7 +256,7 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
         print('reference_injection params', reference_parameters)
         raw_data_dict = wf_manager.get_projected_waveform(x_phys=reference_parameters, ifos=args.ifos,
                                                           time_dict=raw_time_dict,
-                                                          f_ref=args.fref, f_low=args.flow)
+                                                          f_ref=args.fref, f22_start=args.f22_start)
 
     ## tcut = cutoff time in waveform
     if args.Tcut_seconds is not None:
@@ -265,7 +269,7 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
         projected_waveform_dict = wf_manager.get_projected_waveform(reference_parameters,
                                                                     ifos=args.ifos,
                                                                     time_dict=raw_time_dict,
-                                                                    f_ref=args.fref, f_low=args.flow)
+                                                                    f_ref=args.fref, f22_start=args.f22_start)
 
         tcut_geocent = utils.get_Tcut_from_Ncycles(projected_waveform_dict, raw_time_dict,
                                                    ifo="H1", Ncycles=Ncycles,

@@ -111,7 +111,7 @@ def injectWaveform(injection_approx, **kwargs):
     tpeak_dict = kwargs.pop('tpeak_dict')
     ap_dict = kwargs.pop('ap_dict')
     skypos = kwargs.pop('skypos')
-    f_low = kwargs.pop('f_low')
+    f22_start = kwargs.pop('f22_start')
     f_ref = kwargs.pop('f_ref')
     ifos = kwargs.pop('ifos', ['H1', 'L1', 'V1'])
     
@@ -132,7 +132,7 @@ def injectWaveform(injection_approx, **kwargs):
                                    [s2x, s2y, s2z],
                                    dist_mpc=p['luminosity_distance'], 
                                    dt=dt,
-                                   f_low=f_low, 
+                                   f22_start=f22_start,
                                    f_ref=f_ref,
                                    inclination=iota,
                                    phi_ref=p['phase']

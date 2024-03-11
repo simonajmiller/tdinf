@@ -306,7 +306,7 @@ class WaveformManager(LogisticParameterManager):
         self.antenna_and_time_manager = AntennaAndTimeManager(ifos, *args, **kwargs)
 
     def generate_lal_hphc(self, m1_msun, m2_msun, chi1, chi2, delta_t, dist_mpc=1,
-                          f_low=20, f_ref=11, inclination=0, phi_ref=0., eccentricity=0,
+                          f22_start=20, f_ref=11, inclination=0, phi_ref=0., eccentricity=0,
                           mean_anomaly_periastron=0):
         """
         Generate the plus and cross polarizations for given waveform parameters and approximant
@@ -324,12 +324,12 @@ class WaveformManager(LogisticParameterManager):
                                                     chi2[0], chi2[1], chi2[2],
                                                     distance, inclination,
                                                     phi_ref, 0., eccentricity, mean_anomaly_periastron,
-                                                    delta_t, f_low, f_ref,
+                                                    delta_t, f22_start, f_ref,
                                                     param_dict,
                                                     self.approximant)
         return hp, hc
 
-    def get_hplus_hcross(self, x_phys, delta_t, f_low=11, f_ref=11):
+    def get_hplus_hcross(self, x_phys, delta_t, f22_start=11, f_ref=11):
         """
         get complex waveform at geocenter
         """
@@ -338,18 +338,18 @@ class WaveformManager(LogisticParameterManager):
         chi2 = [x_phys['spin2_x'], x_phys['spin2_y'], x_phys['spin2_z']]
 
         hp, hc = self.generate_lal_hphc(m1, m2, chi1, chi2, delta_t=delta_t,
-                                       dist_mpc=x_phys['distance_mpc'],
-                                       f_low=f_low, f_ref=f_ref,
-                                       inclination=x_phys['inclination'],
-                                       phi_ref=x_phys['phase'],
-                                       eccentricity=x_phys['eccentricity'],
-                                       mean_anomaly_periastron=x_phys['mean_anomaly'])
+                                        dist_mpc=x_phys['distance_mpc'],
+                                        f22_start=f22_start, f_ref=f_ref,
+                                        inclination=x_phys['inclination'],
+                                        phi_ref=x_phys['phase'],
+                                        eccentricity=x_phys['eccentricity'],
+                                        mean_anomaly_periastron=x_phys['mean_anomaly'])
         return hp, hc
 
-    def get_projected_waveform(self, x_phys, ifos, time_dict, f_low=11, f_ref=11):
+    def get_projected_waveform(self, x_phys, ifos, time_dict, f22_start=11, f_ref=11):
         delta_t = time_dict[ifos[0]][1] - time_dict[ifos[0]][0]
 
-        hp, hc = self.get_hplus_hcross(x_phys, delta_t, f_low=f_low, f_ref=f_ref)
+        hp, hc = self.get_hplus_hcross(x_phys, delta_t, f22_start=f22_start, f_ref=f_ref)
 
         TP_dict = self.antenna_and_time_manager.get_tpeak_dict(x_phys, ifos)
         AP_dict = self.antenna_and_time_manager.get_antenna_pattern_dict(x_phys, ifos)
@@ -387,23 +387,23 @@ class NewWaveformManager(LogisticParameterManager):
 
         return
 
-    def get_hplus_hcross(self, x_phys, delta_t, f_low=11, f_ref=11):
+    def get_hplus_hcross(self, x_phys, delta_t, f22_start=11, f_ref=11):
         """
         get complex waveform at geocenter
         """
         params = self.physical_dict_to_waveform_dict(x_phys)
-        params['f22_start'] = f_low * u.Hz
+        params['f22_start'] = f22_start * u.Hz
         params['deltaT'] = delta_t * u.s
         params['f22_ref'] = f_ref * u.Hz
         params['condition'] = 0
 
         return wfm.GenerateTDWaveform(params, self.generator)
 
-    def get_projected_waveform(self, x_phys, ifos, time_dict, f_low=11, f_ref=11):
+    def get_projected_waveform(self, x_phys, ifos, time_dict, f22_start=11, f_ref=11):
 
         delta_t = time_dict[ifos[0]][1] - time_dict[ifos[0]][0]
 
-        hp, hc = self.get_hplus_hcross(x_phys, delta_t, f_low=f_low, f_ref=f_ref)
+        hp, hc = self.get_hplus_hcross(x_phys, delta_t, f22_start=f22_start, f_ref=f_ref)
 
         TP_dict = self.antenna_and_time_manager.get_tpeak_dict(x_phys, ifos)
         AP_dict = self.antenna_and_time_manager.get_antenna_pattern_dict(x_phys, ifos)
@@ -429,11 +429,12 @@ class NewWaveformManager(LogisticParameterManager):
 
 
 class LnLikelihoodManager(LogisticParameterManager):
-    def __init__(self, psd_dict, time_dict, data_dict, f_low, f_ref, only_prior=False, *args, **kwargs):
+    def __init__(self, psd_dict, time_dict, data_dict, f_low, f_ref, f22_start, only_prior=False, *args, **kwargs):
         self.time_dict = time_dict
         self.data_dict = data_dict
         self.f_low = f_low
         self.f_ref = f_ref
+        self.f22_start = f22_start
         self.psd_dict = psd_dict
         self.rho_dict = self._make_autocorrolation_dict()
         self.ifos = list(self.data_dict.keys())
@@ -484,7 +485,7 @@ class LnLikelihoodManager(LogisticParameterManager):
         if not self.only_prior:
             projected_wf_dict = self.waveform_manager.get_projected_waveform(
                 x_phys, self.ifos, self.time_dict,
-                f_low=self.f_low,
+                f22_start=self.f22_start,
                 f_ref=self.f_ref
             )
 
