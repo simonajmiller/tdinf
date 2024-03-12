@@ -74,7 +74,7 @@ class LogisticParameterManager:
                 LogisticParameter('spin2_magnitude', kwargs['chi_lim'], None)])
 
         if self.vary_eccentricity:
-            self.logistic_parameters.append(LogisticParameter('eccentricity', [0, 0.3], None))
+            self.logistic_parameters.append(LogisticParameter('eccentricity', kwargs['eccentricity_lim'], None))
 
         if self.vary_skypos:
             self.logistic_parameters.append(TrigLogisticParameter('declination', 'sin', [-1, 1], None))

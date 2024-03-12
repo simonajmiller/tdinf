@@ -68,6 +68,8 @@ def create_run_sampler_arg_parser():
     p.add_argument('--vary-time', action='store_true')
     p.add_argument('--vary-skypos', action='store_true')
     p.add_argument('--vary-eccentricity', action='store_true')
+    p.add_argument('--eccentricity-prior-bounds', type=float, nargs=2, default=[0, 0.9],
+                   help="prior bounds for eccentricity parameter, only used if --vary-eccentricity given")
 
     # Do we want to resume an old run?
     p.add_argument('--resume', action='store_true')
@@ -205,7 +207,7 @@ def initialize_kwargs(args, reference_parameters):
         'q_lim': [0.17, 1],
         'chi_lim': [0, 0.99],
         'dist_lim': [min_dist_prior, max_dist_prior],
-
+        'eccentricity_lim': args.eccentricity_prior_bounds,
         'approx': args.approx,
         'f_ref': args.fref,
         'f_low': args.flow,
