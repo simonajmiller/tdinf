@@ -128,15 +128,27 @@ def modify_parameters(data, args):
     if 'mean_anomaly' not in df.columns:
         df['mean_anomaly'] = 0
 
-    # TODO do not overwrite existing parameters
-    df[['inclination', 'spin1_x', 'spin1_y', 'spin1_z', 'spin2_x', 'spin2_y', 'spin2_z']] = df.apply(
-        lambda row: pd.Series(utils.transform_spins(
-            row['theta_jn'], row['phi_jl'],
-            row['tilt_1'], row['tilt_2'],
-            row['phi_12'], row['a_1'], row['a_2'],
-            row['mass_1'], row['mass_2'],
-            row['f_ref'], row['phase'])
-        ), axis=1)
+    spin_component_keys = ['inclination', 'spin1_x', 'spin1_y', 'spin1_z', 'spin2_x', 'spin2_y', 'spin2_z']
+    if not all(key in df.columns for key in spin_component_keys):
+        # TODO do not overwrite existing parameters
+        df[['inclination', 'spin1_x', 'spin1_y', 'spin1_z', 'spin2_x', 'spin2_y', 'spin2_z']] = df.apply(
+            lambda row: pd.Series(utils.transform_spins(
+                row['theta_jn'], row['phi_jl'],
+                row['tilt_1'], row['tilt_2'],
+                row['phi_12'], row['a_1'], row['a_2'],
+                row['mass_1'], row['mass_2'],
+                row['f_ref'], row['phase'])
+            ), axis=1)
+    else:
+        # TODO do not overwrite existing parameters
+        df[['theta_jn', 'phi_jl', 'tilt_1', 'tilt_2', 'phi_12', 'a_1', 'a_2']] = df.apply(
+            lambda row: pd.Series(utils.transformPrecessingWvf2PE(
+                row['inclination'],
+                row['spin1_x'], row['spin1_y'], row['spin1_z'],
+                row['spin2_x'], row['spin2_y'], row['spin2_z'],
+                row['mass_1'], row['mass_2'],
+                row['f_ref'], row['phase'])
+            ), axis=1)
 
     if isinstance(data, pd.DataFrame):
         return df
