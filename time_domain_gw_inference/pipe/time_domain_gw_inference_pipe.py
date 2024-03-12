@@ -192,6 +192,7 @@ class AbstractPipelineDAG(abc.ABC):
 class RunSamplerDag(AbstractPipelineDAG):
     cycle_list: List[float]
     times_list: List[float]
+    full_only: bool = False
 
     @staticmethod
     def _copy_file_to_directory_and_return_new_name_(file, target_directory, relative_path=None):
@@ -263,6 +264,12 @@ class RunSamplerDag(AbstractPipelineDAG):
                 else:
                     run_modes = ['pre', 'post']
 
+                if self.full_only:
+                    run_modes = ['full']
+                    if len(self.cycle_list) > 1:
+                        print("WARNING: Changing number of cycles doesn't make different runs when mode is full")
+                        print("\t Consider having only cycle == 0 in cycle_list")
+
                 for run_mode in run_modes:
                     runSamplerLayerManager.add_job(self.output_directory, run_mode, cycle, 'cycles')
                     
@@ -272,6 +279,12 @@ class RunSamplerDag(AbstractPipelineDAG):
                     run_modes = ['full', 'pre', 'post']
                 else:
                     run_modes = ['pre', 'post']
+
+                if self.full_only:
+                    run_modes = ['full']
+                    if len(self.times_list) > 1:
+                        print("WARNING: Changing cut time doesn't make different runs when mode is full")
+                        print("\t Consider having only time == 0 in times_list")
 
                 for run_mode in run_modes:
                     runSamplerLayerManager.add_job(self.output_directory, run_mode, time, 'times')
@@ -448,6 +461,8 @@ if __name__ == "__main__":
                         help="Cycles before merger to cut data at, e.g. --cycle_list -3 0 1") 
     parser.add_argument("--times_list", required=False, nargs='+', type=float,
                         help="Times in seconds before merger to cut data at, e.g. --times_list -0.001 0 0.2")
+    parser.add_argument("--full_only", action='store_true', help="Do not run pre or post, only run full")
+
     parser.add_argument("--submit", action="store_true", help="Submit the DAG to Condor (NOT IMPLEMENTED YET))")
     parser.add_argument("--run_in_place", action="store_true",
                         help="Skip condor file transfer and bank on a shared file system")
@@ -467,6 +482,7 @@ if __name__ == "__main__":
     # Create dag file
     pipeline_dag = RunSamplerDag(args.output_directory, args.config_file, args.submit,
                                  transfer_files=not args.run_in_place,
-                                 cycle_list=cutoff_cycles, times_list=cutoff_times)
+                                 cycle_list=cutoff_cycles, times_list=cutoff_times,
+                                 full_only=args.full_only)
 
     pipeline_dag.create_pipeline_dag()
