@@ -74,6 +74,9 @@ def create_run_sampler_arg_parser():
     # Do we want to resume an old run?
     p.add_argument('--resume', action='store_true')
 
+    # Debugging
+    p.add_argument('--verbose', action='store_true')
+
     return p
 
 
@@ -230,6 +233,7 @@ def initialize_kwargs(args, reference_parameters):
         'declination': reference_parameters['declination'],
         'polarization': reference_parameters['polarization'],
         'geocenter_time': reference_parameters['geocenter_time'],
+        'verbose': args.verbose,
     }
     return kwargs
 

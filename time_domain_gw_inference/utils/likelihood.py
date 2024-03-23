@@ -473,21 +473,29 @@ class LnLikelihoodManager(LogisticParameterManager):
 
         return False
 
-    def get_lnprob(self, x,
+    def get_lnprob(self, x, verbose=False,
                    **kwargs):
         # get physical parameters
-        x_phys = self.samp_to_phys(x)
+        x_phys = kwargs.pop('x_phys', None)
+        if x_phys is None:
+            x_phys = self.samp_to_phys(x)
+        if verbose:
+            print('x_phys', x_phys)
 
         # Initialize posterior to 0
         lnprob = 0
 
         # Calculate posterior
         if not self.only_prior:
+            if verbose:
+                print('getting wf')
             projected_wf_dict = self.waveform_manager.get_projected_waveform(
                 x_phys, self.ifos, self.time_dict,
                 f22_start=self.f22_start,
                 f_ref=self.f_ref
             )
+            if verbose:
+                print('done getting wf')
 
             # Cycle through ifos
             for ifo, data in self.data_dict.items():
