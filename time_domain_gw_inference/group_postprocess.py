@@ -4,7 +4,7 @@ import os
 import pandas as pd
 import re
 from matplotlib.lines import Line2D
-
+import imageio
 
 def load_run_settings_from_directory(directory, filename_dict=None):
     """
@@ -155,8 +155,8 @@ def get_choelsky_decomp_of_toeplitz(toeplitz_matrix):
 
 def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full_df,
              full_likelihood_manager,
-             plot_param,
-             ifo='L1'):
+             plot_param, prior_df = None, 
+             ifo='L1', save_dir = None, loc='lower'):
 
     choelsky_rho_dict = {ifo: get_choelsky_decomp_of_toeplitz(rho) for ifo, rho in full_likelihood_manager.rho_dict.items()}
     whitened_data_dict = whiten_waveform_dict(full_likelihood_manager.data_dict, choelsky_rho_dict)
@@ -168,7 +168,7 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
 
     dt_1M = 0.0127 / 10
     time_dict_M = {ifo: time / dt_1M for ifo, time in time_dict.items()}
-
+    filenames = []
     for j, tc in enumerate(tc_floats):
         tc_M = tc / dt_1M
 
@@ -179,7 +179,7 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
             ax.set_rasterization_zorder(2)
 
         # String for labeling the time step
-        tc_str = str(tc_M) + 'M'  # tc_to_plot[j]
+        tc_str = f"{tc_M:.2f}" + 'M'  # tc_to_plot[j]
         lbl = tc_str.replace('m', '-') if tc_str[0] == 'm' else tc_str
         lbl = lbl.replace('M', '\,M_\mathrm{ref}')
 
@@ -207,12 +207,21 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
             alpha_reconstruct = 0.2  # 0.02
             shading_kws = dict(hatch='/', alpha=0.3, color='gray')
             if k == 1:
-                for wf_dict in wfs_at_tc_list[j]['pre']:
+                try:
+                    wf_dict_list = wfs_at_tc_list[j]['pre']
+                except KeyError:
+                    wf_dict_list = []
+                    
+                for wf_dict in wf_dict_list:
                     axes[k].plot(time_dict_M[ifo], wf_dict[ifo] / (1e-22),
                                  color=cp[0], alpha=alpha_reconstruct, zorder=1)
                 axes[k].axvspan(tc_M, x_lims[1], **shading_kws, zorder=0)
             else:
-                for wf_dict in wfs_at_tc_list[j]['post']:
+                try:
+                    wf_dict_list = wfs_at_tc_list[j]['post']
+                except KeyError:
+                    wf_dict_list = []
+                for wf_dict in wf_dict_list:
                     axes[k].plot(time_dict_M[ifo], wf_dict[ifo] / (1e-22),
                                  color=cp[1], alpha=alpha_reconstruct, zorder=1)
                 axes[k].axvspan(x_lims[0], tc_M, **shading_kws, zorder=0)
@@ -242,14 +251,24 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
         axes[2].set_position([x0 + dx, y0, x1, y1])
 
         # Righthand plots, plot posteriors
-        axes[0].hist(dfs_at_tc[j]['pre'][plot_param], histtype='step', bins=30, lw=1.5,
-                     color=cp[0], density=True)
-        axes[0].hist(dfs_at_tc[j]['post'][plot_param], histtype='step', bins=30, lw=1.5,
-                     color=cp2[1], density=True)
+        try:
+            axes[0].hist(dfs_at_tc[j]['pre'][plot_param], histtype='step', bins=30, lw=1.5,
+                         color=cp[0], density=True)
+        except KeyError:
+            pass
+
+        try:
+            axes[0].hist(dfs_at_tc[j]['post'][plot_param], histtype='step', bins=30, lw=1.5,
+                         color=cp2[1], density=True)
+        except KeyError:
+            pass
         axes[0].hist(full_df[plot_param], histtype='step', bins=30, lw=1.5,
                      color='k', density=True)
 
         prior_kws = dict(color='dimgray', ls=':')
+        if prior_df is not None:
+            axes[0].hist(prior_df[plot_param], histtype='step', bins=30, lw=1.5,
+              density=True, **prior_kws)
         axes[0].set_xlabel(plot_param, fontsize=16)
         axes[0].set_ylabel(f"p({plot_param})", fontsize=16)
 
@@ -257,9 +276,7 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
         l = 0.4
         w = 0.3
         dx = 0.04
-        #axin = axes[0].inset_axes([dx - 0.01, dx, l, w])
-        axin = axes[0].inset_axes(get_inset_axes_position(axes[0], dx, l, w))
-        #axin = axes[0].inset_axes([dx - 0.01, 1 - dx - w, l, w])
+        axin = axes[0].inset_axes(get_inset_axes_position(axes[0], dx, l, w, loc=loc))
         axin.plot(time_dict_M[ifo], whitened_data_dict[ifo], color='silver', lw=0.5)
         axin.plot(time_dict_M[ifo], whitened_reference_wf[ifo], color='k', lw=0.75)
         axin.axvline(tc_M, ls='--', color='k')
@@ -272,7 +289,7 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
 
         for ax in axes:
             x0, y0, x1, y1 = ax.get_position().bounds
-            ax.set_position([x0, y0, x1, y1 + 0.05 / len(tc_floats)])
+            ax.set_position([x0, y0, x1, y1 ])#+ 0.05 / len(tc_floats)])
 
         # Legend
         handles = [
@@ -289,20 +306,32 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
         for i, h in enumerate(handles):
             leg.get_lines()[i].set_linewidth(3)
 
-        # plt.savefig(f'for_gif_01/frame_{tc_str}.png', bbox_inches='tight', dpi=200)
+        if save_dir is not None:
+            try:
+                os.mkdir(save_dir)
+            except:
+                pass
+            filename = f'{save_dir}/frame_{tc_str}.png'
+            plt.savefig(filename, bbox_inches='tight', dpi=200)
+            filenames.append(filename)
         #
         # if j == 24:
         #     plt.show()
         # else:
         #     plt.close()
+    
+    if save_dir is not None:
+        frames = []
+        for filename in filenames:
+            image = imageio.v2.imread(filename)
+            frames.append(image)
+        fps = 1.5
+        imageio.mimsave(f'{save_dir}/all.gif', frames, fps=fps) 
 
-def get_inset_axes_position(ax, dx, l, w):
-    # Calculate the density of data points for each region
-    density_top_left = len(ax.lines) / ((1 - dx - w) * l)
-    density_bottom_left = len(ax.lines) / ((1 - dx - w) * l)
 
-    # Determine the position with the least density
-    if density_bottom_left < density_top_left:
-        return dx - 0.01, dx, l, w
-    else:
-        return dx - 0.01, 1 - dx - w, l, w
+def get_inset_axes_position(ax, dx, l, w, loc='upper'):
+    
+    if loc == 'upper':
+        return dx - 0.01, 1 - dx - w, l, w  # Place the inset axes at the bottom left if the legend is at the top
+    if loc == 'lower':
+        return dx - 0.01, dx, l, w  # Place the inset axes at the top left if the legend is at the bottom
