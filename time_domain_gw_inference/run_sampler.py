@@ -411,7 +411,14 @@ def main():
             # So we overwrite it
             # Reset the backend
             print('WARNING! Backend was empty, resetting backend')
-            backend.reset(nwalkers, ndim)
+            try:
+                backend.reset(nwalkers, ndim)
+            except OSError:
+                print("resetting backend did not seem to fix issue, deleting h5 file and making new backend")
+                os.remove(backend_path)
+                backend = emcee.backends.HDFBackend(backend_path)
+                backend.reset(nwalkers, ndim)
+
             p0 = likelihood_manager.log_prior.initialize_walkers(nwalkers, reference_parameters)
 
     else:
