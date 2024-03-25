@@ -401,11 +401,18 @@ def main():
     if args.resume and os.path.isfile(backend_path):
 
         # Load in last sample to use as the new starting walkers
-        p0 = backend.get_last_sample()
-
-        # adjust number of steps
-        nsteps_already_taken = backend.get_chain().shape[0]
-        nsteps = nsteps - nsteps_already_taken
+        try:
+            p0 = backend.get_last_sample()
+            # adjust number of steps
+            nsteps_already_taken = backend.get_chain().shape[0]
+            nsteps = nsteps - nsteps_already_taken
+        except AttributeError:
+            # This happens when the file has been made but the job crashed before writing any points to it.
+            # So we overwrite it
+            # Reset the backend
+            print('WARNING! Backend was empty, resetting backend')
+            backend.reset(nwalkers, ndim)
+            p0 = likelihood_manager.log_prior.initialize_walkers(nwalkers, reference_parameters)
 
     else:
         # Reset the backend
