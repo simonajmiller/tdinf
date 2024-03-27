@@ -46,6 +46,7 @@ def create_run_sampler_arg_parser():
 
     # Optional args for waveform/data settings
     p.add_argument('--approx', default='NRSur7dq4')
+    p.add_argument('--use-higher-order-modes', action='store_true')
 
     p.add_argument('--sampling-rate', type=int, default=2048)
 
@@ -363,6 +364,7 @@ def main():
     reference_parameters = get_injected_parameters(args)
     kwargs = initialize_kwargs(args, reference_parameters)
     wf_manager = utils.NewWaveformManager(args.ifos,
+                                          use_higher_order_modes=args.use_higher_order_modes,
                                           vary_time=args.vary_time,
                                           vary_skypos=args.vary_skypos,
                                           vary_eccentricity=args.vary_eccentricity, **kwargs)
@@ -381,6 +383,7 @@ def main():
         vary_time=args.vary_time, vary_skypos=args.vary_skypos,
         vary_eccentricity=args.vary_eccentricity,
         only_prior=args.only_prior,
+        use_higher_order_modes=args.use_higher_order_modes,
         **kwargs)
 
     """

@@ -88,6 +88,7 @@ def get_settings_from_command_line_string(command_line_string, initial_run_dir, 
         vary_time=args.vary_time, vary_skypos=args.vary_skypos,
         vary_eccentricity=args.vary_eccentricity,
         only_prior=args.only_prior,
+        use_higher_order_modes=args.use_higher_order_modes,
         **kwargs)
     return args, kwargs, likelihood_manager
 

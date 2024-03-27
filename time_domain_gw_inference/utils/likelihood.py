@@ -375,11 +375,15 @@ class WaveformManager(LogisticParameterManager):
 
 
 class NewWaveformManager(LogisticParameterManager):
-    def __init__(self, ifos, *args, **kwargs):
+    def __init__(self, ifos, use_higher_order_modes, *args, **kwargs):
         super(NewWaveformManager, self).__init__(*args, **kwargs)
         self.approx_name = kwargs['approx']
         if self.approx_name == 'TEOBResumSDALI':
-            self.generator = TEOBResumSDALI(modes_to_use=[[2, 2]])
+            if use_higher_order_modes:
+                print('generator using higher order modes')
+                self.generator = TEOBResumSDALI(modes_to_use=[[2, 2], [2, 1], [3, 3], [4, 4]])
+            else:
+                self.generator = TEOBResumSDALI(modes_to_use=[[2, 2]])
         else:
             self.generator = gwsignal.core.waveform.LALCompactBinaryCoalescenceGenerator(self.approx_name)
 
@@ -429,7 +433,8 @@ class NewWaveformManager(LogisticParameterManager):
 
 
 class LnLikelihoodManager(LogisticParameterManager):
-    def __init__(self, psd_dict, time_dict, data_dict, f_low, f_ref, f22_start, only_prior=False, *args, **kwargs):
+    def __init__(self, psd_dict, time_dict, data_dict, f_low, f_ref, f22_start, only_prior=False,
+                 use_higher_order_modes=False, *args, **kwargs):
         self.time_dict = time_dict
         self.data_dict = data_dict
         self.f_low = f_low
@@ -442,7 +447,7 @@ class LnLikelihoodManager(LogisticParameterManager):
             assert len(rho) == len(self.data_dict[ifo]), 'Length for ACF is not the same as for the data'
         self.only_prior = only_prior
         try:
-            self.waveform_manager = NewWaveformManager(self.ifos, *args, **kwargs)
+            self.waveform_manager = NewWaveformManager(self.ifos, use_higher_order_modes, *args, **kwargs)
         except Exception as e:
             print(e)
             print("warning, new waveform manager has failed to be created, using old waveform manager")
