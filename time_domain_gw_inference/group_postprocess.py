@@ -5,6 +5,9 @@ import pandas as pd
 import re
 from matplotlib.lines import Line2D
 import imageio
+import corner
+import matplotlib.cm as cm
+import matplotlib.colors
 
 def load_run_settings_from_directory(directory, filename_dict=None):
     """
@@ -119,7 +122,7 @@ def calc_additional_parameters(df):
 
 def generate_filename_dict(directory):
     filename_dict = {}
-    pattern = re.compile(r'(post|pre|full)_(\d+\.\d+)seconds')
+    pattern = re.compile(r'(post|pre|full)_(-?\d+\.\d+)seconds')
 
     for filename in os.listdir(directory):
         match = pattern.match(filename)
@@ -137,14 +140,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import scipy
+import copy
 
 
-def whiten_waveform_dict(wf_dict, choelsky_rho_dict):
+def whiten_waveform_dict(wf_dict, likelihood_manager):
     whitened_wf_dict = {}
     for ifo in wf_dict.keys():
-        whitened_wf_dict[ifo] = np.linalg.solve(choelsky_rho_dict[ifo], wf_dict[ifo])
+        whitened_wf_dict[ifo] = utils.whitenData(wf_dict[ifo], likelihood_manager.time_dict[ifo],
+                                                 likelihood_manager.psd_dict[ifo][:, 1], likelihood_manager.psd_dict[ifo][:, 0])
     return whitened_wf_dict
-
 
 def get_choelsky_decomp_of_toeplitz(toeplitz_matrix):
     # compute covariance matrix  C and its Cholesky decomposition L (~sqrt of C)
@@ -156,18 +160,21 @@ def get_choelsky_decomp_of_toeplitz(toeplitz_matrix):
 def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full_df,
              full_likelihood_manager,
              plot_param, prior_df = None, 
-             ifo='L1', save_dir = None, loc='lower'):
+             ifo='L1', save_dir = None, loc='lower', 
+             ylim=None, inset_ylim=None, 
+             xlim=None, 
+             param_xlim=None):
 
-    choelsky_rho_dict = {ifo: get_choelsky_decomp_of_toeplitz(rho) for ifo, rho in full_likelihood_manager.rho_dict.items()}
-    whitened_data_dict = whiten_waveform_dict(full_likelihood_manager.data_dict, choelsky_rho_dict)
-    whitened_reference_wf = whiten_waveform_dict(reference_waveform_dict, choelsky_rho_dict)
+    choelsky_rho_dict = {_ifo: get_choelsky_decomp_of_toeplitz(rho) for _ifo, rho in full_likelihood_manager.rho_dict.items()}
+    whitened_data_dict = whiten_waveform_dict(full_likelihood_manager.data_dict, full_likelihood_manager)
+    whitened_reference_wf = whiten_waveform_dict(reference_waveform_dict, full_likelihood_manager)
 
-    time_dict = {ifo: times - full_likelihood_manager.reference_time for ifo, times in full_likelihood_manager.time_dict.items()}
+    time_dict = {_ifo: times - full_likelihood_manager.reference_time  for _ifo, times in full_likelihood_manager.time_dict.items()}
     cp = sns.color_palette('muted')
     cp2 = sns.color_palette('pastel')
 
     dt_1M = 0.0127 / 10
-    time_dict_M = {ifo: time / dt_1M for ifo, time in time_dict.items()}
+    time_dict_M = {_ifo: time / dt_1M for _ifo, time in time_dict.items()}
     filenames = []
     for j, tc in enumerate(tc_floats):
         tc_M = tc / dt_1M
@@ -184,15 +191,18 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
         lbl = lbl.replace('M', '\,M_\mathrm{ref}')
 
         # Middle plots: bandpassed waveforms with cutoff
-        x_lims = [-100, 70]
+        if xlim is None:
+            xlim = (-100, 70)
         # x_lims = [min(time_dict[ifo]), max(time_dict[ifo])]
+
+        
 
         for k in [1, 2]:
             # Set up double axes
             top_ax = axes[k].twiny()
             top_ax.plot(time_dict[ifo], full_likelihood_manager.data_dict[ifo], color='k', alpha=0, zorder=3)
             top_ax.set_xlabel(r'$t~[s] $', fontsize=16, labelpad=10)
-            top_ax.set_xlim(x_lims[0] * dt_1M, x_lims[1] * dt_1M)
+            top_ax.set_xlim(xlim[0] * dt_1M, xlim[1] * dt_1M)
             top_ax.grid(visible=False)
 
             axes[k].plot(time_dict_M[ifo], full_likelihood_manager.data_dict[ifo] / (1e-22), color='k', alpha=0, zorder=3)
@@ -215,7 +225,7 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
                 for wf_dict in wf_dict_list:
                     axes[k].plot(time_dict_M[ifo], wf_dict[ifo] / (1e-22),
                                  color=cp[0], alpha=alpha_reconstruct, zorder=1)
-                axes[k].axvspan(tc_M, x_lims[1], **shading_kws, zorder=0)
+                axes[k].axvspan(tc_M, xlim[1], **shading_kws, zorder=0)
             else:
                 try:
                     wf_dict_list = wfs_at_tc_list[j]['post']
@@ -224,11 +234,13 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
                 for wf_dict in wf_dict_list:
                     axes[k].plot(time_dict_M[ifo], wf_dict[ifo] / (1e-22),
                                  color=cp[1], alpha=alpha_reconstruct, zorder=1)
-                axes[k].axvspan(x_lims[0], tc_M, **shading_kws, zorder=0)
+                axes[k].axvspan(xlim[0], tc_M, **shading_kws, zorder=0)
 
             axes[k].grid(color='silver', ls=':', alpha=0.7)
-            axes[k].set_xlim(*x_lims)
-            axes[k].set_ylim(-7, 7)
+            axes[k].set_xlim(xlim)
+            if ylim is None:
+                ylim = axes[k].get_ylim()
+            axes[k].set_ylim(ylim[0], ylim[1])
 
             # Add label for cutoff time
             if tc_M >= 20:
@@ -237,7 +249,10 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
                 textloc = tc_M - 53
             else:
                 textloc = tc_M + 4
-            axes[k].text(textloc, 5, f'${lbl}$', color='k', fontsize=15, zorder=5)
+                
+            yrange = ylim[1] - ylim[0]
+            
+            axes[k].text(textloc, ylim[1] - 0.20 * yrange, f'${lbl}$', color='k', fontsize=15, zorder=5)
 
         axes[2].yaxis.set_label_position("right")
         axes[2].yaxis.tick_right()
@@ -249,7 +264,8 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
         axes[1].set_position([x0 + dx + 0.0375, y0, x1, y1])
         x0, y0, x1, y1 = axes[2].get_position().bounds
         axes[2].set_position([x0 + dx, y0, x1, y1])
-
+        
+        # -------------------------------------------------------------------------
         # Righthand plots, plot posteriors
         try:
             axes[0].hist(dfs_at_tc[j]['pre'][plot_param], histtype='step', bins=30, lw=1.5,
@@ -271,6 +287,11 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
               density=True, **prior_kws)
         axes[0].set_xlabel(plot_param, fontsize=16)
         axes[0].set_ylabel(f"p({plot_param})", fontsize=16)
+        if param_xlim is None: 
+            param_xlim = axes[0].get_xlim()
+        axes[0].set_xlim(param_xlim)
+        # -------------------------------------------------------------------------
+
 
         # Inset axis in leftmost column with whitened strain
         l = 0.4
@@ -279,11 +300,16 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
         axin = axes[0].inset_axes(get_inset_axes_position(axes[0], dx, l, w, loc=loc))
         axin.plot(time_dict_M[ifo], whitened_data_dict[ifo], color='silver', lw=0.5)
         axin.plot(time_dict_M[ifo], whitened_reference_wf[ifo], color='k', lw=0.75)
-        axin.axvline(tc_M, ls='--', color='k')
-        axin.axvspan(tc_M, x_lims[-1], color=cp2[1], alpha=0.3, zorder=0)
-        axin.axvspan(x_lims[0], tc_M, color=cp[0], alpha=0.3, zorder=0)
-        axin.set_xlim(-60, 70)
-        # axin.set_ylim(-3, 3)
+        # axin.plot(time_dict_M[ifo], full_likelihood_manager.data_dict[ifo], color='silver', lw=0.5)
+        # axin.plot(time_dict_M[ifo], reference_waveform_dict[ifo], color='k', lw=0.75)
+
+        axin.axvline(tc_M, ls='--', color='k', zorder=0)
+        axin.axvspan(tc_M, xlim[-1], color=cp2[1], alpha=0.3, zorder=1)
+        axin.axvspan(xlim[0], tc_M, color=cp[0], alpha=0.3, zorder=1)
+        axin.set_xlim(xlim)
+        if inset_ylim is None:
+            inset_ylim = axin.get_ylim()
+        axin.set_ylim(inset_ylim)
         axin.set_xticklabels([])
         axin.set_yticklabels([])
 
@@ -335,3 +361,65 @@ def get_inset_axes_position(ax, dx, l, w, loc='upper'):
         return dx - 0.01, 1 - dx - w, l, w  # Place the inset axes at the bottom left if the legend is at the top
     if loc == 'lower':
         return dx - 0.01, dx, l, w  # Place the inset axes at the top left if the legend is at the bottom
+
+
+def make_color_dict(keys):
+    # Initialize the color dictionary
+    color_dict_inj = {}
+    if 'full' in keys:
+        color_dict_inj['full'] = 'black'
+    
+    # Define the color map for shades of blue and orange
+    matplotlib.colors.LinearSegmentedColormap.from_list("",['#995c00', '#ffad33'])
+    blue_map = matplotlib.colors.LinearSegmentedColormap.from_list("",[ '#4db8ff', '#005c99'])  #cm.Blues
+    orange_map = matplotlib.colors.LinearSegmentedColormap.from_list("",['#995c00',  '#ffc266']) #cm.Oranges
+    
+    # Extract unique numbers from 'pre' and 'post' keys
+    pre_keys = sorted([(key, float(key.split('_')[1])) for key in keys if key.startswith('pre')], key=lambda x: x[1])
+    post_keys = sorted([(key, float(key.split('_')[1])) for key in keys if key.startswith('post')], key=lambda x: x[1])
+
+    pre_range = max([pre_val for _, pre_val in pre_keys]) - min([pre_val for _, pre_val in pre_keys])
+    post_range = max([val for _, val in post_keys]) - min([val for _, val in post_keys])
+    
+
+    # Assign shades of blue for 'pre' keys
+    for key, num in pre_keys:
+        color_dict_inj[key] = matplotlib.colors.to_hex(blue_map(num / pre_range))
+    for key, num in post_keys:
+        color_dict_inj[key] = matplotlib.colors.to_hex(orange_map(num / post_range))
+    return color_dict_inj
+
+
+def plot_corner(run_set, reference_df_key = 'full',
+                plot_datapoints=False, plot_density=False, plot_contours=True, 
+                run_keys=None, truth_dict=None, plot_keys=None, fig=None, **kwargs):
+    
+    hist2d_kwargs=dict(plot_datapoints=plot_datapoints, 
+                       plot_density=plot_density, 
+                       plot_contours=plot_contours)
+    hist2d_kwargs.update(kwargs)
+    td_samples = run_set['dfs']
+    
+    df = td_samples[reference_df_key]
+
+    if plot_keys is None:
+        plot_keys = []
+        for key in df.keys():
+            if max(df[key]) == min(df[key]):
+                continue
+            plot_keys.append(key)
+
+    if run_keys is None:
+        run_keys = td_samples.keys()
+
+    if truth_dict is not None:
+        truths = [truth_dict[plot_key] for plot_key in plot_keys]
+    else:
+        truths = None
+        
+    fig = corner.corner(df, var_names=plot_keys, hist_kwargs=dict(density=True), 
+                  fig=fig,
+                  truths = truths, 
+                  **hist2d_kwargs)
+    return fig
+
