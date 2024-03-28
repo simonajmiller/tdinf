@@ -379,14 +379,17 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
             filename = f'{save_dir}/frame_{tc_str}.png'
             plt.savefig(filename, bbox_inches='tight', dpi=200)
             filenames.append(filename)
-    
+
     if save_dir is not None:
-        frames = []
-        for filename in filenames:
-            image = imageio.v2.imread(filename)
-            frames.append(image)
-        fps = 1.5
-        imageio.mimsave(f'{save_dir}/all.gif', frames, fps=fps) 
+        save_gif(f'{save_dir}/all.gif', gif_name, fps=1.5)
+
+def save_gif(filenames, gif_name, fps=1.5):
+    frames = []
+    for filename in filenames:
+        image = imageio.v2.imread(filename)
+        frames.append(image)
+    fps = 1.5
+    imageio.mimsave(gif_name, frames, fps=fps) 
 
 
 def get_inset_axes_position(ax, dx, l, w, loc='upper'):
@@ -441,7 +444,8 @@ def get_non_constant_keys(df):
 
 def plot_corner(run_set, reference_df_key = 'full',
                 plot_datapoints=False, plot_density=False, plot_contours=True, 
-                run_keys=None, truth_dict=None, plot_keys=None, fig=None, **kwargs):
+                run_keys=None, truth_dict=None, plot_keys=None, fig=None, 
+                save_dir=None, **kwargs):
     
     hist2d_kwargs=dict(plot_datapoints=plot_datapoints, 
                        plot_density=plot_density, 
@@ -499,6 +503,7 @@ def make_corner_gif(individual_run,
                     reference_waveform_dict,
                     ifo='L1',
                     run_keys=None, reference_parameters=None,
+                    save_dir=None,
                     levels=1, range_dict=None, prior_df=None, **kwargs):
 
     if run_keys is None:
@@ -527,7 +532,17 @@ def make_corner_gif(individual_run,
         plot_kwargs['range'] = [range_dict.get(key, (min(reference_df[key]), max(reference_df[key]))) for key in plot_keys]
         
     color_dict = make_color_dict(individual_run['dfs'].keys())
-    
+    hist_kwargs = dict( histtype='step', density=True, bins='auto')
+
+    filenames = []
+
+    if save_dir is not None:
+        try:
+            os.mkdir(save_dir)
+        except:
+            pass
+
+    ylims = [None for key in plot_keys]
     for t_cut, keys in tcut_dict.items():
         plot_kwargs['fig'] = None
         plot_kwargs['contour_kwargs'] = {'levels':levels}
@@ -546,7 +561,6 @@ def make_corner_gif(individual_run,
 
     
         axes = np.array(fig.axes).reshape((len(plot_keys), len(plot_keys)))
-        
         # corner does weird shit with histograms, replot here 
         for i in range(len(plot_keys)):
             parameter = plot_keys[i]
@@ -554,23 +568,40 @@ def make_corner_gif(individual_run,
             artists = ax.patches
 
             for artist in artists:
-                # Check if the artist is a Rectangle (histogram)
+                # Check if the artist is a polygon (histogram)
                 if isinstance(artist, plt.Polygon): 
                     artist.remove()
-            ax.autoscale(axis="y")
 
-            ax.hist(individual_run['dfs']['full'][parameter], bins='auto',
-                   color='black', histtype='step', density=True)
+            if ylims[i] is None:
+                ax.autoscale(axis="y")
+            else:
+                ax.set_ylim(ylims[i])
+            
+
+            ax.hist(individual_run['dfs']['full'][parameter],
+                   color='black', **hist_kwargs)
             for key in keys:
-                ax.hist(individual_run['dfs'][key][parameter], bins='auto',
-                       color=color_dict[key], histtype='step', density=True)
+                ax.hist(individual_run['dfs'][key][parameter],
+                       color=color_dict[key], **hist_kwargs)
             if prior_df is not None:
-                ax.hist(prior_df[parameter], bins='auto', linestyle='dotted',
-                        color='silver', histtype='step', density=True)
+                ax.hist(prior_df[parameter], linestyle='dotted',
+                        color='silver', **hist_kwargs)
+            if ylims[i] is None:
+                ylims[i] = ax.get_ylim()
 
 
         make_inset_plot(axes[0, -1], time_dict_M[ifo], whitened_data_dict[ifo], whitened_reference_wf[ifo],
                         time_to_mass(t_cut), l=0.5, **kwargs)
+        
+        tc_str = f"{time_to_mass(t_cut):.2f}" + 'M'  # tc_to_plot[j]
+        lbl = tc_str.replace('m', '-') if tc_str[0] == 'm' else tc_str
+
+        filename = f'{save_dir}/corner_frame_{tc_str}.png'
+        plt.savefig(filename, bbox_inches='tight', dpi=200)
+        filenames.append(filename)
+    if save_dir is not None:
+        save_gif(filenames, f'{save_dir}/all_corner.gif')
+    
     
 
     
