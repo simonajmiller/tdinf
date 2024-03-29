@@ -241,7 +241,7 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
             top_ax = axes[k].twiny()
             top_ax.plot(time_dict[ifo], full_likelihood_manager.data_dict[ifo], color='k', alpha=0, zorder=3)
             top_ax.set_xlabel(r'$t~[s] $', fontsize=16, labelpad=10)
-            top_ax.set_xlim(xlim[0] * dt_1M, xlim[1] * dt_1M)
+            #top_ax.set_xlim(xlim[0] * dt_1M, xlim[1] * dt_1M)
             top_ax.grid(visible=False)
 
             axes[k].plot(time_dict_M[ifo], full_likelihood_manager.data_dict[ifo] / (1e-22), color='k', alpha=0, zorder=3)
@@ -379,9 +379,10 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
             filename = f'{save_dir}/frame_{tc_str}.png'
             plt.savefig(filename, bbox_inches='tight', dpi=200)
             filenames.append(filename)
-
+            
+    gif_name = f'{save_dir}/all.gif'
     if save_dir is not None:
-        save_gif(f'{save_dir}/all.gif', gif_name, fps=1.5)
+        save_gif(filenames, gif_name, fps=1.5)
 
 def save_gif(filenames, gif_name, fps=1.5):
     frames = []
@@ -407,7 +408,8 @@ def make_color_dict(keys):
         color_dict_inj['full'] = 'black'
     
     # Define the color map for shades of blue and orange
-    matplotlib.colors.LinearSegmentedColormap.from_list("",['#995c00', '#ffad33'])
+    matplotlib.colors.LinearSegmentedColormap.from_list("",['#ed9911', #'#995c00', 
+                                                            '#ffad33'])
     blue_map = matplotlib.colors.LinearSegmentedColormap.from_list("",[ '#4db8ff', '#005c99'])  #cm.Blues
     orange_map = matplotlib.colors.LinearSegmentedColormap.from_list("",['#995c00',  '#ffc266']) #cm.Oranges
     #blue_map = cm.Blues
@@ -544,6 +546,8 @@ def make_corner_gif(individual_run,
 
     ylims = [None for key in plot_keys]
     for t_cut, keys in tcut_dict.items():
+        
+        
         plot_kwargs['fig'] = None
         plot_kwargs['contour_kwargs'] = {'levels':levels}
         fig = plot_corner(individual_run, reference_df_key = 'full',
@@ -562,6 +566,7 @@ def make_corner_gif(individual_run,
     
         axes = np.array(fig.axes).reshape((len(plot_keys), len(plot_keys)))
         # corner does weird shit with histograms, replot here 
+        print(ylims)
         for i in range(len(plot_keys)):
             parameter = plot_keys[i]
             ax = axes[i, i]
@@ -574,10 +579,7 @@ def make_corner_gif(individual_run,
 
             if ylims[i] is None:
                 ax.autoscale(axis="y")
-            else:
-                ax.set_ylim(ylims[i])
-            
-
+                
             ax.hist(individual_run['dfs']['full'][parameter],
                    color='black', **hist_kwargs)
             for key in keys:
@@ -586,19 +588,42 @@ def make_corner_gif(individual_run,
             if prior_df is not None:
                 ax.hist(prior_df[parameter], linestyle='dotted',
                         color='silver', **hist_kwargs)
+            
             if ylims[i] is None:
-                ylims[i] = ax.get_ylim()
+                ax.autoscale(False)
+                ylim = ax.get_ylim()
+                ylims[i] = (ylim[0], ylim[1] * 1.2)
+            ax.set_ylim(ylims[i])
 
-
-        make_inset_plot(axes[0, -1], time_dict_M[ifo], whitened_data_dict[ifo], whitened_reference_wf[ifo],
+        ax = axes[0, -1]
+        
+        make_inset_plot(ax, time_dict_M[ifo], whitened_data_dict[ifo], whitened_reference_wf[ifo],
                         time_to_mass(t_cut), l=0.5, **kwargs)
+        
+        
+        
         
         tc_str = f"{time_to_mass(t_cut):.2f}" + 'M'  # tc_to_plot[j]
         lbl = tc_str.replace('m', '-') if tc_str[0] == 'm' else tc_str
+        lbl = lbl.replace('M', '\,M_\mathrm{ref}')
+        
+        ylim = ax.get_ylim()
+        yrange = ylim[1] - ylim[0]
+        xlim = ax.get_xlim()
+        xrange = xlim[1] - xlim[0]
+        textloc = xlim[0] + 0.2 * xrange
+        ax.text(textloc, ylim[1] - 0.50 * yrange, f'${lbl}$', color='k', fontsize=15, zorder=5)
+        
+        for i in range(len(plot_keys)):
+            ax = axes[i, i]
+            ax.set_ylim(ylims[i])
 
-        filename = f'{save_dir}/corner_frame_{tc_str}.png'
-        plt.savefig(filename, bbox_inches='tight', dpi=200)
-        filenames.append(filename)
+        
+
+        if save_dir is not None:
+            filename = f'{save_dir}/corner_frame_{tc_str}.png'
+            plt.savefig(filename, bbox_inches='tight', dpi=200)
+            filenames.append(filename)
     if save_dir is not None:
         save_gif(filenames, f'{save_dir}/all_corner.gif')
     
