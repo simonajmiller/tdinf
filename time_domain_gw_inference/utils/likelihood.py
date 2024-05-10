@@ -235,7 +235,7 @@ class LnPriorManager(LogisticParameterManager):
 
         x_dict = self.get_logistic_dict(x)
 
-        # If x_phys passed in kws, return it, if not, calculate it with samp_to_phys
+        # If phys_dict passed in kws, return it, if not, calculate it with samp_to_phys
         if phys_dict is None:
             phys_dict = self.samp_to_phys(x)
 

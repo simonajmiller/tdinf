@@ -4,7 +4,7 @@ from .misc import inv_logit, logit, logit_jacobian
 
 class LogisticParameter:
     """
-    Logistic transformations take values to +/- infinity (?)
+    Logistic transformations take values to +/- infinity
     """
     def __init__(self, physical_name, limit, initial_value=None):
         self.physical_name = physical_name
@@ -19,6 +19,11 @@ class LogisticParameter:
         return logit(physical_value, *self.limit)
 
     def ln_prior_weight(self, physical_value):
+        """
+        Get required prior weight for uniform, flat prior in non-logistic space
+        :param physical_value:
+        :return:
+        """
         return -np.log(logit_jacobian(physical_value, *self.limit))
 
     def initialize_value(self, scale=0.05):
