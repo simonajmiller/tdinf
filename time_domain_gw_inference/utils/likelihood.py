@@ -65,7 +65,7 @@ class LogisticParameterManager:
         # TODO put in injected values
         self.logistic_parameters = [LogisticParameter('total_mass', kwargs['mtot_lim'], None),
                                     LogisticParameter('mass_ratio', kwargs['q_lim'], None),
-                                    LogisticParameter('distance_mpc', kwargs['dist_lim'], None),
+                                    LogisticParameter('luminosity_distance', kwargs['dist_lim'], None),
                                     TrigLogisticParameter('inclination', 'cos', [-1, 1], None)
                                     ]
         if not self.no_spins:
@@ -178,7 +178,7 @@ class LogisticParameterManager:
             'spin2y': physical_dict['spin2_y'] * u.dimensionless_unscaled,
             'spin2z': physical_dict['spin2_z'] * u.dimensionless_unscaled,
             'phi_ref': physical_dict['phase'] * u.rad,
-            'distance': physical_dict['distance_mpc'] * u.Mpc,
+            'distance': physical_dict['luminosity_distance'] * u.Mpc,
             'inclination': physical_dict['inclination'] * u.rad,
         }
         # TODO, maybe it should check if we have an eccentric waveform?
@@ -338,7 +338,7 @@ class WaveformManager(LogisticParameterManager):
         chi2 = [x_phys['spin2_x'], x_phys['spin2_y'], x_phys['spin2_z']]
 
         hp, hc = self.generate_lal_hphc(m1, m2, chi1, chi2, delta_t=delta_t,
-                                        dist_mpc=x_phys['distance_mpc'],
+                                        dist_mpc=x_phys['luminosity_distance'],
                                         f22_start=f22_start, f_ref=f_ref,
                                         inclination=x_phys['inclination'],
                                         phi_ref=x_phys['phase'],

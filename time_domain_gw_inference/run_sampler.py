@@ -115,7 +115,7 @@ def modify_parameters(data, args):
     equivocate_columns(df, 'declination', 'dec')
     equivocate_columns(df, 'mean_anomaly', 'mean_anomaly_periastron')
     equivocate_columns(df, 'polarization', 'psi')
-    equivocate_columns(df, 'distance_mpc', 'luminosity_distance')
+    equivocate_columns(df, 'luminosity_distance', 'distance_mpc')
 
     if 'f_ref' not in df.columns:
         df['f_ref'] = args.fref
