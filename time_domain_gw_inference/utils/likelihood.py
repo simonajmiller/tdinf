@@ -92,7 +92,10 @@ class LogisticParameterManager:
         self.cartesian_angles = [CartesianAngle('phase')]
 
         if self.vary_time:
+            # this is set for the prior manager
+            self.sigma_time = kwargs['sigma_time']
             self.sampled_keys.append('geocenter_time')
+
         if self.vary_skypos:
             self.cartesian_angles.extend([
                 CartesianAngle('right_ascension', phase_offset=np.pi),
@@ -162,7 +165,8 @@ class LogisticParameterManager:
 
         return physical_dict
 
-    def physical_dict_to_waveform_dict(self, physical_dict):
+    @staticmethod
+    def physical_dict_to_waveform_dict(physical_dict):
         """
         Take in the physical dictionary and return one that has units for astropy
         :return:
@@ -222,10 +226,7 @@ class LnPriorManager(LogisticParameterManager):
         # if time of coalescence sampled over need to include this separately since it isn't a unit scaled quantity
         if self.vary_time:
             index = self.sampled_keys.index('geocenter_time')
-            dt_1M = 0.00127
-            #sigma_time = dt_1M * 2.5  # time prior from LVK has width of ~2.5M
-            sigma_time = 0.01
-            initial_t_walkers = np.random.normal(loc=self.reference_time, scale=sigma_time, size=nwalkers)
+            initial_t_walkers = np.random.normal(loc=self.reference_time, scale=self.sigma_time, size=nwalkers)
             p0_arr[:, index] = initial_t_walkers  # time always saved as the final param
 
         p0 = p0_arr.tolist()
@@ -250,9 +251,7 @@ class LnPriorManager(LogisticParameterManager):
 
         if self.vary_time:
             # gaussian
-            dt_1M = 0.00127
-            sigma_time = 0.01 #dt_1M * 2.5  # time prior from LVK has width of ~2.5M
-            lnprior -= 0.5 * ((phys_dict['geocenter_time'] - self.reference_time) ** 2) / (sigma_time ** 2)
+            lnprior -= 0.5 * ((phys_dict['geocenter_time'] - self.reference_time) ** 2) / (self.sigma_time ** 2)
 
         # Spins
         if not self.no_spins:
