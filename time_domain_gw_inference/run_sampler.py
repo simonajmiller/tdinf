@@ -4,12 +4,10 @@
 import argparse
 import numpy as np
 import emcee
-import scipy.linalg as sl
 import pandas as pd
 from multiprocessing import Pool
 from contextlib import closing
 import os
-import sys
 import time_domain_gw_inference.utils as utils
 
 
@@ -53,7 +51,8 @@ def create_run_sampler_arg_parser():
     p.add_argument('--flow', type=float, default=11,
                    help="lower frequency bound for data conditioning and likelihood function (ACF)")
     p.add_argument('--f22-start', type=float, default=11,
-                   help="frequency at which to start generating 22 mode for waveforms")
+                   help="frequency at which to start generating 22 mode for waveforms, "
+                        "NOTE! f22-start _is_ the reference frequency for eccentric waveforms ")
     p.add_argument('--fref', type=float, default=11)
     p.add_argument('--ifos', nargs='+', default=['H1', 'L1', 'V1'])
 
@@ -221,7 +220,7 @@ def initialize_kwargs(args, reference_parameters):
         'mtot_lim': args.total_mass_prior_bounds,
         'q_lim': args.mass_ratio_prior_bounds,
         'chi_lim': args.spin_magnitude_prior_bounds,
-        'dist_lim': args.luminosity_distance_prior,
+        'dist_lim': args.luminosity_distance_prior_bounds,
         'sigma_time': args.time_prior_sigma,
         'eccentricity_lim': args.eccentricity_prior_bounds,
         'approx': args.approx,
@@ -277,7 +276,7 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
                                                           time_dict=raw_time_dict,
                                                           f_ref=args.fref, f22_start=args.f22_start)
 
-    ## tcut = cutoff time in waveform
+    # tcut = cutoff time in waveform
     if args.Tcut_seconds is not None:
         # option 1: truncation time given in seconds already
         tcut_geocent = tpeak_geocent + args.Tcut_seconds
@@ -298,7 +297,8 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
     print('\nCutoff time:')
     tcut_dict, _ = utils.get_tgps_and_ap_dicts(tcut_geocent, ifos,
                                                reference_parameters['right_ascension'],
-                                               reference_parameters['declination'], reference_parameters['polarization'])
+                                               reference_parameters['declination'],
+                                               reference_parameters['polarization'])
 
     """
     Condition data

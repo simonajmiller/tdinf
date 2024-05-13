@@ -200,6 +200,8 @@ class LnPriorManager(LogisticParameterManager):
         # to take boundaries to +/- infinity)
         p0_arr = np.asarray([[np.random.normal() for j in range(self.num_parameters)] for i in range(nwalkers)])
 
+        # we have initialized walkers inside their logistic prior, now for injected parameters
+        # we will inject them closer
         for param in self.logistic_parameters:
             p = self.sampled_keys.index(param.logistic_name)
             param_kw = param.physical_name
@@ -217,6 +219,12 @@ class LnPriorManager(LogisticParameterManager):
                       f' drawing random value from within range, '
                       f"We are not going to draw around that value because we'll get infs!")
                 continue
+            elif param_phys < param.limit[0] or param_phys > param.limit[1]:
+                print(f"WARNING: Injected value ({param_phys}) for {param_kw} is outside limit {param.limit}."
+                      f" We will not set initial values around this value")
+                continue 
+
+
             # transform into logistic space
             param_logit = param.physical_to_logistic(param_phys)
 
