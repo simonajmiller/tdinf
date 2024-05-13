@@ -222,8 +222,7 @@ class LnPriorManager(LogisticParameterManager):
             elif param_phys < param.limit[0] or param_phys > param.limit[1]:
                 print(f"WARNING: Injected value ({param_phys}) for {param_kw} is outside limit {param.limit}."
                       f" We will not set initial values around this value")
-                continue 
-
+                continue
 
             # transform into logistic space
             param_logit = param.physical_to_logistic(param_phys)
