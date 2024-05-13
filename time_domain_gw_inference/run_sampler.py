@@ -70,7 +70,7 @@ def create_run_sampler_arg_parser():
     p.add_argument('--vary-eccentricity', action='store_true')
     p.add_argument('--eccentricity-prior-bounds', type=float, nargs=2, default=[0, 0.9],
                    help="prior bounds for eccentricity parameter, only used if --vary-eccentricity given")
-    p.add_argument('--total-mass-prior-bounds', type=float, nargs=2, default=[97, 198],
+    p.add_argument('--total-mass-prior-bounds', type=float, nargs=2, default=[200, 350],
                    help="detector frame total mass bounds (in solar masses) for total_mass prior")
     p.add_argument('--mass-ratio-prior-bounds', type=float, nargs=2, default=[0.17, 1],
                    help="mass ratio bounds for mass ratio prior")
