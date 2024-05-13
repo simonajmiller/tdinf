@@ -46,7 +46,8 @@ def load_run_settings_from_directory(directory, filename_dict=None):
                     filename_dict[key],
                     directory + '/',
                     parser, verbose=True)
-            except TypeError:
+            except TypeError as e:
+                print(e)
                 print(f'unable to make {run} {key}')
 
             filename = os.path.join(directory, filename_dict[key] + '.dat')
@@ -70,7 +71,8 @@ def get_settings_from_command_line_string(command_line_string, initial_run_dir, 
     wf_manager = utils.NewWaveformManager(args.ifos,
                                           vary_time=args.vary_time,
                                           vary_skypos=args.vary_skypos,
-                                          vary_eccentricity=args.vary_eccentricity, **kwargs)
+                                          vary_eccentricity=args.vary_eccentricity, 
+                                          use_higher_order_modes=args.use_higher_order_modes, **kwargs)
     print('getting conditioned time and data')
     time_dict, data_dict, psd_dict = run_sampler.get_conditioned_time_and_data(args,
                                                                                wf_manager=wf_manager,
@@ -121,6 +123,15 @@ def calc_additional_parameters(df):
 
     return df
 
+def get_tc_from_name(name):
+    pattern = re.compile(r'(post|pre|full)_(-?\d+\.\d+)seconds')
+    match = pattern.match(name)
+    if match:
+        prefix, nseconds = match.groups()
+    else:
+        raise ValueError(f"name {name} did not match regex, could not find name")
+    return nseconds
+
 
 def generate_filename_dict(directory):
     filename_dict = {}
@@ -159,6 +170,35 @@ def get_choelsky_decomp_of_toeplitz(toeplitz_matrix):
     return L
 
 
+def make_inset_plot(ax, times, data_wf, reference_wf, t_cut, 
+                    l=0.4, w=0.3, dx=0.04, xlim=None, inset_ylim=None, **kwargs):
+    cp = sns.color_palette('muted')
+    cp2 = sns.color_palette('pastel')
+    
+    # Inset axis in leftmost column with whitened strain
+    axin = ax.inset_axes(get_inset_axes_position(ax, dx, l, w, loc=kwargs.get('loc', 'upper')))
+    axin.plot(times, data_wf, color='silver', lw=0.5)
+    axin.plot(times, reference_wf, color='k', lw=0.75)
+    
+    if xlim is None:
+        xlim = axin.get_xlim()
+
+    axin.axvline(t_cut, ls='--', color='k', zorder=0)
+    axin.axvspan(t_cut, xlim[-1], color=cp2[1], alpha=0.3, zorder=1)
+    axin.axvspan(xlim[0], t_cut, color=cp[0], alpha=0.3, zorder=1)
+    axin.set_xlim(xlim)
+    if inset_ylim is None:
+        inset_ylim = axin.get_ylim()
+    axin.set_ylim(inset_ylim)
+    axin.set_xticklabels([])
+    axin.set_yticklabels([])
+
+
+def time_to_mass(times):
+    dt_1M = 0.0127 / 10
+    return times / dt_1M
+
+
 def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full_df,
              full_likelihood_manager,
              plot_param, prior_df = None, 
@@ -167,7 +207,6 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
              xlim=None, 
              param_xlim=None):
 
-    choelsky_rho_dict = {_ifo: get_choelsky_decomp_of_toeplitz(rho) for _ifo, rho in full_likelihood_manager.rho_dict.items()}
     whitened_data_dict = whiten_waveform_dict(full_likelihood_manager.data_dict, full_likelihood_manager)
     whitened_reference_wf = whiten_waveform_dict(reference_waveform_dict, full_likelihood_manager)
 
@@ -175,11 +214,10 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
     cp = sns.color_palette('muted')
     cp2 = sns.color_palette('pastel')
 
-    dt_1M = 0.0127 / 10
-    time_dict_M = {_ifo: time / dt_1M for _ifo, time in time_dict.items()}
+    time_dict_M = {_ifo: time_to_mass(time) for _ifo, time in time_dict.items()}
     filenames = []
     for j, tc in enumerate(tc_floats):
-        tc_M = tc / dt_1M
+        tc_M = time_to_mass(tc)
 
         # Make figure
         fig, axes = plt.subplots(1, 3, figsize=(15 / 1.3, 25 / 8 / 1.3))
@@ -204,7 +242,7 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
             top_ax = axes[k].twiny()
             top_ax.plot(time_dict[ifo], full_likelihood_manager.data_dict[ifo], color='k', alpha=0, zorder=3)
             top_ax.set_xlabel(r'$t~[s] $', fontsize=16, labelpad=10)
-            top_ax.set_xlim(xlim[0] * dt_1M, xlim[1] * dt_1M)
+            #top_ax.set_xlim(xlim[0] * dt_1M, xlim[1] * dt_1M)
             top_ax.grid(visible=False)
 
             axes[k].plot(time_dict_M[ifo], full_likelihood_manager.data_dict[ifo] / (1e-22), color='k', alpha=0, zorder=3)
@@ -342,19 +380,18 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
             filename = f'{save_dir}/frame_{tc_str}.png'
             plt.savefig(filename, bbox_inches='tight', dpi=200)
             filenames.append(filename)
-        #
-        # if j == 24:
-        #     plt.show()
-        # else:
-        #     plt.close()
-    
+            
+    gif_name = f'{save_dir}/all.gif'
     if save_dir is not None:
-        frames = []
-        for filename in filenames:
-            image = imageio.v2.imread(filename)
-            frames.append(image)
-        fps = 1.5
-        imageio.mimsave(f'{save_dir}/all.gif', frames, fps=fps) 
+        save_gif(filenames, gif_name, fps=1.5)
+
+def save_gif(filenames, gif_name, fps=1.5):
+    frames = []
+    for filename in filenames:
+        image = imageio.v2.imread(filename)
+        frames.append(image)
+    fps = 1.5
+    imageio.mimsave(gif_name, frames, fps=fps) 
 
 
 def get_inset_axes_position(ax, dx, l, w, loc='upper'):
@@ -372,9 +409,12 @@ def make_color_dict(keys):
         color_dict_inj['full'] = 'black'
     
     # Define the color map for shades of blue and orange
-    matplotlib.colors.LinearSegmentedColormap.from_list("",['#995c00', '#ffad33'])
+    matplotlib.colors.LinearSegmentedColormap.from_list("",['#ed9911', #'#995c00', 
+                                                            '#ffad33'])
     blue_map = matplotlib.colors.LinearSegmentedColormap.from_list("",[ '#4db8ff', '#005c99'])  #cm.Blues
     orange_map = matplotlib.colors.LinearSegmentedColormap.from_list("",['#995c00',  '#ffc266']) #cm.Oranges
+    #blue_map = cm.Blues
+    #orange_map = cm.Oranges
     
     # Extract unique numbers from 'pre' and 'post' keys
     pre_keys = sorted([(key, float(key.split('_')[1])) for key in keys if key.startswith('pre')], key=lambda x: x[1])
@@ -383,18 +423,32 @@ def make_color_dict(keys):
     pre_range = max([pre_val for _, pre_val in pre_keys]) - min([pre_val for _, pre_val in pre_keys])
     post_range = max([val for _, val in post_keys]) - min([val for _, val in post_keys])
     
+    norm_pre = matplotlib.colors.Normalize(vmin=min([val for _, val in pre_keys]), 
+                                                    vmax=max([val for _, val in pre_keys]))
+    norm_post = matplotlib.colors.Normalize(vmin=min([val for _, val in post_keys]), 
+                                                    vmax=max([val for _, val in post_keys]))
 
     # Assign shades of blue for 'pre' keys
     for key, num in pre_keys:
-        color_dict_inj[key] = matplotlib.colors.to_hex(blue_map(num / pre_range))
+        color_dict_inj[key] = matplotlib.colors.to_hex(blue_map(norm_pre(num)))
     for key, num in post_keys:
-        color_dict_inj[key] = matplotlib.colors.to_hex(orange_map(num / post_range))
+        color_dict_inj[key] = matplotlib.colors.to_hex(orange_map(norm_pre(num)))
     return color_dict_inj
+
+
+def get_non_constant_keys(df):
+    plot_keys = []
+    for key in df.keys():
+        if max(df[key]) == min(df[key]):
+            continue
+        plot_keys.append(key)
+    return plot_keys
 
 
 def plot_corner(run_set, reference_df_key = 'full',
                 plot_datapoints=False, plot_density=False, plot_contours=True, 
-                run_keys=None, truth_dict=None, plot_keys=None, fig=None, **kwargs):
+                run_keys=None, truth_dict=None, plot_keys=None, fig=None, 
+                save_dir=None, **kwargs):
     
     hist2d_kwargs=dict(plot_datapoints=plot_datapoints, 
                        plot_density=plot_density, 
@@ -405,12 +459,8 @@ def plot_corner(run_set, reference_df_key = 'full',
     df = td_samples[reference_df_key]
 
     if plot_keys is None:
-        plot_keys = []
-        for key in df.keys():
-            if max(df[key]) == min(df[key]):
-                continue
-            plot_keys.append(key)
-
+        plot_keys = get_non_constant_keys(df)
+        
     if run_keys is None:
         run_keys = td_samples.keys()
 
@@ -424,4 +474,161 @@ def plot_corner(run_set, reference_df_key = 'full',
                   truths = truths, 
                   **hist2d_kwargs)
     return fig
+
+def get_sorted_pre_and_post_keys(keys):
+    t_cuts = sorted(list(set(float(key.split('_')[1]) if '_' in key else 0 for key in keys )))
+    # Extract unique numbers from 'pre' and 'post' keys
+    pre_keys = sorted([(key, float(key.split('_')[1])) for key in keys if key.startswith('pre')], key=lambda x: x[1])
+    post_keys = sorted([(key, float(key.split('_')[1])) for key in keys if key.startswith('post')], key=lambda x: x[1])
+            
+    tcut_dict = {}
+
+    # Iterate over unique t_cuts
+    for t_cut in t_cuts:
+        # Find the corresponding 'pre' key
+        pre_key = next((key for key, t in pre_keys if t == t_cut), None)
+        # Find the corresponding 'post' key
+        post_key = next((key for key, t in post_keys if t == t_cut), None)
+        
+        # Create a dictionary entry for the current t_cut
+        new_keys = []
+        if pre_key is not None:
+            new_keys.append(pre_key)
+        if post_key is not None:
+            new_keys.append(post_key)
+        tcut_dict[t_cut] = new_keys
+        
+    return tcut_dict
+
+
+def make_corner_gif(individual_run,
+                    full_likelihood_manager, 
+                    reference_waveform_dict,
+                    ifo='L1',
+                    run_keys=None, reference_parameters=None,
+                    save_dir=None,
+                    levels=1, range_dict=None, prior_df=None, **kwargs):
+
+    if run_keys is None:
+        run_keys = individual_run['dfs'].keys()
+    
+    tcut_dict = get_sorted_pre_and_post_keys(run_keys)
+
+    whitened_data_dict = whiten_waveform_dict(full_likelihood_manager.data_dict, full_likelihood_manager)
+    whitened_reference_wf = whiten_waveform_dict(reference_waveform_dict, full_likelihood_manager)
+
+    time_dict = {_ifo: times - full_likelihood_manager.reference_time  for _ifo, times in full_likelihood_manager.time_dict.items()}
+    time_dict_M = {_ifo: time_to_mass(time) for _ifo, time in time_dict.items()}
+
+    plot_keys = kwargs.get('plot_keys', None)
+    if plot_keys is None:
+        plot_keys = get_non_constant_keys(df)
+
+    plot_kwargs = {}
+
+    if range_dict is not None:
+        if prior_df is not None:
+            reference_df = prior_df
+        else:
+            reference_df = individual_run['dfs']['full']
+        
+        plot_kwargs['range'] = [range_dict.get(key, (min(reference_df[key]), max(reference_df[key]))) for key in plot_keys]
+        
+    color_dict = make_color_dict(individual_run['dfs'].keys())
+    hist_kwargs = dict( histtype='step', density=True, bins='auto')
+
+    filenames = []
+
+    if save_dir is not None:
+        try:
+            os.mkdir(save_dir)
+        except:
+            pass
+
+    ylims = [None for key in plot_keys]
+    for t_cut, keys in tcut_dict.items():
+        
+        
+        plot_kwargs['fig'] = None
+        plot_kwargs['contour_kwargs'] = {'levels':levels}
+        fig = plot_corner(individual_run, reference_df_key = 'full',
+                          truth_dict=reference_parameters,
+                          color='black', 
+                          truth_color='black',
+                          **plot_kwargs, **kwargs)
+            
+        for key in keys:
+            plot_kwargs['fig'] = fig
+            plot_kwargs['contour_kwargs'] = {'levels':1}
+            fig = plot_corner(individual_run, reference_df_key = key,
+                          color=color_dict[key],
+                          **plot_kwargs, **kwargs)
+
+    
+        axes = np.array(fig.axes).reshape((len(plot_keys), len(plot_keys)))
+        # corner does weird shit with histograms, replot here 
+        print(ylims)
+        for i in range(len(plot_keys)):
+            parameter = plot_keys[i]
+            ax = axes[i, i]
+            artists = ax.patches
+
+            for artist in artists:
+                # Check if the artist is a polygon (histogram)
+                if isinstance(artist, plt.Polygon): 
+                    artist.remove()
+
+            if ylims[i] is None:
+                ax.autoscale(axis="y")
+                
+            ax.hist(individual_run['dfs']['full'][parameter],
+                   color='black', **hist_kwargs)
+            for key in keys:
+                ax.hist(individual_run['dfs'][key][parameter],
+                       color=color_dict[key], **hist_kwargs)
+            if prior_df is not None:
+                ax.hist(prior_df[parameter], linestyle='dotted',
+                        color='silver', **hist_kwargs)
+            
+            if ylims[i] is None:
+                ax.autoscale(False)
+                ylim = ax.get_ylim()
+                ylims[i] = (ylim[0], ylim[1] * 1.2)
+            ax.set_ylim(ylims[i])
+
+        ax = axes[0, -1]
+        
+        make_inset_plot(ax, time_dict_M[ifo], whitened_data_dict[ifo], whitened_reference_wf[ifo],
+                        time_to_mass(t_cut), l=0.5, **kwargs)
+        
+        
+        
+        
+        tc_str = f"{time_to_mass(t_cut):.2f}" + 'M'  # tc_to_plot[j]
+        lbl = tc_str.replace('m', '-') if tc_str[0] == 'm' else tc_str
+        lbl = lbl.replace('M', '\,M_\mathrm{ref}')
+        
+        ylim = ax.get_ylim()
+        yrange = ylim[1] - ylim[0]
+        xlim = ax.get_xlim()
+        xrange = xlim[1] - xlim[0]
+        textloc = xlim[0] + 0.2 * xrange
+        ax.text(textloc, ylim[1] - 0.50 * yrange, f'${lbl}$', color='k', fontsize=15, zorder=5)
+        
+        for i in range(len(plot_keys)):
+            ax = axes[i, i]
+            ax.set_ylim(ylims[i])
+
+        
+
+        if save_dir is not None:
+            filename = f'{save_dir}/corner_frame_{tc_str}.png'
+            plt.savefig(filename, bbox_inches='tight', dpi=200)
+            filenames.append(filename)
+    if save_dir is not None:
+        save_gif(filenames, f'{save_dir}/all_corner.gif')
+    
+    
+
+    
 
