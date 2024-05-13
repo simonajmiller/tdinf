@@ -229,7 +229,7 @@ def get_ACF(pe_psds, time_dict, f_low=11):
 
         freq = freq[freq <= fmax]
         psd = psd[freq <= fmax]
-        # Computer ACF from PSD
+        # Compute ACF from PSD
         rho = 0.5 * np.fft.irfft(psd) / dt  # dt comes from numpy fft conventions
         rho_dict[ifo] = rho[:Nanalyze]
         

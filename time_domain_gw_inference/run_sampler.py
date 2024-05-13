@@ -4,12 +4,10 @@
 import argparse
 import numpy as np
 import emcee
-import scipy.linalg as sl
 import pandas as pd
 from multiprocessing import Pool
 from contextlib import closing
 import os
-import sys
 import time_domain_gw_inference.utils as utils
 
 
@@ -53,7 +51,8 @@ def create_run_sampler_arg_parser():
     p.add_argument('--flow', type=float, default=11,
                    help="lower frequency bound for data conditioning and likelihood function (ACF)")
     p.add_argument('--f22-start', type=float, default=11,
-                   help="frequency at which to start generating 22 mode for waveforms")
+                   help="frequency at which to start generating 22 mode for waveforms, "
+                        "NOTE! f22-start _is_ the reference frequency for eccentric waveforms ")
     p.add_argument('--fref', type=float, default=11)
     p.add_argument('--ifos', nargs='+', default=['H1', 'L1', 'V1'])
 
@@ -71,6 +70,15 @@ def create_run_sampler_arg_parser():
     p.add_argument('--vary-eccentricity', action='store_true')
     p.add_argument('--eccentricity-prior-bounds', type=float, nargs=2, default=[0, 0.9],
                    help="prior bounds for eccentricity parameter, only used if --vary-eccentricity given")
+    p.add_argument('--total-mass-prior-bounds', type=float, nargs=2, default=[97, 198],
+                   help="detector frame total mass bounds (in solar masses) for total_mass prior")
+    p.add_argument('--mass-ratio-prior-bounds', type=float, nargs=2, default=[0.17, 1],
+                   help="mass ratio bounds for mass ratio prior")
+    p.add_argument('--luminosity-distance-prior-bounds', type=float, nargs=2, default=[100, 10000],
+                   help="luminosity_distance bounds for luminosity_distance prior")
+    p.add_argument('--spin-magnitude-prior-bounds', type=float, nargs=2, default=[0, 0.99],
+                   help="Spin magnitude bounds for spin magnitude prior")
+    p.add_argument('--time-prior-sigma', type=float, default=0.01, help="Standard deviation of time prior [s]")
 
     # Do we want to resume an old run?
     p.add_argument('--resume', action='store_true')
@@ -115,7 +123,7 @@ def modify_parameters(data, args):
     equivocate_columns(df, 'declination', 'dec')
     equivocate_columns(df, 'mean_anomaly', 'mean_anomaly_periastron')
     equivocate_columns(df, 'polarization', 'psi')
-    equivocate_columns(df, 'distance_mpc', 'luminosity_distance')
+    equivocate_columns(df, 'luminosity_distance', 'distance_mpc')
 
     if 'f_ref' not in df.columns:
         df['f_ref'] = args.fref
@@ -207,22 +215,13 @@ def initialize_kwargs(args, reference_parameters):
     Arguments for the posterior function
     """
 
-    # configure mass prior
-    inj_mtot = reference_parameters['mass_1'] + reference_parameters['mass_2']
-    max_mass_prior = np.ceil(inj_mtot + 50)
-    min_mass_prior = np.maximum(np.floor(inj_mtot - 50), 60)  ## min total mass for f22_start=20 hz is 60 Msun
-
-    # configure distance prior
-    inj_dist_log = np.log10(reference_parameters['luminosity_distance'])
-    min_dist_prior = max(100, int(np.power(10, np.floor(inj_dist_log-1))))  # cap min distance at 100 MPc
-    max_dist_prior = min(10000, int(np.power(10, np.ceil(inj_dist_log + 1))))  # cap max distance at 10000 MPc
-
     # put all arguments into a dict
     kwargs = {
-        'mtot_lim': [min_mass_prior, max_mass_prior],
-        'q_lim': [0.17, 1],
-        'chi_lim': [0, 0.99],
-        'dist_lim': [min_dist_prior, max_dist_prior],
+        'mtot_lim': args.total_mass_prior_bounds,
+        'q_lim': args.mass_ratio_prior_bounds,
+        'chi_lim': args.spin_magnitude_prior_bounds,
+        'dist_lim': args.luminosity_distance_prior_bounds,
+        'sigma_time': args.time_prior_sigma,
         'eccentricity_lim': args.eccentricity_prior_bounds,
         'approx': args.approx,
         'f_ref': args.fref,
@@ -277,7 +276,7 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
                                                           time_dict=raw_time_dict,
                                                           f_ref=args.fref, f22_start=args.f22_start)
 
-    ## tcut = cutoff time in waveform
+    # tcut = cutoff time in waveform
     if args.Tcut_seconds is not None:
         # option 1: truncation time given in seconds already
         tcut_geocent = tpeak_geocent + args.Tcut_seconds
@@ -298,7 +297,8 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
     print('\nCutoff time:')
     tcut_dict, _ = utils.get_tgps_and_ap_dicts(tcut_geocent, ifos,
                                                reference_parameters['right_ascension'],
-                                               reference_parameters['declination'], reference_parameters['polarization'])
+                                               reference_parameters['declination'],
+                                               reference_parameters['polarization'])
 
     """
     Condition data

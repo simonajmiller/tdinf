@@ -65,7 +65,7 @@ class LogisticParameterManager:
         # TODO put in injected values
         self.logistic_parameters = [LogisticParameter('total_mass', kwargs['mtot_lim'], None),
                                     LogisticParameter('mass_ratio', kwargs['q_lim'], None),
-                                    LogisticParameter('distance_mpc', kwargs['dist_lim'], None),
+                                    LogisticParameter('luminosity_distance', kwargs['dist_lim'], None),
                                     TrigLogisticParameter('inclination', 'cos', [-1, 1], None)
                                     ]
         if not self.no_spins:
@@ -92,7 +92,10 @@ class LogisticParameterManager:
         self.cartesian_angles = [CartesianAngle('phase')]
 
         if self.vary_time:
+            # this is set for the prior manager
+            self.sigma_time = kwargs['sigma_time']
             self.sampled_keys.append('geocenter_time')
+
         if self.vary_skypos:
             self.cartesian_angles.extend([
                 CartesianAngle('right_ascension', phase_offset=np.pi),
@@ -162,7 +165,8 @@ class LogisticParameterManager:
 
         return physical_dict
 
-    def physical_dict_to_waveform_dict(self, physical_dict):
+    @staticmethod
+    def physical_dict_to_waveform_dict(physical_dict):
         """
         Take in the physical dictionary and return one that has units for astropy
         :return:
@@ -178,7 +182,7 @@ class LogisticParameterManager:
             'spin2y': physical_dict['spin2_y'] * u.dimensionless_unscaled,
             'spin2z': physical_dict['spin2_z'] * u.dimensionless_unscaled,
             'phi_ref': physical_dict['phase'] * u.rad,
-            'distance': physical_dict['distance_mpc'] * u.Mpc,
+            'distance': physical_dict['luminosity_distance'] * u.Mpc,
             'inclination': physical_dict['inclination'] * u.rad,
         }
         # TODO, maybe it should check if we have an eccentric waveform?
@@ -196,6 +200,8 @@ class LnPriorManager(LogisticParameterManager):
         # to take boundaries to +/- infinity)
         p0_arr = np.asarray([[np.random.normal() for j in range(self.num_parameters)] for i in range(nwalkers)])
 
+        # we have initialized walkers inside their logistic prior, now for injected parameters
+        # we will inject them closer
         for param in self.logistic_parameters:
             p = self.sampled_keys.index(param.logistic_name)
             param_kw = param.physical_name
@@ -213,6 +219,11 @@ class LnPriorManager(LogisticParameterManager):
                       f' drawing random value from within range, '
                       f"We are not going to draw around that value because we'll get infs!")
                 continue
+            elif param_phys < param.limit[0] or param_phys > param.limit[1]:
+                print(f"WARNING: Injected value ({param_phys}) for {param_kw} is outside limit {param.limit}."
+                      f" We will not set initial values around this value")
+                continue
+
             # transform into logistic space
             param_logit = param.physical_to_logistic(param_phys)
 
@@ -222,10 +233,7 @@ class LnPriorManager(LogisticParameterManager):
         # if time of coalescence sampled over need to include this separately since it isn't a unit scaled quantity
         if self.vary_time:
             index = self.sampled_keys.index('geocenter_time')
-            dt_1M = 0.00127
-            #sigma_time = dt_1M * 2.5  # time prior from LVK has width of ~2.5M
-            sigma_time = 0.01
-            initial_t_walkers = np.random.normal(loc=self.reference_time, scale=sigma_time, size=nwalkers)
+            initial_t_walkers = np.random.normal(loc=self.reference_time, scale=self.sigma_time, size=nwalkers)
             p0_arr[:, index] = initial_t_walkers  # time always saved as the final param
 
         p0 = p0_arr.tolist()
@@ -235,7 +243,7 @@ class LnPriorManager(LogisticParameterManager):
 
         x_dict = self.get_logistic_dict(x)
 
-        # If x_phys passed in kws, return it, if not, calculate it with samp_to_phys
+        # If phys_dict passed in kws, return it, if not, calculate it with samp_to_phys
         if phys_dict is None:
             phys_dict = self.samp_to_phys(x)
 
@@ -250,9 +258,7 @@ class LnPriorManager(LogisticParameterManager):
 
         if self.vary_time:
             # gaussian
-            dt_1M = 0.00127
-            sigma_time = 0.01 #dt_1M * 2.5  # time prior from LVK has width of ~2.5M
-            lnprior -= 0.5 * ((phys_dict['geocenter_time'] - self.reference_time) ** 2) / (sigma_time ** 2)
+            lnprior -= 0.5 * ((phys_dict['geocenter_time'] - self.reference_time) ** 2) / (self.sigma_time ** 2)
 
         # Spins
         if not self.no_spins:
@@ -338,7 +344,7 @@ class WaveformManager(LogisticParameterManager):
         chi2 = [x_phys['spin2_x'], x_phys['spin2_y'], x_phys['spin2_z']]
 
         hp, hc = self.generate_lal_hphc(m1, m2, chi1, chi2, delta_t=delta_t,
-                                        dist_mpc=x_phys['distance_mpc'],
+                                        dist_mpc=x_phys['luminosity_distance'],
                                         f22_start=f22_start, f_ref=f_ref,
                                         inclination=x_phys['inclination'],
                                         phi_ref=x_phys['phase'],
