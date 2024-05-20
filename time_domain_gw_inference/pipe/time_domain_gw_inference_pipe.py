@@ -66,6 +66,8 @@ class AbstractPipelineDAG(abc.ABC):
             "getenv": "True",
             "initialdir": os.path.abspath(self.output_directory),
             "notification": "ERROR",
+            "stream_output": "True",
+            "stream_error": "True",
             "output": "$(log_dir)/$(run_prefix)-$(nodename)-$(cluster)-$(process).out",
             "error": "$(log_dir)/$(run_prefix)-$(nodename)-$(cluster)-$(process).err",
             "log": "$(log_dir)/$(run_prefix)-$(nodename)-$(cluster)-$(process).log",
