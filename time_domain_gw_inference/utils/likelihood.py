@@ -470,7 +470,7 @@ class LnLikelihoodManager(LogisticParameterManager):
         if np.all(waveform_ifo == 0):
             print('waveform falls outside allowed window for:')
             print(phys_dict)
-            return True
+            return False
 
         if sum(np.isnan(residual)) > 0:
             print('NaNs in residuals for:')
