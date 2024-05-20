@@ -270,7 +270,7 @@ def generate_lal_waveform(hplus, hcross, times, triggertime, **kwargs):
     # Make sure the waveform actually fits in the buffer; if it doesn't, just return a
     # list of zeros with no waveform a
     if bufWaveLength <= 0:
-        print("Warning! time asked to analyze is non-existant! between indices : {bufStartIndex} {bufEndIndex} ")
+        print(f"Warning! time asked to analyze is non-existant! between indices : {bufStartIndex} {bufEndIndex} ")
         return h_td
 
 
