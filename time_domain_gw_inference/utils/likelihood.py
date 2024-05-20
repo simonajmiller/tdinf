@@ -484,6 +484,35 @@ class LnLikelihoodManager(LogisticParameterManager):
 
         return False
 
+    def get_log_posterior(self, x_phys, verbose=False, **kwargs):
+        if verbose:
+            print('getting wf')
+        projected_wf_dict = self.waveform_manager.get_projected_waveform(
+            x_phys, self.ifos, self.time_dict,
+            f22_start=self.f22_start,
+            f_ref=self.f_ref
+        )
+        if verbose:
+            print('done getting wf')
+
+        ln_posterior = 0
+
+        # Cycle through ifos
+        for ifo, data in self.data_dict.items():
+
+            # Truncate and compute residuals
+            r = data - projected_wf_dict[ifo]
+
+            if self.waveform_has_error(x_phys, projected_wf_dict[ifo], r):
+                return -np.inf
+
+            # "Over whiten" residuals
+            rwt = solve_toeplitz(self.rho_dict[ifo], r)
+
+            # Compute log likelihood for ifo
+            ln_posterior -= 0.5 * np.dot(r, rwt)
+        return ln_posterior
+
     def get_lnprob(self, x, verbose=False,
                    **kwargs):
         # get physical parameters
@@ -498,30 +527,7 @@ class LnLikelihoodManager(LogisticParameterManager):
 
         # Calculate posterior
         if not self.only_prior:
-            if verbose:
-                print('getting wf')
-            projected_wf_dict = self.waveform_manager.get_projected_waveform(
-                x_phys, self.ifos, self.time_dict,
-                f22_start=self.f22_start,
-                f_ref=self.f_ref
-            )
-            if verbose:
-                print('done getting wf')
-
-            # Cycle through ifos
-            for ifo, data in self.data_dict.items():
-
-                # Truncate and compute residuals
-                r = data - projected_wf_dict[ifo]
-
-                if self.waveform_has_error(x_phys, projected_wf_dict[ifo], r):
-                    return -np.inf
-
-                # "Over whiten" residuals
-                rwt = solve_toeplitz(self.rho_dict[ifo], r)
-
-                # Compute log likelihood for ifo
-                lnprob -= 0.5 * np.dot(r, rwt)
+            lnprob += self.get_log_posterior(x_phys, verbose=verbose, **kwargs)
 
         # Calculate prior
         lnprob += self.log_prior.get_lnprior(x, phys_dict=x_phys)
