@@ -220,7 +220,7 @@ def make_inset_plot(ax, times, data_wf, reference_wf, t_cut,
     # Inset axis in leftmost column with whitened strain
     axin = ax.inset_axes(get_inset_axes_position(ax, dx, l, w, loc=kwargs.get('loc', 'upper')))
 
-    plot_pre_post_data_and_reference(axin, times, data_wf, reference_wf, t_cut, xlim=None, inset_ylim=None)
+    plot_pre_post_data_and_reference(axin, times, data_wf, reference_wf, t_cut, xlim=xlim, inset_ylim=inset_ylim)
 
     axin.set_xticklabels([])
     axin.set_yticklabels([])
@@ -320,8 +320,11 @@ def plot_pre_and_post(ax, mode, times, tc_M, data, reference_wf, wf_dict_list, x
 
     if percentiles:
         wf_list = [w[ifo] / scale_const for w in _wf_dict_list]
-        plot_percentiles(times, 
+        try:
+            plot_percentiles(times, 
                          wf_list, ax=ax, color=color, **kwargs)
+        except:
+            print('not able to plot percentiles')
     else:
         for wf_dict in _wf_dict_list:
             ax.plot(times, wf_dict[ifo] / scale_const,
@@ -521,6 +524,7 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
             # -------------------------------------------------------------------------
             axin = make_inset_plot(axes[0], time_dict_M[ifo], whitened_data_dict[ifo], whitened_reference_wf[ifo], tc_M, 
                                 l=0.4, w=0.3, dx=0.04, xlim=xlim, inset_ylim=inset_ylim)
+            print(axin.get_ylim())
 
         for ax in axes:
             x0, y0, x1, y1 = ax.get_position().bounds
@@ -887,7 +891,8 @@ def make_corner_gif(individual_run,
                     levels=1, range_dict=None, prior_df=None, **kwargs):
 
     if run_keys is None:
-        run_keys = individual_run['dfs'].keys()
+        run_keys = [key for key, df in individual_run['dfs'].items() if df is not None]
+        
     
     tcut_dict = get_sorted_pre_and_post_keys(run_keys)
 
