@@ -41,6 +41,9 @@ def create_run_sampler_arg_parser():
 
     # Option to do an injection instead of use real data;
     p.add_argument('--injected-parameters', default=None)
+    p.add_argument('--reference-parameters', default=None, help='json of parameters that initialize '
+                                                                '1) how 0 is defined in the time cuts '
+                                                                '2) the initialization of prior draw points ')
 
     # Optional args for waveform/data settings
     p.add_argument('--approx', default='NRSur7dq4')
@@ -168,39 +171,54 @@ def modify_parameters(data, args):
         return df.to_dict(orient='records')[0]  # Convert back to dictionary
 
 
-def get_injected_parameters(args, initial_run_dir=''):
+def get_injected_parameters(args, initial_run_dir='', verbose=False):
     """
     Loads in injection parameters from args.injected_paramters or, if there was no injection,
     loads in max likelihood samples from args.pe_posterior_h5_file
     :param args: argparser
     :param initial_run_dir:
+    :param verbose: Level of detail printing output
     :return:
     """
-    data_path_dict, psd_path_dict = utils.parse_data_and_psds(args, initial_run_dir)
 
-    # If real data ...
+    if (args.injected_parameters is None) and (args.reference_parameters is None) and (args.pe_posterior_h5_file is None):
+        raise ValueError("WARNING: none of --injected-parameters, "
+                         "--reference_parameters, or --pe-posterior-h5-file were given. "
+                         " These parameters are needed in order to set up time cuts and initialize the sampler."
+                         " Please provide one!")
+
+    # if using real data
     if args.injected_parameters is None:
-        pe_posterior_h5_file = os.path.join(initial_run_dir, args.pe_posterior_h5_file)
-        pe_samples = utils.get_pe_samples(pe_posterior_h5_file)
+        # Use reference parameter from max logL in PE file...
+        if args.reference_parameters is None:
+            pe_posterior_h5_file = os.path.join(initial_run_dir, args.pe_posterior_h5_file)
+            pe_samples = utils.get_pe_samples(pe_posterior_h5_file)
 
-        # "Injected parameters" = max(P) draw from the samples associated with this data
-        log_prob = pe_samples['log_likelihood'] + pe_samples['log_prior']
-        max_L_index = np.argmax(log_prob)
-        injected_parameters = {field: pe_samples[field][max_L_index] for field in pe_samples.dtype.names}
+            # "Injected parameters" = max(P) draw from the samples associated with this data
+            log_prob = pe_samples['log_likelihood'] + pe_samples['log_prior']
+            max_L_index = np.argmax(log_prob)
+            reference_parameters = {field: pe_samples[field][max_L_index] for field in pe_samples.dtype.names}
+        # set reference parameters to the passed in reference_parameters
+        else:
+            reference_parameters = utils.parse_injected_parameters(args.reference_parameters,
+                                                                  initial_run_dir=initial_run_dir)
 
-        if 'f_ref' not in injected_parameters.keys():
-            injected_parameters['f_ref'] = args.fref
+        if 'f_ref' not in reference_parameters.keys():
+            reference_parameters['f_ref'] = args.fref
     # Else, generate an injection (currently, only set up for no noise case)
     else:
         # Load in injected parameters
-        injected_parameters = utils.parse_injected_parameters(args.injected_parameters, initial_run_dir=initial_run_dir)
+        reference_parameters = utils.parse_injected_parameters(args.injected_parameters, initial_run_dir=initial_run_dir)
 
         # Check that the reference freqs line up
-        err_msg = f"Injection fref={injected_parameters['f_ref']} does not equal sampler fref={args.fref}"
-        assert injected_parameters['f_ref'] == args.fref, err_msg
+        err_msg = f"Injection fref={reference_parameters['f_ref']} does not equal sampler fref={args.fref}"
+        assert reference_parameters['f_ref'] == args.fref, err_msg
 
-    injected_parameters = modify_parameters(injected_parameters, args)
-    return injected_parameters
+    reference_parameters = modify_parameters(reference_parameters, args)
+
+    if verbose:
+        print('reference_parameters are', reference_parameters)
+    return reference_parameters
 
 
 def initialize_kwargs(args, reference_parameters):
