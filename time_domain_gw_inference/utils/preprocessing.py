@@ -54,7 +54,8 @@ def condition(raw_time_dict, raw_data_dict, t_dict, desired_sample_rate, f_low=1
     raw_data_sample_rate = 1 / (raw_time_dict[ifo][1] - raw_time_dict[ifo][0])
     # TODO how do i check that this is an integer?
     downsample_factor = int(np.floor(raw_data_sample_rate / desired_sample_rate))
-    print('downsample factor is', downsample_factor)
+    if verbose:
+        print('downsample factor is', downsample_factor)
     if downsample_factor == 0:
         raise ValueError(f"Desired sampling rate must be less than or equal to given sample rate! "
                          f"raw:{raw_data_sample_rate}, desired:{desired_sample_rate}")

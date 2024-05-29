@@ -41,6 +41,9 @@ def create_run_sampler_arg_parser():
 
     # Option to do an injection instead of use real data;
     p.add_argument('--injected-parameters', default=None)
+    p.add_argument('--reference-parameters', default=None, help='json of parameters that initialize '
+                                                                '1) how 0 is defined in the time cuts '
+                                                                '2) the initialization of prior draw points ')
 
     # Optional args for waveform/data settings
     p.add_argument('--approx', default='NRSur7dq4')
@@ -168,39 +171,54 @@ def modify_parameters(data, args):
         return df.to_dict(orient='records')[0]  # Convert back to dictionary
 
 
-def get_injected_parameters(args, initial_run_dir=''):
+def get_injected_parameters(args, initial_run_dir='', verbose=False):
     """
     Loads in injection parameters from args.injected_paramters or, if there was no injection,
     loads in max likelihood samples from args.pe_posterior_h5_file
     :param args: argparser
     :param initial_run_dir:
+    :param verbose: Level of detail printing output
     :return:
     """
-    data_path_dict, psd_path_dict = utils.parse_data_and_psds(args, initial_run_dir)
 
-    # If real data ...
+    if (args.injected_parameters is None) and (args.reference_parameters is None) and (args.pe_posterior_h5_file is None):
+        raise ValueError("WARNING: none of --injected-parameters, "
+                         "--reference_parameters, or --pe-posterior-h5-file were given. "
+                         " These parameters are needed in order to set up time cuts and initialize the sampler."
+                         " Please provide one!")
+
+    # if using real data
     if args.injected_parameters is None:
-        pe_posterior_h5_file = os.path.join(initial_run_dir, args.pe_posterior_h5_file)
-        pe_samples = utils.get_pe_samples(pe_posterior_h5_file)
+        # Use reference parameter from max logL in PE file...
+        if args.reference_parameters is None:
+            pe_posterior_h5_file = os.path.join(initial_run_dir, args.pe_posterior_h5_file)
+            pe_samples = utils.get_pe_samples(pe_posterior_h5_file)
 
-        # "Injected parameters" = max(P) draw from the samples associated with this data
-        log_prob = pe_samples['log_likelihood'] + pe_samples['log_prior']
-        max_L_index = np.argmax(log_prob)
-        injected_parameters = {field: pe_samples[field][max_L_index] for field in pe_samples.dtype.names}
+            # "Injected parameters" = max(P) draw from the samples associated with this data
+            log_prob = pe_samples['log_likelihood'] + pe_samples['log_prior']
+            max_L_index = np.argmax(log_prob)
+            reference_parameters = {field: pe_samples[field][max_L_index] for field in pe_samples.dtype.names}
+        # set reference parameters to the passed in reference_parameters
+        else:
+            reference_parameters = utils.parse_injected_parameters(args.reference_parameters,
+                                                                  initial_run_dir=initial_run_dir)
 
-        if 'f_ref' not in injected_parameters.keys():
-            injected_parameters['f_ref'] = args.fref
+        if 'f_ref' not in reference_parameters.keys():
+            reference_parameters['f_ref'] = args.fref
     # Else, generate an injection (currently, only set up for no noise case)
     else:
         # Load in injected parameters
-        injected_parameters = utils.parse_injected_parameters(args.injected_parameters, initial_run_dir=initial_run_dir)
+        reference_parameters = utils.parse_injected_parameters(args.injected_parameters, initial_run_dir=initial_run_dir)
 
         # Check that the reference freqs line up
-        err_msg = f"Injection fref={injected_parameters['f_ref']} does not equal sampler fref={args.fref}"
-        assert injected_parameters['f_ref'] == args.fref, err_msg
+        err_msg = f"Injection fref={reference_parameters['f_ref']} does not equal sampler fref={args.fref}"
+        assert reference_parameters['f_ref'] == args.fref, err_msg
 
-    injected_parameters = modify_parameters(injected_parameters, args)
-    return injected_parameters
+    reference_parameters = modify_parameters(reference_parameters, args)
+
+    if verbose:
+        print('reference_parameters are', reference_parameters)
+    return reference_parameters
 
 
 def initialize_kwargs(args, reference_parameters):
@@ -238,7 +256,7 @@ def initialize_kwargs(args, reference_parameters):
     return kwargs
 
 
-def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initial_run_dir=''):
+def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initial_run_dir='', verbose=False):
     # Check that a cutoff time is given
     assert args.Tcut_cycles is not None or args.Tcut_seconds is not None, "must give a cutoff time"
 
@@ -265,13 +283,14 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
     # If real data ...
     if args.injected_parameters is None:
         # Load data
-        raw_time_dict, raw_data_dict = utils.load_raw_data(ifos=ifos, path_dict=data_path_dict)
+        raw_time_dict, raw_data_dict = utils.load_raw_data(ifos=ifos, path_dict=data_path_dict, verbose=verbose)
 
     # Else, generate an injection (currently, only set up for no noise case)
     else:
         # Times
-        raw_time_dict, _ = utils.load_raw_data(ifos=ifos, path_dict=data_path_dict)
-        print('reference_injection params', reference_parameters)
+        raw_time_dict, _ = utils.load_raw_data(ifos=ifos, path_dict=data_path_dict, verbose=verbose)
+        if verbose:
+            print('reference_injection params: ', reference_parameters)
         raw_data_dict = wf_manager.get_projected_waveform(x_phys=reference_parameters, ifos=args.ifos,
                                                           time_dict=raw_time_dict,
                                                           f_ref=args.fref, f22_start=args.f22_start)
@@ -294,7 +313,8 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
                                                    ra=reference_parameters['right_ascension'],
                                                    dec=reference_parameters['declination'])
 
-    print('\nCutoff time:')
+    if verbose:
+        print(f'\nCutoff time: {tcut_geocent}')
     tcut_dict, _ = utils.get_tgps_and_ap_dicts(tcut_geocent, ifos,
                                                reference_parameters['right_ascension'],
                                                reference_parameters['declination'],
@@ -305,7 +325,7 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
     """
     # icut = index corresponding to cutoff time
     time_dict, data_dict, icut_dict = utils.condition(raw_time_dict, raw_data_dict, tcut_dict,
-                                                      args.sampling_rate, args.flow)
+                                                      args.sampling_rate, args.flow, verbose=verbose)
 
     # Time spacing of data
     dt = time_dict['H1'][1] - time_dict['H1'][0]
@@ -335,7 +355,8 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
     # otherwise WF placement gets messed up
     Nanalyze = Npre + Npost
     Tanalyze = Nanalyze * dt
-    print('\nWill analyze {:.3f} s of data at {:.1f} Hz\n'.format(Tanalyze, 1 / dt))
+    if verbose:
+        print('\nWill analyze {:.3f} s of data at {:.1f} Hz\n'.format(Tanalyze, 1 / dt))
     assert Tanalyze > 0, "Geocenter cut time must be between Tstart and Tend. Please Modify your run settings." \
                          f" Start to end: {args.Tstart}, {args.Tend} with cut at {tcut_geocent}"
 
@@ -355,13 +376,15 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
 
 
 def main():
+
+    verbose = True
     # Parse the commandline arguments
     p = create_run_sampler_arg_parser()
     args = p.parse_args()
 
     backend_path = args.output_h5  # where emcee spits its output
 
-    reference_parameters = get_injected_parameters(args)
+    reference_parameters = get_injected_parameters(args, verbose=verbose)
     kwargs = initialize_kwargs(args, reference_parameters)
     wf_manager = utils.NewWaveformManager(args.ifos,
                                           use_higher_order_modes=args.use_higher_order_modes,
@@ -371,9 +394,12 @@ def main():
 
     time_dict, data_dict, psd_dict = get_conditioned_time_and_data(args,
                                                                    wf_manager=wf_manager,
-                                                                   reference_parameters=reference_parameters)
-    print(f"kwargs are:")
-    print(kwargs)
+                                                                   reference_parameters=reference_parameters,
+                                                                   verbose=verbose)
+
+    if verbose:
+        print(f"kwargs are:")
+        print(kwargs)
     """
     Set up likelihood 
     """
@@ -395,7 +421,8 @@ def main():
     nwalkers = args.nwalkers
     # Default num dimensions (fixed time and sky position) = 14
     ndim = likelihood_manager.num_parameters
-    print("Sampling %i parameters." % ndim)
+    if verbose:
+        print("Sampling %i parameters." % ndim)
 
     # Where to save samples while sampler running
     backend = emcee.backends.HDFBackend(backend_path)
@@ -422,7 +449,7 @@ def main():
                 backend = emcee.backends.HDFBackend(backend_path)
                 backend.reset(nwalkers, ndim)
 
-            p0 = likelihood_manager.log_prior.initialize_walkers(nwalkers, reference_parameters)
+            p0 = likelihood_manager.log_prior.initialize_walkers(nwalkers, reference_parameters, verbose=verbose)
 
     else:
         # Reset the backend
