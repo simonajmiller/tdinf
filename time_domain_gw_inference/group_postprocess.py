@@ -70,15 +70,18 @@ def load_run_settings_from_directory(directory, filename_dict=None):
 def get_settings_from_command_line_string(command_line_string, initial_run_dir, parser, verbose=False):
     skip_initial_arg = command_line_string.split()[1:]
     args = parser.parse_args(skip_initial_arg)
-    reference_parameters = run_sampler.get_injected_parameters(args, initial_run_dir)
+    reference_parameters = run_sampler.get_injected_parameters(args, initial_run_dir, verbose=verbose)
     kwargs = run_sampler.initialize_kwargs(args, reference_parameters)
-    print('making wf manager')
+
+    if verbose:
+        print('making wf manager')
     wf_manager = utils.NewWaveformManager(args.ifos,
                                           vary_time=args.vary_time,
                                           vary_skypos=args.vary_skypos,
                                           vary_eccentricity=args.vary_eccentricity, 
                                           use_higher_order_modes=args.use_higher_order_modes, **kwargs)
-    print('getting conditioned time and data')
+    if verbose:
+        print('getting conditioned time and data')
     time_dict, data_dict, psd_dict = run_sampler.get_conditioned_time_and_data(args,
                                                                                wf_manager=wf_manager,
                                                                                reference_parameters=reference_parameters,

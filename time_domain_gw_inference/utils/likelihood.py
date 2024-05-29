@@ -194,7 +194,7 @@ class LogisticParameterManager:
 
 class LnPriorManager(LogisticParameterManager):
 
-    def initialize_walkers(self, nwalkers, injected_parameters):
+    def initialize_walkers(self, nwalkers, injected_parameters, verbose=False):
         # Initialize walkers
         # (code sees unit scale quantities; use logit transformations
         # to take boundaries to +/- infinity)
@@ -207,12 +207,15 @@ class LnPriorManager(LogisticParameterManager):
             param_kw = param.physical_name
             try:
                 param_phys = injected_parameters[param_kw]
-                print('injected', param_phys, param_kw)
+                if verbose:
+                    print('injected', param_phys, param_kw)
             except ValueError:
-                print(f"{param_kw} not in injected_parameters dict, continuing anyways")
+                if verbose:
+                    print(f"{param_kw} not in injected_parameters dict, continuing anyways")
                 continue
             except KeyError:
-                print(f"{param_kw} not in injected_parameters dict, continuing anyways")
+                if verbose:
+                    print(f"{param_kw} not in injected_parameters dict, continuing anyways")
                 continue
             if param_phys in param.limit:
                 print(f'reference value of {param_kw} is on boundary of acceptable range,'
