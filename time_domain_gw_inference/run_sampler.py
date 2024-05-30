@@ -356,7 +356,9 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
         print(f"Warning! Seconds analyzed after cut is less than 0!: {TPost} from {tcut_geocent} to {args.Tend}")
 
     # Duration --> number of time samples to look at
-    Npre = int(round(TPre / dt))
+    # Note Npre cannot be greater than idx or else our times index from [-1: idx],
+    # (so itll be empty), to avoid this off by 1 error we use np.floor
+    Npre = int(np.floor(TPre / dt))
     Npost = int(
         round(TPost / dt)) + 1  # must add one so that the target time is actually included, even if Tpost = 0,
     # otherwise WF placement gets messed up
@@ -369,6 +371,9 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
 
     # Crop analysis data to specified duration.
     for ifo, idx in icut_dict.items():
+        if Npre > idx:
+            print("ERROR! You cannot have more points pre-cutoff time than there are points "
+                    "between the start and the cutoff time")
         # idx = sample closest to desired time
         time_dict[ifo] = time_dict[ifo][idx - Npre:idx + Npost]
         data_dict[ifo] = data_dict[ifo][idx - Npre:idx + Npost]
