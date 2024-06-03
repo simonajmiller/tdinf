@@ -1,6 +1,6 @@
 import numpy as np
 import lal
-from lalsimulation import SimInspiralTransformPrecessingNewInitialConditions
+from lalsimulation import SimInspiralTransformPrecessingNewInitialConditions, SimInspiralTransformPrecessingWvf2PE
 
 """
 Functions to calculate various mass quantities
@@ -33,6 +33,62 @@ def m1m2_from_mtotq(mtot, q):
 """
 Functions to calculate various spin quantities
 """
+
+def transformPrecessingWvf2PE( incl, S1x, S1y, S1z, S2x, S2y, S2z,  m1, m2, fRef, phiRef):
+    """
+    Get inclination angle and spin components at a given reference frequency from the
+    masses, spin magnitudes, and various tilt and azimuthal angles
+    Parameters
+    ----------
+    iota : `numpy.array` or float
+        inclination angle of the binary at f_ref
+    s1x : `numpy.array`  or float
+        x-component spin of primary mass at f_ref
+    s1y : `numpy.array` or float
+        y-component spin of primary mass at f_ref
+    s1z : `numpy.array` or float
+        z-component spin of primary mass at f_ref
+    s2x : `numpy.array` or float
+        x-component spin of secondary mass at f_ref
+    s2y : `numpy.array` or float
+        y-component spin of secondary mass at f_ref
+    s2z : `numpy.array` or float
+        z-component spin of secondary mass at f_ref
+
+    Returns
+    ----------
+    theta_jn : `numpy.array` or float
+        zenith angle (in radians) between J (total angular momentum) and N (line of sight)
+    phi_jl : `numpy.array` or float
+        azimuthal angle (in radians) of L_N (orbital angular momentum) on its cone about J
+    tilt1 : `numpy.array` or float
+        tilt angle (in radians) of the primary mass
+    tilt2 : `numpy.array` or float
+        tilt angle (in radians) of the secondary mass
+    phi12 : `numpy.array` or float
+        azimuthal angle  (in radians) between the projections of the component spins onto
+        the orbital plane
+    a1 : `numpy.array` or float
+        spin magnitude of the primary mass
+    a2 : `numpy.array` or float
+        spin magnitude of the secondary mass
+    """
+
+    if isinstance(m1, float):
+        return SimInspiralTransformPrecessingWvf2PE(incl, S1x, S1y, S1z, S2x, S2y, S2z, m1, m2, fRef, phiRef)
+
+    thetaJN = np.zeros(len(m1))
+    phiJL = np.zeros(len(m1))
+    theta1 = np.zeros(len(m1))
+    theta2 = np.zeros(len(m1))
+    phi12 = np.zeros(len(m1))
+    chi1 = np.zeros(len(m1))
+    chi2 = np.zeros(len(m1))
+    for i in range(len(m1)):
+        thetaJN[i], phiJL[i], theta1[i], theta2[i], phi12[i], chi1[i], chi2[i] = SimInspiralTransformPrecessingWvf2PE(
+            incl[i], S1x[i], S1y[i], S1z[i], S2x[i], S2y[i], S2z[i],  m1[i], m2[i], fRef[i], phiRef[i])
+
+    return thetaJN, phiJL, theta1, theta2, phi12, chi1, chi2
 
 
 def transform_spins(theta_jn, phi_jl, tilt1, tilt2, phi12, a1, a2, m1, m2, f_ref, phi_ref):

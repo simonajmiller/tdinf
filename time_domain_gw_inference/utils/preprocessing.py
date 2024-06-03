@@ -8,7 +8,7 @@ import json
 import os
 from collections import OrderedDict
 
-def condition(raw_time_dict, raw_data_dict, t_dict, ds_factor=16, f_low=11,
+def condition(raw_time_dict, raw_data_dict, t_dict, desired_sample_rate, f_low=11,
               scipy_decimate=True, verbose=True):
     
     """
@@ -25,9 +25,8 @@ def condition(raw_time_dict, raw_data_dict, t_dict, ds_factor=16, f_low=11,
         above)
     t_dict : dictionary
         time at each interferometer find the sample index of
-    ds_factor : float (optional)
-        downsampling factor for the data; defaults to 16 which takes ~16kHz data to 
-        1024 Hz data
+    desired_sample_rate : float must be a factor of 2^n
+        sampling rate that we want the data to have after we downsample the original data
     f_low : float (optional)
         frequency for the highpass filter
     scipy_decimate : boolean (optional)
@@ -50,13 +49,24 @@ def condition(raw_time_dict, raw_data_dict, t_dict, ds_factor=16, f_low=11,
     data_dict = {}
     time_dict = {}
     i_dict = {}
+
+    ifo = list(raw_time_dict.keys())[0]
+    raw_data_sample_rate = 1 / (raw_time_dict[ifo][1] - raw_time_dict[ifo][0])
+    # TODO how do i check that this is an integer?
+    downsample_factor = int(np.floor(raw_data_sample_rate / desired_sample_rate))
+    if verbose:
+        print('downsample factor is', downsample_factor)
+    if downsample_factor == 0:
+        raise ValueError(f"Desired sampling rate must be less than or equal to given sample rate! "
+                         f"raw:{raw_data_sample_rate}, desired:{desired_sample_rate}")
+
     
     # Cycle through interferometers
     for ifo in ifos:
         
         # Find the nearest sample in H to the designated time t
         i = np.argmin(np.abs(raw_time_dict[ifo] - t_dict[ifo]))
-        ir = i % ds_factor
+        ir = i % downsample_factor
         if verbose:
             print('\nRolling {:s} by {:d} samples'.format(ifo, ir))
         raw_data = np.roll(raw_data_dict[ifo], -ir)
@@ -71,12 +81,12 @@ def condition(raw_time_dict, raw_data_dict, t_dict, ds_factor=16, f_low=11,
             data = raw_data.copy()
         
         # Decimate
-        if ds_factor > 1:
+        if downsample_factor > 1:
             if scipy_decimate:
-                data = sig.decimate(data, ds_factor, zero_phase=True)
+                data = sig.decimate(data, downsample_factor, zero_phase=True)
             else:
-                data = data[::ds_factor]
-            time = raw_time[::ds_factor]
+                data = data[::downsample_factor]
+            time = raw_time[::downsample_factor]
         else: 
             time = raw_time
         
@@ -93,16 +103,16 @@ def condition(raw_time_dict, raw_data_dict, t_dict, ds_factor=16, f_low=11,
     return time_dict, data_dict, i_dict
 
 
-def injectWaveform(**kwargs): 
-    
+def injectWaveform(injection_approx, **kwargs):
+    # TODO modify this function so that it directly invokes the waveformManager we wrote before
+    # Also, this currently does not depend on skypos and i think it maybe should? something to look into
     # Unpack inputs
     p = kwargs.pop('parameters')
     time_dict = kwargs.pop('time_dict')
     tpeak_dict = kwargs.pop('tpeak_dict')
     ap_dict = kwargs.pop('ap_dict')
     skypos = kwargs.pop('skypos')
-    approx = kwargs.pop('approx', 'NRSur7dq4')
-    f_low = kwargs.pop('f_low')
+    f22_start = kwargs.pop('f22_start')
     f_ref = kwargs.pop('f_ref')
     ifos = kwargs.pop('ifos', ['H1', 'L1', 'V1'])
     
@@ -113,15 +123,17 @@ def injectWaveform(**kwargs):
     iota, s1x, s1y, s1z, s2x, s2y, s2z = transform_spins(p['theta_jn'], p['phi_jl'], p['tilt_1'], p['tilt_2'],
                                           p['phi_12'], p['a_1'], p['a_2'], p['mass_1'], p['mass_2'],
                                           f_ref, p['phase'])
+    if p['phi_jl'] == 0:
+        s1x, s1y, s2x, s2y = 0, 0, 0, 0
 
     # Get strain
-    hp, hc = rwf.generate_lal_hphc(approx, 
+    hp, hc = rwf.generate_lal_hphc(injection_approx,
                                    p['mass_1'], p['mass_2'],
                                    [s1x, s1y, s1z], 
                                    [s2x, s2y, s2z],
                                    dist_mpc=p['luminosity_distance'], 
                                    dt=dt,
-                                   f_low=f_low, 
+                                   f22_start=f22_start,
                                    f_ref=f_ref,
                                    inclination=iota,
                                    phi_ref=p['phase']
@@ -143,26 +155,26 @@ def injectWaveform(**kwargs):
     return h_ifos
 
 
-def get_Tcut_from_Ncycles(Ncycles, **kwargs): 
+def get_Tcut_from_Ncycles(waveform_dict, time_dict, ifo, Ncycles, ra, dec):
     
     """
     Calculate the cutoff time given the cutoff cycle and the parameters of the 
     waveform to base the cutoff time from
     """
-    
+
     # Get waveform in H1
-    h_H1 = injectWaveform(**kwargs)['H1']
+    h_ifo = waveform_dict[ifo]
     
     # Get indices of extrema 
-    idxs, _ = sig.find_peaks(np.abs(h_H1), height=0)
+    idxs, _ = sig.find_peaks(np.abs(h_ifo), height=0)
     
     # Get times of extrema 
-    times = kwargs['time_dict']['H1']
-    t_cycles_H1 = times[idxs]
+    times = time_dict[ifo]
+    t_cycles_ifo = times[idxs]
     
     # Get the cycle we care about
-    i0 = np.argmax(np.abs(h_H1[idxs])) # index corresponding to tcut=0 (absolute peak time)
-    n_i = 2*Ncycles                    # one index = 1/2 cycle
+    i0 = np.argmax(np.abs(h_ifo[idxs])) # index corresponding to tcut=0 (absolute peak time)
+    n_i = 2 * Ncycles                    # one index = 1/2 cycle
 
     # If the desired cycle cut is at a peak/trough ...
     if n_i.is_integer():
@@ -170,31 +182,29 @@ def get_Tcut_from_Ncycles(Ncycles, **kwargs):
         icut = i0 + int(n_i)           # index corresponding to the cycle we care about
 
         # Get time in H1
-        tcut_H1 = t_cycles_H1[icut]
+        tcut_ifo = t_cycles_ifo[icut]
     
     # Otherwise, linearly interpolate between nearest peak and trough  
     else: 
         # Our desired cut sits between these two times 
-        tcut_H1_min = t_cycles_H1[i0 + int(np.floor(n_i))]
-        tcut_H1_max = t_cycles_H1[i0 + int(np.ceil(n_i))]
+        tcut_ifo_min = t_cycles_ifo[i0 + int(np.floor(n_i))]
+        tcut_ifo_max = t_cycles_ifo[i0 + int(np.ceil(n_i))]
 
         # How far between the extrema?
         frac_between = n_i - np.floor(n_i)
 
         # Interpolate
-        tcut_H1 = tcut_H1_min + frac_between*(tcut_H1_max - tcut_H1_min)
+        tcut_ifo = tcut_ifo_min + frac_between*(tcut_ifo_max - tcut_ifo_min)
     
     # Get geocenter time
-    skypos = kwargs['skypos']
-    dt_H = lal.TimeDelayFromEarthCenter(lal.cached_detector_by_prefix['H1'].location, 
-                                        skypos['ra'], skypos['dec'], lal.LIGOTimeGPS(tcut_H1))
-    tcut_geo = tcut_H1-dt_H
+    dt_ifo = lal.TimeDelayFromEarthCenter(lal.cached_detector_by_prefix[ifo].location,
+                                        ra, dec, lal.LIGOTimeGPS(tcut_ifo))
+    tcut_geo = tcut_ifo - dt_ifo
     
     return tcut_geo
 
 
-
-def get_ACF(pe_psds, time_dict, f_low=11): 
+def get_ACF(pe_psds, time_dict, f_low=11, f_max=None, nan_inf_replacement=1e10, return_psds=False): 
     
     """
     Get ACF from PSDs and the times
@@ -212,18 +222,27 @@ def get_ACF(pe_psds, time_dict, f_low=11):
         times = time_dict[ifo]
         dt = times[1] - times[0]
         Nanalyze = len(times)
+        
+        # get rid of infs and nans and replace them with a large number
+        psd = np.nan_to_num(
+            psd, nan=nan_inf_replacement, posinf=nan_inf_replacement, neginf=nan_inf_replacement
+        )
 
-        # lower freq cut
-        m = freq >= f_low
-        psd[~m] = 100 * max(psd[m])  # set values below 11 Hz to be equal to 100*max(psd)
+        # cut out frequencies above upper bound (defaults nyquist)
+        fmax = f_max if f_max is not None else 0.5 / dt
+        m_upper = freq <= fmax
+        freq = freq[m_upper]
+        psd = psd[m_upper]
 
-        # upper freq cut
-        fmax = 0.5 / dt        
-        freq = freq[freq <= fmax]
-        psd = psd[freq <= fmax]
-
-        # Computer ACF from PSD
+        # set values below f_low to be equal to 100*max(psd)
+        m_lower = freq >= f_low
+        psd[~m_lower] = 100 * max(psd[m_lower])
+        
+        # Compute ACF from PSD
         rho = 0.5 * np.fft.irfft(psd) / dt  # dt comes from numpy fft conventions
         rho_dict[ifo] = rho[:Nanalyze]
         
-    return rho_dict
+    if return_psds: 
+        return rho_dict, cond_psds
+    else:
+        return rho_dict
