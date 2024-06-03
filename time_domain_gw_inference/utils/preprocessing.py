@@ -204,7 +204,7 @@ def get_Tcut_from_Ncycles(waveform_dict, time_dict, ifo, Ncycles, ra, dec):
     return tcut_geo
 
 
-def get_ACF(pe_psds, time_dict, f_low=11): 
+def get_ACF(pe_psds, time_dict, f_low=11, f_max=None, nan_inf_replacement=1e10, return_psds=False): 
     
     """
     Get ACF from PSDs and the times
@@ -222,16 +222,27 @@ def get_ACF(pe_psds, time_dict, f_low=11):
         times = time_dict[ifo]
         dt = times[1] - times[0]
         Nanalyze = len(times)
+        
+        # get rid of infs and nans and replace them with a large number
+        psd = np.nan_to_num(
+            psd, nan=nan_inf_replacement, posinf=nan_inf_replacement, neginf=nan_inf_replacement
+        )
 
-        # set values outside of upper and lower bound to 100xmaxPSD value
-        fmax = 0.5 / dt   # upper freq cut (nyquist)
-        m = (freq >= f_low) & (freq <= fmax)  # Combine conditions for both lower and upper frequency cuts
-        psd[~m] = 100 * max(psd[m])  # set values outside the desired frequency range to be equal to 100*max(psd)
+        # cut out frequencies above upper bound (defaults nyquist)
+        fmax = f_max if f_max is not None else 0.5 / dt
+        m_upper = freq <= fmax
+        freq = freq[m_upper]
+        psd = psd[m_upper]
 
-        freq = freq[freq <= fmax]
-        psd = psd[freq <= fmax]
+        # set values below f_low to be equal to 100*max(psd)
+        m_lower = freq >= f_low
+        psd[~m_lower] = 100 * max(psd[m_lower])
+        
         # Compute ACF from PSD
         rho = 0.5 * np.fft.irfft(psd) / dt  # dt comes from numpy fft conventions
         rho_dict[ifo] = rho[:Nanalyze]
         
-    return rho_dict
+    if return_psds: 
+        return rho_dict, cond_psds
+    else:
+        return rho_dict
