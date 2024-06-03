@@ -68,6 +68,7 @@ class AbstractPipelineDAG(abc.ABC):
             "notification": "ERROR",
             "stream_output": "True",
             "stream_error": "True",
+            "environment": "\"HDF5_USE_FILE_LOCKING=FAlSE OMP_NUM_THREADS=1 OMP_PROC_BIND=false\"",
             "output": "$(log_dir)/$(run_prefix)-$(nodename)-$(cluster)-$(process).out",
             "error": "$(log_dir)/$(run_prefix)-$(nodename)-$(cluster)-$(process).err",
             "log": "$(log_dir)/$(run_prefix)-$(nodename)-$(cluster)-$(process).log",
