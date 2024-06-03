@@ -40,6 +40,9 @@ def parse_data_and_psds(args, initial_dir_path=''):
 
 
 def hdf5_to_dict(hdf5_group):
+    """
+    Turn an hdf5 group into a dictionary for help loading in data
+    """
     result_dict = {}
     for key, item in hdf5_group.items():
         if isinstance(item, h5py.Group):

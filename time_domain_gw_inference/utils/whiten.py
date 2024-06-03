@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def whitenData(h_td, times, psd, psd_freqs):
+def whitenData(h_td, times, psd, psd_freqs, verbose=False):
     """
     Whiten a timeseries with a given power spectral density
     
@@ -26,6 +26,9 @@ def whitenData(h_td, times, psd, psd_freqs):
     dt = times[1] - times[0]
     Nt = len(h_td)
     freqs = np.fft.rfftfreq(Nt, dt)
+
+    if verbose: 
+        print(Nt, dt, freqs)
 
     # Interpolate PSD to the correct frequencies
     interp_psd = np.interp(freqs, psd_freqs, psd)
