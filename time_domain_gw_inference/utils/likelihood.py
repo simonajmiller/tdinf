@@ -314,7 +314,6 @@ class WaveformManager(LogisticParameterManager):
         super(WaveformManager, self).__init__(*args, **kwargs)
         self.approx_name = kwargs['approx']
         self.approximant = lalsim.SimInspiralGetApproximantFromString(self.approx_name)
-
         self.antenna_and_time_manager = AntennaAndTimeManager(ifos, *args, **kwargs)
 
     def generate_lal_hphc(self, m1_msun, m2_msun, chi1, chi2, delta_t, dist_mpc=1,

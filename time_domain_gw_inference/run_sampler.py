@@ -391,11 +391,19 @@ def main():
 
     reference_parameters = get_injected_parameters(args, verbose=verbose)
     kwargs = initialize_kwargs(args, reference_parameters)
-    wf_manager = utils.NewWaveformManager(args.ifos,
-                                          use_higher_order_modes=args.use_higher_order_modes,
-                                          vary_time=args.vary_time,
-                                          vary_skypos=args.vary_skypos,
-                                          vary_eccentricity=args.vary_eccentricity, **kwargs)
+
+    if args.approx == 'TEOBResumSDALI':
+        wf_manager = utils.NewWaveformManager(args.ifos,
+                                              use_higher_order_modes=args.use_higher_order_modes,
+                                              vary_time=args.vary_time,
+                                              vary_skypos=args.vary_skypos,
+                                              vary_eccentricity=args.vary_eccentricity, **kwargs)
+    else:
+        wf_manager = utils.WaveformManager(args.ifos,
+                                           vary_time=args.vary_time,
+                                           vary_skypos=args.vary_skypos,
+                                           vary_eccentricity=args.vary_eccentricity,
+                                           **kwargs)
 
     time_dict, data_dict, psd_dict = get_conditioned_time_and_data(args,
                                                                    wf_manager=wf_manager,
