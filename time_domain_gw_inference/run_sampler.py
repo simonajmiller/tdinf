@@ -131,6 +131,11 @@ def modify_parameters(data, args):
     if 'f_ref' not in df.columns:
         df['f_ref'] = args.fref
 
+    if 'mass_1' not in df.columns and all(col in df.columns for col in ['total_mass', 'mass_ratio']):
+        m1s, m2s = utils.m1m2_from_mtotq(df['total_mass'], df['mass_ratio'])
+        df['mass_1'] = m1s
+        df['mass_2'] = m2s
+
     if 'total_mass' not in df.columns:
         df['total_mass'] = df['mass_1'] + df['mass_2']
 
