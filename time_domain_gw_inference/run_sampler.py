@@ -53,6 +53,8 @@ def create_run_sampler_arg_parser():
 
     p.add_argument('--flow', type=float, default=11,
                    help="lower frequency bound for data conditioning and likelihood function (ACF)")
+    p.add_argument('--fmax', type=float, default=None,
+                   help="Upper frequency bound for data conditioning and likelihood function (ACF) default: None")
     p.add_argument('--f22-start', type=float, default=11,
                    help="frequency at which to start generating 22 mode for waveforms, "
                         "NOTE! f22-start _is_ the reference frequency for eccentric waveforms ")
@@ -372,7 +374,7 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
         data_dict[ifo] = data_dict[ifo][idx - Npre:idx + Npost]
 
     # Calculate ACF
-    rho_dict = utils.get_ACF(pe_psds, time_dict, f_low=args.flow)
+    rho_dict = utils.get_ACF(pe_psds, time_dict, f_low=args.flow, f_max=args.fmax)
 
     for ifo, rho in rho_dict.items():
         assert len(rho) == len(data_dict[ifo]), 'Length for ACF is not the same as for the data'
@@ -421,6 +423,7 @@ def main():
         data_dict=data_dict,
         vary_time=args.vary_time, vary_skypos=args.vary_skypos,
         vary_eccentricity=args.vary_eccentricity,
+        f_max=args.fmax,
         only_prior=args.only_prior,
         use_higher_order_modes=args.use_higher_order_modes,
         **kwargs)

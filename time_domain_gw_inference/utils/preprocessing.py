@@ -230,7 +230,11 @@ def get_ACF(pe_psds, time_dict, f_low=11, f_max=None, nan_inf_replacement=1e10, 
         )
 
         # cut out frequencies above upper bound (defaults nyquist)
-        fmax = f_max if f_max is not None else 0.5 / dt
+        nyquist_freq = 0.5 / dt
+        if f_max is not None:
+            if f_max > nyquist_freq:
+                raise(ValueError, f"WARNING: f_max {f_max} cannot be greater than the nyquist frequency {nyquist_freq}")
+        fmax = f_max if f_max is not None else nyquist_freq
         m_upper = freq <= fmax
         freq = freq[m_upper]
         psd = psd[m_upper]

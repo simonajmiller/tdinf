@@ -444,13 +444,14 @@ class NewWaveformManager(LogisticParameterManager):
 
 
 class LnLikelihoodManager(LogisticParameterManager):
-    def __init__(self, psd_dict, time_dict, data_dict, f_low, f_ref, f22_start, only_prior=False,
+    def __init__(self, psd_dict, time_dict, data_dict, f_low, f_ref, f22_start, f_max=None, only_prior=False,
                  use_higher_order_modes=False, *args, **kwargs):
         self.time_dict = time_dict
         self.data_dict = data_dict
         self.f_low = f_low
         self.f_ref = f_ref
         self.f22_start = f22_start
+        self.f_max = f_max
         self.psd_dict = psd_dict
         self.rho_dict = self._make_autocorrolation_dict()
         self.ifos = list(self.data_dict.keys())
@@ -468,7 +469,7 @@ class LnLikelihoodManager(LogisticParameterManager):
         super().__init__(*args, **kwargs)
 
     def _make_autocorrolation_dict(self):
-        return get_ACF(self.psd_dict, self.time_dict, f_low=self.f_low)
+        return get_ACF(self.psd_dict, self.time_dict, f_low=self.f_low, f_max=self.f_max)
 
     def waveform_has_error(self, phys_dict, waveform_ifo, residual):
         # check for various errors before continuing
