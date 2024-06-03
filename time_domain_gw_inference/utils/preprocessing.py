@@ -211,6 +211,7 @@ def get_ACF(pe_psds, time_dict, f_low=11, f_max=None, nan_inf_replacement=1e10, 
     """
     
     rho_dict = OrderedDict()  # stores acf
+    cond_psds = OrderedDict() # stores conditioned psds
     
     # Cycle through ifos
     for ifo, freq_psd in pe_psds.items():
@@ -241,6 +242,8 @@ def get_ACF(pe_psds, time_dict, f_low=11, f_max=None, nan_inf_replacement=1e10, 
         # Compute ACF from PSD
         rho = 0.5 * np.fft.irfft(psd) / dt  # dt comes from numpy fft conventions
         rho_dict[ifo] = rho[:Nanalyze]
+
+        cond_psds[ifo] = np.transpose([freq, psd])
         
     if return_psds: 
         return rho_dict, cond_psds
