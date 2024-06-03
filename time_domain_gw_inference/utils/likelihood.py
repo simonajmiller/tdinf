@@ -207,6 +207,9 @@ class LnPriorManager(LogisticParameterManager):
             param_kw = param.physical_name
             try:
                 param_phys = injected_parameters[param_kw]
+                # If given (e.g. declination, get sin declination like we need)
+                if type(param) == TrigLogisticParameter:
+                    param_phys = param.trig_function(param_phys)
                 if verbose:
                     print('injected', param_phys, param_kw)
             except ValueError:
