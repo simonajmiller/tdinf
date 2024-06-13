@@ -87,7 +87,7 @@ def condition(raw_time_dict, raw_data_dict, t_dict, desired_sample_rate, f_min=1
         if f_min or f_max:
             data = sig.filtfilt(b, a, raw_data)
         else:
-            data = raw_data
+            data = raw_data.copy()
         
         # Decimate
         if downsample_factor > 1:
