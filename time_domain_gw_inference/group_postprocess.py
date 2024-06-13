@@ -75,11 +75,8 @@ def get_settings_from_command_line_string(command_line_string, initial_run_dir, 
 
     if verbose:
         print('making wf manager')
-    wf_manager = utils.NewWaveformManager(args.ifos,
-                                          vary_time=args.vary_time,
-                                          vary_skypos=args.vary_skypos,
-                                          vary_eccentricity=args.vary_eccentricity, 
-                                          use_higher_order_modes=args.use_higher_order_modes, **kwargs)
+
+    wf_manager = run_sampler.make_waveform_manager(args, **kwargs)
     if verbose:
         print('getting conditioned time and data')
     time_dict, data_dict, psd_dict = run_sampler.get_conditioned_time_and_data(args,
