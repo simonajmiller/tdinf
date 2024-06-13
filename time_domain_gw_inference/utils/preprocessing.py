@@ -8,7 +8,7 @@ import json
 import os
 from collections import OrderedDict
 
-def condition(raw_time_dict, raw_data_dict, t_dict, desired_sample_rate, f_low=11,
+def condition(raw_time_dict, raw_data_dict, t_dict, desired_sample_rate, f_min=11, f_max=None,
               scipy_decimate=True, verbose=True):
     
     """
@@ -28,7 +28,9 @@ def condition(raw_time_dict, raw_data_dict, t_dict, desired_sample_rate, f_low=1
     desired_sample_rate : float must be a factor of 2^n
         sampling rate that we want the data to have after we downsample the original data
     f_low : float (optional)
-        frequency for the highpass filter
+        frequency for the lower bound of the band pass / highpass
+    f_max : float (optional)
+        frequency for the upper bound of the band pass / lowpass
     scipy_decimate : boolean (optional)
         whether or not to use the scipy decimate function for downsampling, defaults
         to True 
@@ -72,10 +74,17 @@ def condition(raw_time_dict, raw_data_dict, t_dict, desired_sample_rate, f_low=1
         raw_data = np.roll(raw_data_dict[ifo], -ir)
         raw_time = np.roll(raw_time_dict[ifo], -ir)
         
+        fny = 0.5/(raw_time[1] - raw_time[0])
         # Filter
-        if f_low:
-            fny = 0.5/(raw_time[1]-raw_time[0])
-            b, a = sig.butter(4, f_low/fny, btype='highpass', output='ba')
+        if f_min and not f_max:
+            b, a = sig.butter(4, f_min/fny, btype='highpass', output='ba')
+        elif f_max and not f_min:
+            b, a = sig.butter(4, f_max/fny, btype='lowpass', output='ba')
+        elif f_min and f_max:
+            b, a = sig.butter(4, (f_min/fny, f_max/fny), btype='bandpass',
+                              output='ba')
+
+        if f_min or f_max:
             data = sig.filtfilt(b, a, raw_data)
         else:
             data = raw_data.copy()
@@ -90,6 +99,8 @@ def condition(raw_time_dict, raw_data_dict, t_dict, desired_sample_rate, f_low=1
         else: 
             time = raw_time
         
+        
+
         # Subtract mean and store
         data_dict[ifo] = data - np.mean(data)
         time_dict[ifo] = time
