@@ -125,10 +125,14 @@ def get_pe_samples(path):
         except:
             # hdf5 --> dict
             pe_samples_dict = hdf5_to_dict(f)['posterior']
-            # dict --> a structured array with labels
-            pe_samples = np.rec.fromarrays([pe_samples_dict[key] for key in pe_samples_dict],
-                                           names=list(pe_samples_dict.keys()))
 
+            if isinstance(pe_samples_dict, np.ndarray):
+                pe_samples = pe_samples_dict
+
+            else:
+                # dict --> a structured array with labels
+                pe_samples = np.rec.fromarrays([pe_samples_dict[key] for key in pe_samples_dict],
+                                               names=list(pe_samples_dict.keys()))
     return pe_samples
 
 

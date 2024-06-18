@@ -13,7 +13,7 @@ import numpy as np
 import seaborn as sns
 import scipy
 import copy
-
+from tqdm import tqdm
 
 def load_run_settings_from_directory(directory, filename_dict=None, args_and_kwargs_only=True):
     """
@@ -203,19 +203,35 @@ def get_waveform_dict(selected_point, likelihood_manager, ifos=None):
                                                      f_ref = likelihood_manager.f_ref)
 
 
-def get_N_waveforms(df, likelihood_manager, ifos=None, N_waveforms = 15):
+def get_N_waveforms(df, likelihood_manager, ifos=None, N_waveforms=None):
+    
+    # setup
     if ifos is None:
         ifos = likelihood_manager.ifos
-    rand_ints = np.random.randint(len(df), size=N_waveforms)
+    if N_waveforms is None:
+        rand_ints = np.arange(len(df))
+    else:
+        rand_ints = np.random.randint(len(df), size=N_waveforms)
     wf_dict_list = []
-    for rand_int in rand_ints:
-        selected_point = df.iloc[rand_int]
-        wf_dict = likelihood_manager.waveform_manager.get_projected_waveform(selected_point,
-                                                     ifos, 
-                                                     time_dict = likelihood_manager.time_dict, 
-                                                     f22_start = likelihood_manager.f22_start, 
-                                                     f_ref = likelihood_manager.f_ref)
-        wf_dict_list.append(wf_dict)
+        
+    # print out progress
+    with tqdm(total=len(rand_ints)) as t:
+        
+        # cycle through the waveforms
+        for rand_int in rand_ints:
+            
+            # generate waveform
+            selected_point = df.iloc[rand_int]
+            wf_dict = likelihood_manager.waveform_manager.get_projected_waveform(selected_point,
+                                                         ifos, 
+                                                         time_dict = likelihood_manager.time_dict, 
+                                                         f22_start = likelihood_manager.f22_start, 
+                                                         f_ref = likelihood_manager.f_ref)
+            wf_dict_list.append(wf_dict)
+            
+            # update progress bar
+            t.update()
+        
     return wf_dict_list 
     
 def whiten_waveform(wf_array, likelihood_manager, ifo): 
@@ -230,8 +246,17 @@ def whiten_waveform_dict(wf_dict, likelihood_manager):
 
 def whiten_waveform_list(wf_dict_list, likelihood_manager):
     whitened_waveform_list = []
-    for wf_dict in wf_dict_list:
-        whitened_waveform_list.append(whiten_waveform_dict(wf_dict, likelihood_manager))
+    
+    # print out progress
+    with tqdm(total=len(wf_dict_list)) as t:
+    
+        # cycle through the waveforms and whiten each one
+        for wf_dict in wf_dict_list:
+            whitened_waveform_list.append(whiten_waveform_dict(wf_dict, likelihood_manager))
+            
+        # update progress bar
+        t.update()
+        
     return whitened_waveform_list
 
 def get_snr(whitened_wf_dict):

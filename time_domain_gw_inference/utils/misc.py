@@ -24,16 +24,14 @@ Functions to calculate matched-filter SNR;
 See Eqs. (50) through (53) of  https://arxiv.org/pdf/2107.05609.pdf
 """
 
-
 def inner_product(x, y, rho):
-    prod = x @ sl.solve_toeplitz(rho, y)
-    return prod
-
+    return x @ sl.solve_toeplitz(rho, y)
 
 def calc_mf_SNR(d, s, rho):
-    snr = inner_product(s, d, rho) / np.sqrt(inner_product(s, s, rho))
-    return snr
+    return inner_product(s, d, rho) / calc_opt_SNR(s, rho)
 
+def calc_opt_SNR(s, rho): 
+    return np.sqrt(inner_product(s, s, rho))
 
 def calc_network_mf_SNR(snr_list):
     snrs_sq = [snr ** 2 for snr in snr_list]
