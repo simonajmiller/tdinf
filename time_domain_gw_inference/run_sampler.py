@@ -200,12 +200,12 @@ def get_injected_parameters(args, initial_run_dir='', verbose=False):
         # Use reference parameter from max logL in PE file...
         if args.reference_parameters is None:
             pe_posterior_h5_file = os.path.join(initial_run_dir, args.pe_posterior_h5_file)
-            pe_samples = utils.get_pe_samples(pe_posterior_h5_file)
+            ref_pe_samples = utils.get_pe_samples(pe_posterior_h5_file)
 
             # "Injected parameters" = max(P) draw from the samples associated with this data
-            log_prob = pe_samples['log_likelihood'] + pe_samples['log_prior']
+            log_prob = ref_pe_samples['log_likelihood'] + ref_pe_samples['log_prior']
             max_L_index = np.argmax(log_prob)
-            reference_parameters = {field: pe_samples[field][max_L_index] for field in pe_samples.dtype.names}
+            reference_parameters = {field: ref_pe_samples[field][max_L_index] for field in ref_pe_samples.dtype.names}
         # set reference parameters to the passed in reference_parameters
         else:
             reference_parameters = utils.parse_injected_parameters(args.reference_parameters,
@@ -221,12 +221,15 @@ def get_injected_parameters(args, initial_run_dir='', verbose=False):
         # Check that the reference freqs line up
         err_msg = f"Injection fref={reference_parameters['f_ref']} does not equal sampler fref={args.fref}"
         assert reference_parameters['f_ref'] == args.fref, err_msg
+        
+        ref_pe_samples = None
 
     reference_parameters = modify_parameters(reference_parameters, args)
 
     if verbose:
         print('reference_parameters are', reference_parameters)
-    return reference_parameters
+        
+    return reference_parameters, ref_pe_samples
 
 
 def initialize_kwargs(args, reference_parameters):
@@ -418,7 +421,7 @@ def main():
 
     backend_path = args.output_h5  # where emcee spits its output
 
-    reference_parameters = get_injected_parameters(args, verbose=verbose)
+    reference_parameters, ref_pe_samples = get_injected_parameters(args, verbose=verbose)
     kwargs = initialize_kwargs(args, reference_parameters)
 
     wf_manager = make_waveform_manager(args, **kwargs)
@@ -482,7 +485,9 @@ def main():
                 backend = emcee.backends.HDFBackend(backend_path)
                 backend.reset(nwalkers, ndim)
 
-            p0 = likelihood_manager.log_prior.initialize_walkers(nwalkers, reference_parameters, verbose=verbose)
+            p0 = likelihood_manager.log_prior.initialize_walkers(
+                nwalkers, reference_parameters, reference_posteriors=ref_pe_samples, verbose=verbose
+            )
 
     else:
         # Reset the backend

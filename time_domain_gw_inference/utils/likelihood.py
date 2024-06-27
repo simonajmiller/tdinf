@@ -212,7 +212,7 @@ class LogisticParameterManager:
 
 class LnPriorManager(LogisticParameterManager):
 
-    def initialize_walkers(self, nwalkers, injected_parameters, verbose=False):
+    def initialize_walkers(self, nwalkers, injected_parameters, reference_posteriors=None, verbose=False):
         # Initialize walkers
         # (code sees unit scale quantities; use logit transformations
         # to take boundaries to +/- infinity)
@@ -220,7 +220,10 @@ class LnPriorManager(LogisticParameterManager):
 
         # we have initialized walkers inside their logistic prior, now for injected parameters
         # we will inject them closer
-        for param in self.logistic_parameters:
+        logistic_params = self.logistic_parameters
+        logistic_names_phys = [x.physical_name for x in logistic_params]
+        
+        for param in logistic_params:
             p = self.sampled_keys.index(param.logistic_name)
             param_kw = param.physical_name
             try:
@@ -259,7 +262,34 @@ class LnPriorManager(LogisticParameterManager):
             index = self.sampled_keys.index('geocenter_time')
             initial_t_walkers = np.random.normal(loc=self.reference_time, scale=self.sigma_time, size=nwalkers)
             p0_arr[:, index] = initial_t_walkers  # time always saved as the final param
-
+            
+        # if sampling in skyposition, option to draw ra and dec from the skyring given in the 
+        # reference posteriors
+        cartesian_params = self.cartesian_angles
+        cartesian_names_phys = [x.physical_name for x in cartesian_params]
+        if self.vary_skypos and reference_posteriors is not None:
+            
+            # select random set of walkers from the ref posteriors
+            idxs = np.random.choice(range(len(reference_posteriors['ra'])), size=nwalkers) 
+            
+            # physical ra --> ra_x and ra_y 
+            ra = cartesian_params[cartesian_names_phys.index('right_ascension')] 
+            initial_ra_x, initial_ra_y = ra.radian_to_cartesian(reference_posteriors['ra'][idxs]) 
+            p0_arr[:, self.sampled_keys.index('right_ascension_x')] = -1.0*initial_ra_x
+            p0_arr[:, self.sampled_keys.index('right_ascension_y')] = -1.0*initial_ra_y
+            
+            # physical dec --> sin dec
+            dec = logistic_params[logistic_names_phys.index('declination')] 
+            initial_x_sin_dec = dec.physical_to_logistic(reference_posteriors['dec'][idxs])
+            p0_arr[:, self.sampled_keys.index('x_sin_declination')] = initial_x_sin_dec
+            
+            # physical pol --> psi_x and psi_y
+            psi = cartesian_params[cartesian_names_phys.index('polarization')] 
+            initial_psi_x, initial_psi_y = psi.radian_to_cartesian(reference_posteriors['psi'][idxs]) 
+            p0_arr[:, self.sampled_keys.index('polarization_x')] = -1.0*initial_psi_x
+            p0_arr[:, self.sampled_keys.index('polarization_y')] = -1.0*initial_psi_y
+            
+                
         p0 = p0_arr.tolist()
         return p0
 
