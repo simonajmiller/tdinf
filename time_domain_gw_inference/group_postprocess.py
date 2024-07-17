@@ -142,7 +142,7 @@ def get_tc_from_name(name):
     return nseconds
 
 
-def generate_filename_dict(directory):
+def generate_filename_dict(directory, pattern=r'(post|pre|full)_(-?\d+\.\d+)seconds'):
     filename_dict = {}
     pattern = re.compile(r'(post|pre|full)_(-?\d+\.\d+)seconds')
 
@@ -372,7 +372,7 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
              plot_whitened=False,
              param_xlims=None, modes = None, hist_modes = None,
              alpha_reconstruct=0.02, make_legend=True, 
-             inset_down=False, param_ylims=None,
+             inset_down=False, param_ylims=None, hist_kwargs=None,
              plot_data_with_modes=False):
     cp = sns.color_palette('muted')
     cp2 = sns.color_palette('pastel')
@@ -382,6 +382,8 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
         modes = ['pre', 'post']
     if hist_modes is None: 
         hist_modes = ['pre', 'post']
+    if hist_kwargs is None:
+        hist_kwargs = {}
 
     mode_kwargs = dict(pre={'color': pre_color}, post={'color': post_color})
 
@@ -488,7 +490,7 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
                 x0, y0, x1, y1 = axes[-1].get_position().bounds
                 axes[-1].set_position([x0 + dx, y0, x1, y1])
             
-        hist_kwargs = dict(density=True, bins='auto')
+        hist_kwargs.update(dict(density=True, bins='auto'))
         # -------------------------------------------------------------------------
         # Righthand plots, plot posteriors
         for param, ax, i in zip(plot_param, axes[:len(plot_param)], range(len(plot_param))):
@@ -499,7 +501,7 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
                                  **hist_kwargs)
                 except KeyError:
                     pass
-            ax.hist(full_df[param], lw=1.5, histtype='step',
+            ax.hist(full_df[param], lw=1.5, #histtype='step',
                          color='k', zorder=2, **hist_kwargs)
 
             if reference_df is not None:
@@ -528,7 +530,6 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
             # -------------------------------------------------------------------------
             axin = make_inset_plot(axes[0], time_dict_M[ifo], whitened_data_dict[ifo], whitened_reference_wf[ifo], tc_M, 
                                 l=0.4, w=0.3, dx=0.04, xlim=xlim, inset_ylim=inset_ylim)
-            print(axin.get_ylim())
 
         for ax in axes:
             x0, y0, x1, y1 = ax.get_position().bounds
