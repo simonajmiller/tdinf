@@ -55,31 +55,51 @@ def load_run_settings_from_directory(directory, filename_dict=None):
                 print(e)
                 print(f'unable to make {run} {key}')
 
-            filename = os.path.join(directory, filename_dict[key] + '.dat')
-            if not os.path.exists(filename):
-                filename = os.path.join(directory, filename_dict[key] + '/' + filename_dict[key] + '.dat')
-
-            try:
-                td_samples[key] = pd.read_csv(filename, delimiter='\s+')
-            except:
+            df = load_dataframe(directory, filename_dict[key])
+            if df is None:
                 continue
-            td_samples[key] = calc_additional_parameters(td_samples[key])
+
+            td_samples[key] = df
     return settings
+
+
+def load_dataframe(directory, run_directory_name):
+
+    filename = os.path.join(directory, run_directory_name + '.dat')
+    if not os.path.exists(filename):
+        filename = os.path.join(directory, run_directory_name + '/' + run_directory_name + '.dat')
+
+    try:
+        df = pd.read_csv(filename, delimiter='\s+')
+    except:
+        return None
+    df = calc_additional_parameters(df)
+    return df
+
 
 
 def get_settings_from_command_line_string(command_line_string, initial_run_dir, parser, verbose=False):
     skip_initial_arg = command_line_string.split()[1:]
     args = parser.parse_args(skip_initial_arg)
-    reference_parameters = run_sampler.get_injected_parameters(args, initial_run_dir, verbose=verbose)
+    return get_settings_from_args(args, initial_run_dir, verbose)
+
+def get_settings_from_args(args, initial_run_dir, verbose=False):
+    """
+    Returns args, kwargs, likelihood manager for a run
+    :param args: argparser object, created from create_run_sampler_arg_parser()
+    :param initial_run_dir: directory in which the paths in args are wrt to.
+    :param verbose:
+    :return:
+    """
+    reference_parameters = run_sampler.get_injected_parameters(args,
+                                                               initial_run_dir,
+                                                               verbose=verbose)
     kwargs = run_sampler.initialize_kwargs(args, reference_parameters)
 
     if verbose:
         print('making wf manager')
-    wf_manager = utils.NewWaveformManager(args.ifos,
-                                          vary_time=args.vary_time,
-                                          vary_skypos=args.vary_skypos,
-                                          vary_eccentricity=args.vary_eccentricity, 
-                                          use_higher_order_modes=args.use_higher_order_modes, **kwargs)
+
+    wf_manager = run_sampler.make_waveform_manager(args, **kwargs)
     if verbose:
         print('getting conditioned time and data')
     time_dict, data_dict, psd_dict = run_sampler.get_conditioned_time_and_data(args,
