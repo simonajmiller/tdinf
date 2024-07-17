@@ -70,7 +70,19 @@ def load_run_settings_from_directory(directory, filename_dict=None):
 def get_settings_from_command_line_string(command_line_string, initial_run_dir, parser, verbose=False):
     skip_initial_arg = command_line_string.split()[1:]
     args = parser.parse_args(skip_initial_arg)
-    reference_parameters = run_sampler.get_injected_parameters(args, initial_run_dir, verbose=verbose)
+    return get_settings_from_args(args, initial_run_dir, verbose)
+
+def get_settings_from_args(args, initial_run_dir, verbose=False):
+    """
+    Returns args, kwargs, likelihood manager for a run
+    :param args: argparser object, created from create_run_sampler_arg_parser()
+    :param initial_run_dir: directory in which the paths in args are wrt to.
+    :param verbose:
+    :return:
+    """
+    reference_parameters = run_sampler.get_injected_parameters(args,
+                                                               initial_run_dir,
+                                                               verbose=verbose)
     kwargs = run_sampler.initialize_kwargs(args, reference_parameters)
 
     if verbose:
