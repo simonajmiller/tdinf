@@ -49,6 +49,7 @@ def postprocess_samples(sampler, log_prior, getRidOfFixed=False, **kwargs):
         burnin = max(int(5 * np.max(tau)), 0)
         thin = max(int(0.5 * np.min(tau)), 1)
     except:
+        print('WARNING thinning by 1, 0 burnin!')
         burnin = 0
         thin = 1
 
