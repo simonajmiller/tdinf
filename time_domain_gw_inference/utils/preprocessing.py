@@ -74,6 +74,7 @@ def condition(raw_time_dict, raw_data_dict, t_dict, desired_sample_rate, f_low=1
         
         # Filter
         if f_low:
+            # Nyquist frequency
             fny = 0.5/(raw_time[1]-raw_time[0])
             b, a = sig.butter(4, f_low/fny, btype='highpass', output='ba')
             data = sig.filtfilt(b, a, raw_data)
