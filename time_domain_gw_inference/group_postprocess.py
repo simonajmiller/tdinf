@@ -55,16 +55,27 @@ def load_run_settings_from_directory(directory, filename_dict=None):
                 print(e)
                 print(f'unable to make {run} {key}')
 
-            filename = os.path.join(directory, filename_dict[key] + '.dat')
-            if not os.path.exists(filename):
-                filename = os.path.join(directory, filename_dict[key] + '/' + filename_dict[key] + '.dat')
-
-            try:
-                td_samples[key] = pd.read_csv(filename, delimiter='\s+')
-            except:
+            df = load_dataframe(directory, filename_dict[key])
+            if df is None:
                 continue
-            td_samples[key] = calc_additional_parameters(td_samples[key])
+
+            td_samples[key] = df
     return settings
+
+
+def load_dataframe(directory, run_directory_name):
+
+    filename = os.path.join(directory, run_directory_name + '.dat')
+    if not os.path.exists(filename):
+        filename = os.path.join(directory, run_directory_name + '/' + run_directory_name + '.dat')
+
+    try:
+        df = pd.read_csv(filename, delimiter='\s+')
+    except:
+        return None
+    df = calc_additional_parameters(df)
+    return df
+
 
 
 def get_settings_from_command_line_string(command_line_string, initial_run_dir, parser, verbose=False):
