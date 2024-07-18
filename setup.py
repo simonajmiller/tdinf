@@ -9,7 +9,9 @@ setup(
               ],
     install_requires=[],
     scripts=['time_domain_gw_inference/run_sampler.py',
-             'time_domain_gw_inference/pipe/time_domain_gw_inference_pipe.py'],
+             'time_domain_gw_inference/pipe/time_domain_gw_inference_pipe.py',
+             'time_domain_gw_inference/waveform_h5s.py',
+             ],
     license='GPL',
     long_description=open('README.md').read(),
 )
