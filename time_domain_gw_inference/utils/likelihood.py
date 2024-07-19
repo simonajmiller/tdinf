@@ -288,7 +288,6 @@ class LnPriorManager(LogisticParameterManager):
             initial_psi_x, initial_psi_y = psi.radian_to_cartesian(reference_posteriors['psi'][idxs]) 
             p0_arr[:, self.sampled_keys.index('polarization_x')] = -1.0*initial_psi_x
             p0_arr[:, self.sampled_keys.index('polarization_y')] = -1.0*initial_psi_y
-            
                 
         p0 = p0_arr.tolist()
         return p0

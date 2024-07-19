@@ -139,7 +139,7 @@ def get_settings_from_args(args, initial_run_dir, return_ref_pe=False, args_and_
     if return_ref_pe:
         return args, kwargs, likelihood_manager, reference_parameters, ref_pe_samples
     else:
-        return args, kwargs, likelihood_manager,
+        return args, kwargs, likelihood_manager
 
 
 def get_settings_from_command_line_file(command_line_file, file_prefix, initial_run_dir, parser,
