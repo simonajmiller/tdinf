@@ -357,10 +357,11 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
     """
     # icut = index corresponding to cutoff time
     time_dict, data_dict, icut_dict = utils.condition(raw_time_dict, raw_data_dict, tcut_dict,
-                                                      args.sampling_rate, f_min=args.flow, f_max=args.fmax, verbose=verbose)
+                                                      args.sampling_rate, f_min=args.flow * 3 / 4,
+                                                      f_max=args.fmax, verbose=verbose)
 
     # Time spacing of data
-    dt = time_dict['H1'][1] - time_dict['H1'][0]
+    dt = time_dict[ifos[0]][1] - time_dict[ifos[0]][0]
 
     # Decide how much data to analyze based of off run mode
     if run_mode == 'full':
@@ -492,7 +493,9 @@ def main():
     else:
         # Reset the backend
         backend.reset(nwalkers, ndim)
-        p0 = likelihood_manager.log_prior.initialize_walkers(nwalkers, reference_parameters)
+        p0 = likelihood_manager.log_prior.initialize_walkers(
+            nwalkers, reference_parameters, reference_posteriors=ref_pe_samples, verbose=verbose
+        )
 
     # Deactivate numpy default number of cores to avoid using too many
     if args.ncpu > 1:
