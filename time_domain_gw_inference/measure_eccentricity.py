@@ -1,7 +1,4 @@
-from gwsignal.models.teobresums import convert_parameters_to_teob, TEOB_DALI_MODES_FROM_K
 import argparse
-import sys
-import gw_eccentricity as gwe
 import pandas as pd
 import os
 from time_domain_gw_inference import group_postprocess
@@ -10,18 +7,14 @@ from tqdm import tqdm
 import astropy.units as u
 import astropy.constants as constants
 import numpy as np
-from gw_eccentricity import measure_eccentricity
 import multiprocessing as mp
 from itertools import repeat
 try:
     import EOBRun_module
+    from gwsignal.models.teobresums import convert_parameters_to_teob, TEOB_DALI_MODES_FROM_K
+    from gw_eccentricity import measure_eccentricity
 except ImportError:
     print("Warning! Unable to import EOBRun_module, will not be able to calculate eccentricities ")
-
-
-
-tqdm.pandas()
-
 
 def EOBRunPy(generator, **parameters):
     #print(parameters)
