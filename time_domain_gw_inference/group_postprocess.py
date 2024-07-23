@@ -77,11 +77,11 @@ def load_dataframe(directory, run_directory_name):
     return df
 
 
-
 def get_settings_from_command_line_string(command_line_string, initial_run_dir, parser, verbose=False):
     skip_initial_arg = command_line_string.split()[1:]
     args = parser.parse_args(skip_initial_arg)
     return get_settings_from_args(args, initial_run_dir, verbose)
+
 
 def get_settings_from_args(args, initial_run_dir, verbose=False):
     """
