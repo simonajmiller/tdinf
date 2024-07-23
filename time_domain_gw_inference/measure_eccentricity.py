@@ -117,7 +117,13 @@ if __name__ == "__main__":
     parser.add_argument("--append", action="store_true",
                         help="Flag to compute additional eccentricity parameters if file already exists")
 
-    parser.add_argument("--ncpu", type=int, default=mp.cpu_count(), help="Number of parallel processes to start")
+    parser.add_argument("--ncpu", type=int, default=mp.cpu_count(), help=f"Number of parallel processes to start,"
+                                                                         f" default {mp.cpu_count()}")
+    parser.add_argument("--debug_level", type=int, default=0, help="level of verbosity for measure eccentricity\n"
+                                                                   "\t-1: All warnings are suppressed. NOTE: Use at your own risk! \n"
+                                                                   "\t0: Only important warnings are issued. \n"
+                                                                   "\t1: All warnings are issued. Use when investigating. \n"
+                                                                   "\t2: All warnings become exceptions.\n")
 
     parser.add_argument('--method', type=str, default="AmplitudeFits",
                         help="""
@@ -228,7 +234,8 @@ if __name__ == "__main__":
     delta_t = run_likelihood_manager.time_dict[ifo][1] - run_likelihood_manager.time_dict[ifo][0]
     args_iter = [(new_df.iloc[i], run_likelihood_manager, delta_t) for i in range(len(new_df))]
 
-    kwargs_iter = repeat(dict(fref_in=fref_in, method=args.method, tref_in=tref_in))
+    kwargs_iter = repeat(dict(fref_in=fref_in, method=args.method, tref_in=tref_in,
+                              extra_kwargs=dict(debug_level=args.debug_level)))
 
     with mp.Pool(processes=args.ncpu) as pool:
         # Use pool.starmap to parallelize the computation
