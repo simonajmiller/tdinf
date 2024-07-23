@@ -5,7 +5,6 @@ import gw_eccentricity as gwe
 import pandas as pd
 import os
 from time_domain_gw_inference import group_postprocess
-import EOBRun_module
 import run_sampler
 from tqdm import tqdm
 import astropy.units as u
@@ -14,6 +13,12 @@ import numpy as np
 from gw_eccentricity import measure_eccentricity
 import multiprocessing as mp
 from itertools import repeat
+try:
+    import EOBRun_module
+except ImportError:
+    print("Warning! Unable to import EOBRun_module, will not be able to calculate eccentricities ")
+
+
 
 tqdm.pandas()
 
@@ -22,7 +27,8 @@ def EOBRunPy(generator, **parameters):
     #print(parameters)
     # remove fixed and model-dependent pars from parameters
     #fixed_pars = {}
-    generator.parameter_check(units_sys="Cosmo", extra_parameters=generator.metadata['extra_parameters'],
+    generator.parameter_check(units_sys="Cosmo",
+                              extra_parameters=generator.metadata['extra_parameters'],
                               **parameters)
     generator.waveform_dict = generator._strip_units(generator.waveform_dict)
     #generator.waveform_dict.update(**fixed_pars)
