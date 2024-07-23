@@ -73,9 +73,10 @@ def get_actual_eccentricity(parameters, waveform_manager, delta_t, f_ref, f22_st
         return res
     return res
 
+
 def starmap_with_kwargs(pool, fn, args_iter, kwargs_iter):
     args_for_starmap = zip(repeat(fn), args_iter, kwargs_iter)
-    return pool.starmap(apply_args_and_kwargs, args_for_starmap)
+    return pool.starmap(apply_args_and_kwargs, tqdm(args_for_starmap, total=len(args_iter)))
 
 def apply_args_and_kwargs(fn, args, kwargs):
     return fn(*args, **kwargs)
@@ -87,10 +88,10 @@ def calculate_eccentricity(row, lm, delta_t, fref_in=None, tref_in=None, **kwarg
                                   f22_start=lm.f22_start,
                                   fref_in=fref_in, tref_in=tref_in, **kwargs)
     if tref_in is None:
-        ecc_key = f'ecc_{fref_in}'
+        ecc_key = f'eccentricity_{fref_in}'
         mean_anomaly_key = f'mean_anomaly_{fref_in}'
     else:
-        ecc_key = f'ecc_tref_{tref_in}'
+        ecc_key = f'eccentricity_tref_{tref_in}'
         mean_anomaly_key = f'mean_anomaly_tref_{tref_in}'
 
     row[ecc_key] = res['eccentricity']
@@ -120,6 +121,9 @@ if __name__ == "__main__":
     parser.add_argument("--run_key", type=str, help="name of run for which to create waveforms")
     parser.add_argument("--overwrite", action="store_true",
                         help="Flag to overwrite existing files (default: False)")
+    parser.add_argument("--append", action="store_true",
+                        help="Flag to compute additional eccentricity parameters if file already exists")
+
     parser.add_argument("--ncpu", type=int, default=mp.cpu_count(), help="Number of parallel processes to start")
 
     parser.add_argument('--method', type=str, default="AmplitudeFits",
@@ -179,11 +183,15 @@ if __name__ == "__main__":
     new_sample_filename = 'new_' + os.path.basename(dataframe_file)
     new_sample_path = os.path.join(dirname, new_sample_filename)
 
+    if args.overwrite and args.append:
+        print("Both --overwrite and --append were given, please (at most) pick one!")
+        exit()
 
-    #waveform_filename = get_waveform_filename(directory, args.run_key)
-    if not overwrite and new_sample_path is not None and os.path.exists(new_sample_path):
+    if not overwrite and (not args.append) and os.path.exists(new_sample_path):
+
         # print('loading from existing file')
-        print('new calculated dataframe already exists, use --overwrite in order to overwrite all the files!')
+        print('new calculated dataframe already exists, use --overwrite in order to overwrite all the files,'
+              ' or --append to calculate new columns')
         exit()
 
     run_parser = run_sampler.create_run_sampler_arg_parser()
@@ -198,30 +206,40 @@ if __name__ == "__main__":
     sub_directory = filename_dict[args.run_key]
     dataframe = group_postprocess.load_dataframe(directory, sub_directory)
 
-    new_df = dataframe.copy()[:4]
+    if args.append and (not args.overwrite) and os.path.exists(new_sample_path):
+        new_df = group_postprocess.load_dataframe_and_parameters(new_sample_path)
+    else:
+        new_df = dataframe.copy()
+
+    #new_df = new_df.copy()[:4] # just makes dataframe shorter for tests
     if tref_in is not None:
-        new_df[f'eccentricity_tref_{tref_in}'] = 0
-        new_df[f'mean_anomaly_tref_{tref_in}'] = 0
+        eccentricity_key = f'eccentricity_tref_{tref_in}'
+        mean_anomaly_key = f'mean_anomaly_tref_{tref_in}'
     elif fref_in is not None:
-        new_df[f'eccentricity_{fref_in}'] = 0
-        new_df[f'mean_anomaly_{fref_in}'] = 0
+        eccentricity_key = f'eccentricity_{fref_in}'
+        mean_anomaly_key = f'mean_anomaly_{fref_in}'
     else:
         raise RuntimeError(f"One of tref_in or fref_in must not be none!")
 
+    if {eccentricity_key, mean_anomaly_key}.issubset(new_df.columns) and args.append:
+        print(f'WARNING: new calculated dataframe already exists WITH {eccentricity_key} and {mean_anomaly_key}'
+              ' but! you have run with --append. \n'
+              'Use --overwrite in order to overwrite this dataframe entirely, '
+              'or else sit happy knowing your calculations have already been done')
+        exit()
+    else:
+        new_df[eccentricity_key] = 0
+        new_df[mean_anomaly_key] = 0
+
     ifo = run_likelihood_manager.ifos[0]
     delta_t = run_likelihood_manager.time_dict[ifo][1] - run_likelihood_manager.time_dict[ifo][0]
-
-    parallel_args = [dict(row=new_df.iloc[i],  lm=run_likelihood_manager,
-                          delta_t=delta_t, fref_in=fref_in, method=args.method,
-                          tref_in=tref_in) for i in range(len(new_df))]
-
     args_iter = [(new_df.iloc[i], run_likelihood_manager, delta_t) for i in range(len(new_df))]
 
     kwargs_iter = repeat(dict(fref_in=fref_in, method=args.method, tref_in=tref_in))
 
     with mp.Pool(processes=args.ncpu) as pool:
         # Use pool.starmap to parallelize the computation
-        results = starmap_with_kwargs(pool, calculate_eccentricity, args_iter, tqdm(kwargs_iter, total=len(new_df)))
+        results = starmap_with_kwargs(pool, calculate_eccentricity, args_iter, kwargs_iter)
 
     results_df = pd.DataFrame.from_records(results)
 
