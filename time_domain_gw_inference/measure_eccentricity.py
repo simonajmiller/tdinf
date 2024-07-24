@@ -60,6 +60,13 @@ def get_actual_eccentricity(parameters, waveform_manager, delta_t, f_ref, f22_st
                                    method=method,
                                    num_orbits_to_exclude_before_merger=num_orbits_to_exclude_before_merger,
                                    **kwargs)
+        # For debugging
+        # import matplotlib.pyplot as plt
+        # gwecc_object = res["gwecc_object"]
+        # fig, ax = gwecc_object.make_diagnostic_plots()
+        # plt.savefig('diagnostic.png')
+        # plt.show()
+
     except Exception as e:
         print(f'measure eccentricity failed with error {e} \n \t from parameters {parameters}')
         res = {'eccentricity': np.nan, 'mean_anomaly': np.nan}
@@ -182,10 +189,6 @@ if __name__ == "__main__":
     new_sample_filename = 'new_' + os.path.basename(dataframe_file)
     new_sample_path = os.path.join(dirname, new_sample_filename)
 
-    if args.overwrite and args.append:
-        print("Both --overwrite and --append were given, please (at most) pick one!")
-        exit()
-
     if not overwrite and (not args.append) and os.path.exists(new_sample_path):
 
         # print('loading from existing file')
@@ -205,12 +208,12 @@ if __name__ == "__main__":
     sub_directory = filename_dict[args.run_key]
     dataframe = group_postprocess.load_dataframe(directory, sub_directory)
 
-    if args.append and (not args.overwrite) and os.path.exists(new_sample_path):
+    if args.append and os.path.exists(new_sample_path):
         new_df = group_postprocess.load_dataframe_and_parameters(new_sample_path)
     else:
         new_df = dataframe.copy()
 
-    #new_df = new_df.copy()[:4] # just makes dataframe shorter for tests
+    new_df = new_df.copy() # just makes dataframe shorter for tests
     if tref_in is not None:
         eccentricity_key = f'eccentricity_tref_{tref_in}'
         mean_anomaly_key = f'mean_anomaly_tref_{tref_in}'
@@ -220,7 +223,7 @@ if __name__ == "__main__":
     else:
         raise RuntimeError(f"One of tref_in or fref_in must not be none!")
 
-    if {eccentricity_key, mean_anomaly_key}.issubset(new_df.columns) and args.append:
+    if {eccentricity_key, mean_anomaly_key}.issubset(new_df.columns) and args.append and (not args.overwrite):
         print(f'WARNING: new calculated dataframe already exists WITH {eccentricity_key} and {mean_anomaly_key}'
               ' but! you have run with --append. \n'
               'Use --overwrite in order to overwrite this dataframe entirely, '
