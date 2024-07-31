@@ -311,7 +311,7 @@ def plot_percentiles(xs, array_list, ax=None, color=None, label=None, zorder=Non
        
     ax.plot(xs, median, color=color, label=label, **kwargs)
 
- 
+    
 def plot_pre_and_post(ax, mode, times, tc_M, data, reference_wf, wf_dict_list, xlim, color, likelihood_manager, 
                       ylim=None, time_label=None,
                       alpha_reconstruct=0.02, ifo='L1', 
@@ -381,19 +381,48 @@ def add_time_label(ax, time_label, tc_M, xlim, ylim):
 
     ax.text(textloc, ylim[1] - 0.20 * yrange, f'${time_label}$', color='k', fontsize=15, zorder=5)
 
+def flatten_comprehension(matrix):
+    # flatten list 
+    return [item for row in matrix for item in row]
+
 
 def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full_df,
              full_likelihood_manager,
              plot_param, prior_df = None, 
-             ifo='L1', save_dir = None, loc='lower', 
+             ifo='L1', save_dir = None, 
              ylim=None, inset_ylim=None, 
              xlim=None, 
              percentiles=True, reference_df=None, plot_inset=True,
              plot_whitened=False,
              param_xlims=None, modes = None, hist_modes = None,
+             scatter_2D_list=None, 
              alpha_reconstruct=0.02, make_legend=True, 
              inset_down=False, param_ylims=None, hist_kwargs=None,
              plot_data_with_modes=False):
+    """
+    tc_floats: time cuts, desired order 
+    wfs_at_tc_list: list (corresponding to time cuts) of dict of waveforms with {'post': [list of wf_dicts]}
+        where wf_dict = {'H1': projected_wf, 'L1':projected wf, ...}
+    dfs_at_tc: for each time cut (in tc_floats), {'pre': df_pre, 'post':df_post}
+    plot_param: param [str] or list of params to plot 
+    prior_df: dataframe of prior draws
+    ifo: which ifo to plot waveforms in 
+    save_dir: name of directory to save plot in
+    ylim: lim for pre and post waveforms plot 
+    percentiles: if true, plots 50th and 90th percentile of wfs_at_tc_list, if false plots draws 
+    reference_df: if a plot_param is in reference_df, will plot reference_df[param] as a vertical line 
+    plot_inset: plot whitened waveform as a little inset 
+    plot_whitened: if true, plots whitened waveforms instead of colored 
+    param_xlims: dict of xlims to use for different parameter hists  
+    modes: list of which modes to plot, options are from 'pre' and 'post' or []
+    hist_modes: which modes to plot on each parameter histogram, options are 'pre', post or []
+    scatter_2D_list=list of paired params to scatter against each other 
+    inset_down: if true, instead of plotting inset as a little inset, plots it as a full plot 
+    param_ylims: dict of ylims to use for different parameter hists 
+    hist_kwargs: kwargs to pass on to each histogram
+    plot_data_with_modes: Whether or not to plot the real data along side the modes plots 
+    
+    """
     cp = sns.color_palette('muted')
     cp2 = sns.color_palette('pastel')
     pre_color = cp[0]
@@ -404,6 +433,8 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
         hist_modes = ['pre', 'post']
     if hist_kwargs is None:
         hist_kwargs = {}
+    if scatter_2D_list is None:
+        scatter_2D_list = []
 
     mode_kwargs = dict(pre={'color': pre_color}, post={'color': post_color})
 
@@ -427,10 +458,12 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
     else:
         hist_ylims = [param_ylims.get(param, None) for param in plot_param]
         
+    all_params = flatten_comprehension(scatter_2D_list) + plot_param
+        
     if param_xlims is None:
-        hist_xlims = [None for p in plot_param]
+        hist_xlims = {key: None for key in all_params}
     else:
-        hist_xlims = [param_ylims.get(param, None) for param in plot_param]
+        hist_xlims = {param:param_ylims.get(param, None) for key in all_params}
         
 
     for j, tc in enumerate(tc_floats):
@@ -438,7 +471,8 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
 
         # Make figure
         
-        fig, axes = plt.subplots(1, len(plot_param) + int(inset_down) + len(modes), figsize=(15 / 1.3, 25 / 8 / 1.3))
+        fig, axes = plt.subplots(1, len(plot_param) + int(inset_down) + len(modes) + len(scatter_2D_list),
+                                 figsize=(15 / 1.3, 25 / 8 / 1.3))
 
         for ax in axes:
             ax.set_rasterization_zorder(2)
@@ -453,7 +487,7 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
             xlim = (-100, 70)
 
         if inset_down:
-            ax = axes[len(plot_param)]
+            ax = axes[len(plot_param) + len(scatter_2D_list)]
             plot_pre_post_data_and_reference(ax, 
                                              time_dict_M[ifo], 
                                              whitened_data_dict[ifo], whitened_reference_wf[ifo], tc_M, 
@@ -469,7 +503,7 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
 
         
         
-        for mode, ax in zip(modes, axes[len(plot_param) + int(inset_down):]):
+        for mode, ax in zip(modes, axes[len(plot_param) + len(scatter_2D_list) + int(inset_down):]):
             try:
                 wf_dict_list = wfs_at_tc_list[j][mode]
             except KeyError:
@@ -504,9 +538,9 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
 
             if len(modes) == 2:
                 axes[-2].set_yticklabels([])
-                dx = -0.05 / len(plot_param)
+                dx = -0.05 / (len(plot_param) + len(scatter_2D_list))
                 x0, y0, x1, y1 = axes[-2].get_position().bounds
-                axes[-2].set_position([x0 + dx + 0.0375 / len(plot_param), y0, x1, y1])
+                axes[-2].set_position([x0 + dx + 0.0375 / (len(plot_param) + len(scatter_2D_list)), y0, x1, y1])
                 x0, y0, x1, y1 = axes[-1].get_position().bounds
                 axes[-1].set_position([x0 + dx, y0, x1, y1])
             
@@ -527,7 +561,8 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
             if reference_df is not None:
                 try:
                     ax.axvline(reference_df[param], color='black', linestyle='dashed', zorder=0)
-                except:
+                except Exception as e:
+                    print('excpetion is', e)
                     pass
                     
             if prior_df is not None:
@@ -536,14 +571,51 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
 
             ax.set_xlabel(format_name(param), fontsize=16)
             ax.set_yticks([])
-            if hist_xlims[i] is None: 
-                hist_xlims[i] = ax.get_xlim()
-            ax.set_xlim(hist_xlims[i])
+            if hist_xlims[param] is None: 
+                hist_xlims[param] = ax.get_xlim()
+            ax.set_xlim(hist_xlims[param])
             
             if hist_ylims[i] is None:
                 hist_ylims[i] = ax.get_ylim()
             ax.set_ylim(hist_ylims[i])
+        
+        # Plot 2D scatter plots 
+        for param_pair, ax, i in zip(scatter_2D_list, axes[len(plot_param):len(plot_param) + len(scatter_2D_list)], range(len(scatter_2D_list))):
+            param_x = param_pair[0]
+            param_y = param_pair[1]
+
+            for mode in hist_modes: 
+                try:
+                    df_x = dfs_at_tc[j][mode][param_x]
+                    df_y = dfs_at_tc[j][mode][param_y]
+                    ax.plot(df_x, df_y, ',', #lw=1.5, zorder=1,
+                                 **mode_kwargs[mode],)
+                except KeyError:
+                    pass
+            ax.plot(full_df[param_x], full_df[param_y], ',',
+                         color='k', zorder=2,)
+
+            if reference_df is not None:
+                try:
+                    ax.axvline(reference_df[param_x], color='black', linestyle='dashed', zorder=0)
+                    ax.axhline(reference_df[param_y], color='black', linestyle='dashed', zorder=0)
+                except Exception as e:
+                    print('excpetion is', e)
+                    pass
+                    
+            #if prior_df is not None:
+            #    ax.hist(prior_df[param], histtype='step', bins=30, lw=1.5, zorder=0, 
+            #      density=True, **prior_kws)
             
+            ax.set_xlabel(format_name(param_x), fontsize=16)
+            ax.set_ylabel(format_name(param_y), fontsize=16)
+            #ax.set_yticks([])
+            if hist_xlims[param_x] is None: 
+                hist_xlims[param_x] = ax.get_xlim()
+            ax.set_xlim(hist_xlims[param_x])
+            if hist_xlims[param_y] is None: 
+                hist_xlims[param_y] = ax.get_ylim()
+            ax.set_ylim(hist_xlims[param_y])
 
         if plot_inset:
             # add inset plot to leftmost 
@@ -812,6 +884,10 @@ def format_name(name):
         return r'$D_{L}$'
     if name == 'total_mass':
         return r'$M_{\mathrm{tot}} [M_{\odot}]$'
+    if name == 'right_ascension':
+        return r'$\alpha$'
+    if name == 'declination':
+        return r'$\delta$'
     return name
     
 
