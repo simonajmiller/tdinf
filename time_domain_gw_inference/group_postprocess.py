@@ -62,15 +62,9 @@ def load_run_settings_from_directory(directory, filename_dict=None):
             td_samples[key] = df
     return settings
 
-
-def load_dataframe(directory, run_directory_name):
-
-    filename = os.path.join(directory, run_directory_name + '.dat')
-    if not os.path.exists(filename):
-        filename = os.path.join(directory, run_directory_name + '/' + run_directory_name + '.dat')
-
+def load_dataframe_and_parameters(dataframe_file):
     try:
-        df = pd.read_csv(filename, delimiter='\s+')
+        df = pd.read_csv(dataframe_file, delimiter='\s+')
     except:
         return None
     df = calc_additional_parameters(df)
@@ -78,10 +72,20 @@ def load_dataframe(directory, run_directory_name):
 
 
 
+def load_dataframe(directory, run_directory_name):
+
+    filename = os.path.join(directory, run_directory_name + '.dat')
+    if not os.path.exists(filename):
+        filename = os.path.join(directory, run_directory_name + '/' + run_directory_name + '.dat')
+
+    return load_dataframe_and_parameters(filename)
+
+
 def get_settings_from_command_line_string(command_line_string, initial_run_dir, parser, verbose=False):
     skip_initial_arg = command_line_string.split()[1:]
     args = parser.parse_args(skip_initial_arg)
     return get_settings_from_args(args, initial_run_dir, verbose)
+
 
 def get_settings_from_args(args, initial_run_dir, verbose=False):
     """
