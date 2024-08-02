@@ -15,7 +15,7 @@ import scipy
 import copy
 
 
-def load_run_settings_from_directory(directory, filename_dict=None):
+def load_run_settings_from_directory(directory, filename_dict=None, args_and_kwargs_only=True):
     """
     Given a directory with runs created via the pipeline, load in args, kwargs, likelihood_manager, and dataframe
     :param directory: directory containing runs
@@ -43,14 +43,22 @@ def load_run_settings_from_directory(directory, filename_dict=None):
         directory = settings['dir']
         for key in td_settings.keys():
             print(f'key: {key}')
+            _args_and_kwargs_only = args_and_kwargs_only
+            if key == 'full':
+                _args_and_kwargs_only = False
             try:
-                td_settings[key]['args'], \
-                td_settings[key]['kwargs'], \
-                td_settings[key]['likelihood_manager'] = get_settings_from_command_line_file(
-                    os.path.join(directory, 'command_line.sh'),
+                output = get_settings_from_command_line_file(
+                    os.path.join(directory, 'command_line.sh'), 
                     filename_dict[key],
                     directory + '/',
-                    parser, verbose=True)
+                    parser, verbose=True, args_and_kwargs_only=_args_and_kwargs_only)
+                if _args_and_kwargs_only: 
+                    args, kwargs = output 
+                else:
+                    args, kwargs, lm = output
+                    td_settings[key]['likelihood_manager'] = lm
+                td_settings[key]['args'] = args
+                td_settings[key]['kwargs'] = kwargs 
             except TypeError as e:
                 print(e)
                 print(f'unable to make {run} {key}')
@@ -62,15 +70,6 @@ def load_run_settings_from_directory(directory, filename_dict=None):
             td_samples[key] = df
     return settings
 
-def load_dataframe_and_parameters(dataframe_file):
-    try:
-        df = pd.read_csv(dataframe_file, delimiter='\s+')
-    except:
-        return None
-    df = calc_additional_parameters(df)
-    return df
-
-
 
 def load_dataframe(directory, run_directory_name):
 
@@ -78,16 +77,21 @@ def load_dataframe(directory, run_directory_name):
     if not os.path.exists(filename):
         filename = os.path.join(directory, run_directory_name + '/' + run_directory_name + '.dat')
 
-    return load_dataframe_and_parameters(filename)
+    try:
+        df = pd.read_csv(filename, delimiter='\s+')
+    except:
+        return None
+    df = calc_additional_parameters(df)
+    return df
 
 
-def get_settings_from_command_line_string(command_line_string, initial_run_dir, parser, verbose=False):
+
+def get_settings_from_command_line_string(command_line_string, initial_run_dir, parser, args_and_kwargs_only=False, verbose=False):
     skip_initial_arg = command_line_string.split()[1:]
     args = parser.parse_args(skip_initial_arg)
-    return get_settings_from_args(args, initial_run_dir, verbose)
+    return get_settings_from_args(args, initial_run_dir, verbose=verbose, args_and_kwargs_only=args_and_kwargs_only)
 
-
-def get_settings_from_args(args, initial_run_dir, verbose=False):
+def get_settings_from_args(args, initial_run_dir, args_and_kwargs_only=False, verbose=False):
     """
     Returns args, kwargs, likelihood manager for a run
     :param args: argparser object, created from create_run_sampler_arg_parser()
@@ -95,10 +99,14 @@ def get_settings_from_args(args, initial_run_dir, verbose=False):
     :param verbose:
     :return:
     """
+
     reference_parameters = run_sampler.get_injected_parameters(args,
                                                                initial_run_dir,
                                                                verbose=verbose)
     kwargs = run_sampler.initialize_kwargs(args, reference_parameters)
+    
+    if args_and_kwargs_only:
+        return args, kwargs
 
     if verbose:
         print('making wf manager')
@@ -129,7 +137,8 @@ def get_settings_from_args(args, initial_run_dir, verbose=False):
     return args, kwargs, likelihood_manager
 
 
-def get_settings_from_command_line_file(command_line_file, file_prefix, initial_run_dir, parser, **kwargs):
+def get_settings_from_command_line_file(command_line_file, file_prefix, initial_run_dir, parser, 
+                                        **kwargs):
     with open(command_line_file, 'r') as f:
         lines = f.readlines()
         for line in lines:
