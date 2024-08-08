@@ -19,58 +19,58 @@ lalsim = lalsimulation
 Functions to generate waveform reconstructions
 """
 
-def get_trigger_times(approx, *args, **kwargs):
-    """
-    Get the trigger time: time at which the Hanford strain is loudest (peak time)
-    at geocenter and each inferometer
-    """
-
-    # Unpack inputs
-    p = kwargs.pop('parameters')
-    times = kwargs.pop('times')
-    ifos = kwargs.pop('ifos', ['H1', 'L1', 'V1'])
-
-    # Get delta t and length of timeseries
-    delta_t = times[1] - times[0]
-    tlen = len(times)
-
-    # Frequency parameters
-    fp = {k: kwargs[k] if k in kwargs else p[k] for k in ['f_ref', 'f_low', 'f22_start', 'lal_amporder']}
-
-    # Change spin convention
-    iota, s1x, s1y, s1z, s2x, s2y, s2z = transform_spins(p['theta_jn'], p['phi_jl'], p['tilt_1'], p['tilt_2'],
-                                                         p['phi_12'], p['a_1'], p['a_2'], p['mass_1'], p['mass_2'],
-                                                         fp['f_ref'], p['phase'])
-    chi1 = [s1x, s1y, s1z]
-    chi2 = [s2x, s2y, s2z]
-
-    # TODO replace this function entirely
-    hplus, hcross = generate_lal_hphc(approx, p['mass_1'], p['mass_2'], chi1, chi2, dist_mpc=p['luminosity_distance'],
-                                      dt=delta_t, f22_start=fp['f22_start'], f_ref=fp['f_ref'], inclination=iota,
-                                      phi_ref=p['phase']
-                                      )
-
-    # Get time-domain strain
-    h_td = generate_lal_waveform(hplus, hcross, times, p['geocent_time'], **kwargs)
-
-    # get peak time
-    tp_geo_loc = np.argmax(np.abs(h_td))
-    tp_geo = times[tp_geo_loc]
-
-    geo_gps_time = lal.LIGOTimeGPS(p['geocent_time'])
-
-    # Cycle through ifos
-    tp_dict = {'geo': tp_geo}
-    for ifo in ifos:
-        detector = lal.cached_detector_by_prefix[ifo]
-
-        # get time delay and align waveform
-        # assume reference time corresponds to envelope peak
-        timedelay = lal.TimeDelayFromEarthCenter(detector.location, p['ra'], p['dec'], geo_gps_time)
-
-        tp_dict[ifo] = tp_geo + timedelay
-
-    return tp_dict
+# def get_trigger_times(approx, *args, **kwargs):
+#     """
+#     Get the trigger time: time at which the Hanford strain is loudest (peak time)
+#     at geocenter and each inferometer
+#     """
+#
+#     # Unpack inputs
+#     p = kwargs.pop('parameters')
+#     times = kwargs.pop('times')
+#     ifos = kwargs.pop('ifos', ['H1', 'L1', 'V1'])
+#
+#     # Get delta t and length of timeseries
+#     delta_t = times[1] - times[0]
+#     tlen = len(times)
+#
+#     # Frequency parameters
+#     fp = {k: kwargs[k] if k in kwargs else p[k] for k in ['f_ref', 'f_low', 'f22_start', 'lal_amporder']}
+#
+#     # Change spin convention
+#     iota, s1x, s1y, s1z, s2x, s2y, s2z = transform_spins(p['theta_jn'], p['phi_jl'], p['tilt_1'], p['tilt_2'],
+#                                                          p['phi_12'], p['a_1'], p['a_2'], p['mass_1'], p['mass_2'],
+#                                                          fp['f_ref'], p['phase'])
+#     chi1 = [s1x, s1y, s1z]
+#     chi2 = [s2x, s2y, s2z]
+#
+#     # TODO replace this function entirely
+#     hplus, hcross = generate_lal_hphc(approx, p['mass_1'], p['mass_2'], chi1, chi2, dist_mpc=p['luminosity_distance'],
+#                                       dt=delta_t, f22_start=fp['f22_start'], f_ref=fp['f_ref'], inclination=iota,
+#                                       phi_ref=p['phase']
+#                                       )
+#
+#     # Get time-domain strain
+#     h_td = generate_lal_waveform(hplus, hcross, times, p['geocent_time'], **kwargs)
+#
+#     # get peak time
+#     tp_geo_loc = np.argmax(np.abs(h_td))
+#     tp_geo = times[tp_geo_loc]
+#
+#     geo_gps_time = lal.LIGOTimeGPS(p['geocent_time'])
+#
+#     # Cycle through ifos
+#     tp_dict = {'geo': tp_geo}
+#     for ifo in ifos:
+#         detector = lal.cached_detector_by_prefix[ifo]
+#
+#         # get time delay and align waveform
+#         # assume reference time corresponds to envelope peak
+#         timedelay = lal.TimeDelayFromEarthCenter(detector.location, p['ra'], p['dec'], geo_gps_time)
+#
+#         tp_dict[ifo] = tp_geo + timedelay
+#
+#     return tp_dict
 
 
 def get_tgps_dict(tgps_geocent, ifos, ra, dec):
@@ -205,91 +205,92 @@ def generate_lal_hphc(approximant_key, m1_msun, m2_msun, chi1, chi2, dist_mpc=1,
     return hp, hc
 
 
-def generate_lal_waveform(hplus, hcross, times, triggertime, **kwargs):
-    """
-    Generate a waveform in a detector with time of coalescence 'triggertime' for given parameters 
-    and approximant; if 'hplus' and 'hcross' not passed, uses the generate_lal_hphc function above to 
-    generate a waveform. Then aligns places the waveform at the desired time. 
-    """
-
-    # times = kwargs.pop('times')
-    # triggertime_geo = kwargs.pop('triggertime')
-    triggertime_geo = triggertime
-
-    bufLength = len(times)
-    delta_t = times[1] - times[0]
-    tStart = times[0]
-    tEnd = tStart + delta_t * bufLength
-
-
-    new_generator = False
-    if isinstance(hplus, gwpy.timeseries.timeseries.TimeSeries):
-        new_generator = True
-
-    # align waveform, based on LALInferenceTemplate
-    # https://git.ligo.org/lscsoft/lalsuite/blob/master/lalinference/lib/LALInferenceTemplate.c#L1124
-
-    # The nearest sample in model buffer to the desired time of coalescence (t_c)
-    tcSample = round((triggertime_geo - tStart) / delta_t)
-
-    # The actual coalescence time that corresponds to the buffer sample on which the waveform's 
-    # t_c lands, i.e. the nearest time in the buffer
-    injTc = tStart + tcSample * delta_t
-
-    if new_generator:
-        hplus_epoch = hplus.epoch.value
-    else:
-        hplus_epoch = hplus.epoch.gpsSeconds + hplus.epoch.gpsNanoSeconds * 1E-9
-    # The sample at which the waveform reaches t_c
-    waveTcSample = round(-hplus_epoch / delta_t)
-
-    # 1 + (number of samples post - t_c in waveform)
-    if new_generator:
-        data_length = len(hplus)
-    else:
-        data_length = hplus.data.length
-    wavePostTc = data_length - waveTcSample
-
-    # Start and end indices for placing the waveform for the buffer:
-    # - If the waveform "touches" the beginning of the buffer, set start index to 0, else shift by difference
-    # between tc indices in buffer and waveform
-    bufStartIndex = int(tcSample - waveTcSample if tcSample >= waveTcSample else 0)
-    # - If waveform "touches" the end of the buffer, set end index to the end of the buffer, else truncated
-    # where the waveform will naturally end
-    bufEndIndex = int(tcSample + wavePostTc if tcSample + wavePostTc <= bufLength else bufLength)
-
-    # Number of samples in the buffer taken up by the of waveform
-    bufWaveLength = bufEndIndex - bufStartIndex
-
-    # Start index for the waveform
-    waveStartIndex = int(0 if tcSample >= waveTcSample else waveTcSample - tcSample)
-    waveEndIndex = waveStartIndex + bufWaveLength
-
-    # Generate the buffer we're storing the waveform
-    h_td = np.zeros(bufLength, dtype=complex)
-
-    # Make sure the waveform actually fits in the buffer; if it doesn't, just return a
-    # list of zeros with no waveform a
-    if bufWaveLength <= 0:
-        print(f"Warning! time asked to analyze is non-existant! between indices : {bufStartIndex} {bufEndIndex} ")
-        return h_td
-
-
-    # Window if we want
-    if kwargs.get('window', True) and tcSample >= waveTcSample:
-        # smoothly turn on waveform
-        window = scipy.signal.tukey(bufWaveLength)
-        window[int(0.5 * bufWaveLength):] = 1.
-    else:
-        window = 1
-
-    h_td = np.zeros(bufLength, dtype=complex)
-
-    # Place waveform
-    if new_generator:
-        h_td[bufStartIndex:bufEndIndex] = window * hplus[waveStartIndex:waveEndIndex].value - \
-                                      1j * window * hcross[waveStartIndex:waveEndIndex].value
-    else:
-        h_td[bufStartIndex:bufEndIndex] = window * hplus.data.data[waveStartIndex:waveEndIndex] - \
-                                          1j * window * hcross.data.data[waveStartIndex:waveEndIndex]
-    return h_td
+# def generate_lal_waveform(hplus, hcross, times, triggertime, **kwargs):
+#     """
+#     Generate a waveform in a detector with time of coalescence 'triggertime' for given parameters
+#     and approximant; Then aligns places the waveform at the desired time.
+#     both times and triggertime are given in detector time
+#     """
+#
+#     # times = kwargs.pop('times')
+#     # triggertime_geo = kwargs.pop('triggertime')
+#     triggertime_geo = triggertime
+#
+#     bufLength = len(times)
+#     delta_t = times[1] - times[0]
+#     tStart = times[0]
+#     # tEnd = tStart + delta_t * bufLength
+#
+#
+#     new_generator = False
+#     if isinstance(hplus, gwpy.timeseries.timeseries.TimeSeries):
+#         new_generator = True
+#
+#     # align waveform, based on LALInferenceTemplate
+#     # https://git.ligo.org/lscsoft/lalsuite/blob/master/lalinference/lib/LALInferenceTemplate.c#L1124
+#
+#     # The nearest sample in model buffer to the desired time of coalescence (t_c)
+#     tcSample = round((triggertime_geo - tStart) / delta_t)
+#     # I think instead you have to interpolate on times grid
+#
+#     # The actual coalescence time that corresponds to the buffer sample on which the waveform's
+#     # t_c lands, i.e. the nearest time in the buffer
+#     # injTc = tStart + tcSample * delta_t
+#
+#     if new_generator:
+#         hplus_epoch = hplus.epoch.value
+#     else:
+#         hplus_epoch = hplus.epoch.gpsSeconds + hplus.epoch.gpsNanoSeconds * 1E-9
+#     # The sample at which the waveform reaches t_c
+#     waveTcSample = round(-hplus_epoch / delta_t)
+#
+#     # 1 + (number of samples post - t_c in waveform)
+#     if new_generator:
+#         data_length = len(hplus)
+#     else:
+#         data_length = hplus.data.length
+#     wavePostTc = data_length - waveTcSample
+#
+#     # Start and end indices for placing the waveform for the buffer:
+#     # - If the waveform "touches" the beginning of the buffer, set start index to 0, else shift by difference
+#     # between tc indices in buffer and waveform
+#     bufStartIndex = int(tcSample - waveTcSample if tcSample >= waveTcSample else 0)
+#     # - If waveform "touches" the end of the buffer, set end index to the end of the buffer, else truncated
+#     # where the waveform will naturally end
+#     bufEndIndex = int(tcSample + wavePostTc if tcSample + wavePostTc <= bufLength else bufLength)
+#
+#     # Number of samples in the buffer taken up by the of waveform
+#     bufWaveLength = bufEndIndex - bufStartIndex
+#
+#     # Start index for the waveform
+#     waveStartIndex = int(0 if tcSample >= waveTcSample else waveTcSample - tcSample)
+#     waveEndIndex = waveStartIndex + bufWaveLength
+#
+#     # Generate the buffer we're storing the waveform
+#     h_td = np.zeros(bufLength, dtype=complex)
+#
+#     # Make sure the waveform actually fits in the buffer; if it doesn't, just return a
+#     # list of zeros with no waveform a
+#     if bufWaveLength <= 0:
+#         print(f"Warning! time asked to analyze is non-existant! between indices : {bufStartIndex} {bufEndIndex} ")
+#         return h_td
+#
+#
+#     # Window if we want
+#     if kwargs.get('window', True) and tcSample >= waveTcSample:
+#         # smoothly turn on waveform
+#         window = scipy.signal.tukey(bufWaveLength)
+#         window[int(0.5 * bufWaveLength):] = 1.
+#     else:
+#         window = 1
+#
+#     h_td = np.zeros(bufLength, dtype=complex)
+#
+#     # Place waveform
+#     if new_generator:
+#         h_td[bufStartIndex:bufEndIndex] = window * hplus[waveStartIndex:waveEndIndex].value - \
+#                                       1j * window * hcross[waveStartIndex:waveEndIndex].value
+#     else:
+#         h_td[bufStartIndex:bufEndIndex] = window * hplus.data.data[waveStartIndex:waveEndIndex] - \
+#                                           1j * window * hcross.data.data[waveStartIndex:waveEndIndex]
+#     return h_td

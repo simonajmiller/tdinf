@@ -3,6 +3,7 @@ from scipy.linalg import solve_toeplitz
 import lal
 import lalsimulation as lalsim
 import sys
+from gwpy.timeseries import TimeSeries
 
 try:
     import reconstructwf as rwf
@@ -17,6 +18,7 @@ from .parameter import LogisticParameter, CartesianAngle, TrigLogisticParameter
 from .preprocessing import get_ACF
 
 import astropy.units as u
+
 try:
     import gwsignal
     from gwsignal.models.teobresums import TEOBResumSDALI
@@ -49,6 +51,22 @@ def check_spin_settings_of_approx(approx_name):
     else:
         print("WARNING, UNSURE IF WAVEFORM HAS SPINS")
     return aligned_spins, no_spins
+
+
+def interpolate_timeseries(time, values, new_time_grid):
+    """
+    Interpolates a timeseries to a new grid of points
+
+    Parameters:
+    - time: array-like, the original time grid
+    - values: array-like, the values of the timeseries at the original time grid
+    - new_time_grid: array-like, the new time grid
+
+    Returns:
+    - value_on_grid: array-like, the interpolated values at the new time grid
+    """
+    value_on_grid = np.interp(new_time_grid, time, values, left=0, right=0)
+    return value_on_grid
 
 
 class LogisticParameterManager:
@@ -284,18 +302,40 @@ class AntennaAndTimeManager(LogisticParameterManager):
         # If we are sampling over sky position and/or time ...
         self.peak_time_dict = None
         self.antenna_pattern_dict = None
+        self.time_delay_dict = None
         if not self.vary_skypos:
             # antenna pattern is fixed if sky location is fixed
             # (it will vary a tiny amount over different geocenter times)
             self.antenna_pattern_dict = rwf.get_antenna_pattern_dict(self.reference_time, ifos,
-                        self.fixed['right_ascension'], self.fixed['declination'], self.fixed['polarization'])
+                                                                     self.fixed['right_ascension'],
+                                                                     self.fixed['declination'],
+                                                                     self.fixed['polarization'])
 
             if not self.vary_time:
                 # tpeak dict is only fixed if both sky location and time are fixed
                 self.peak_time_dict = rwf.get_tgps_dict(
-                            self.reference_time, ifos,
-                            self.fixed['right_ascension'], self.fixed['declination'])
+                    self.reference_time, ifos,
+                    self.fixed['right_ascension'], self.fixed['declination'])
+
+                self.time_delay_dict = self.compute_time_delay_dict(self.fixed['right_ascension'],
+                                                                    self.fixed['declination'],
+                                                                    self.reference_time, ifos)
         return
+
+    def get_time_delay_dict(self, x_phys, ifos):
+        if self.time_delay_dict is not None:
+            return self.time_delay_dict
+        return self.compute_time_delay_dict(x_phys['right_ascension'],
+                                            x_phys['declination'], x_phys['geocenter_time'], ifos)
+
+    @staticmethod
+    def compute_time_delay_dict(right_ascension, declination, geocenter_time, ifos):
+
+        time_delay_dict = {ifo: lal.TimeDelayFromEarthCenter(lal.cached_detector_by_prefix[ifo].location,
+                                                             right_ascension,
+                                                             declination,
+                                                             geocenter_time) for ifo in ifos}
+        return time_delay_dict
 
     def get_tpeak_dict(self, x_phys, ifos):
         if self.peak_time_dict is not None:
@@ -355,32 +395,35 @@ class WaveformManager(LogisticParameterManager):
                                         phi_ref=x_phys['phase'],
                                         eccentricity=x_phys['eccentricity'],
                                         mean_anomaly_periastron=x_phys['mean_anomaly'])
-        return hp, hc
+        return TimeSeries.from_lal(hp), TimeSeries.from_lal(hc)
 
     def get_projected_waveform(self, x_phys, ifos, time_dict, f22_start=11, f_ref=11):
         delta_t = time_dict[ifos[0]][1] - time_dict[ifos[0]][0]
 
         hp, hc = self.get_hplus_hcross(x_phys, delta_t, f22_start=f22_start, f_ref=f_ref)
+        # set times in geocenter time
+        hp.t0 = x_phys['geocenter_time'] + hp.t0.value
+        hc.t0 = x_phys['geocenter_time'] + hc.t0.value
 
-        TP_dict = self.antenna_and_time_manager.get_tpeak_dict(x_phys, ifos)
         AP_dict = self.antenna_and_time_manager.get_antenna_pattern_dict(x_phys, ifos)
+        time_delay_dict = self.antenna_and_time_manager.get_time_delay_dict(x_phys, ifos)
 
         # Cycle through ifos
         projected_waveform_dict = {}
         for ifo in ifos:
-            # Antenna patterns and tpeak
+            h_td = hp.value - 1j * hc.value
+
             Fp, Fc = AP_dict[ifo]
-            tt = TP_dict[ifo]  # triggertime = peak time, NOT tcut (cutoff time)
 
-            # Generate waveform
-            h = rwf.generate_lal_waveform(hplus=hp, hcross=hc,
-                                          times=time_dict[ifo],
-                                          triggertime=tt)
+            h_ifo = Fp * h_td.real - Fc * h_td.imag
 
-            # Project onto detector
-            h_ifo = Fp * h.real - Fc * h.imag
+            # convert h_ifo to detector_time
+            time_delay = time_delay_dict[ifo]
 
-            projected_waveform_dict[ifo] = h_ifo
+            # convert geocenter timeseries to detector timeseries by adding time delay
+            # then interpolating that timeseries to the actual, sampled detector times
+            h_projected = interpolate_timeseries(hp.times.value + time_delay, h_ifo, time_dict[ifo])
+            projected_waveform_dict[ifo] = h_projected
 
         return projected_waveform_dict
 
@@ -415,30 +458,32 @@ class NewWaveformManager(LogisticParameterManager):
         return wfm.GenerateTDWaveform(params, self.generator)
 
     def get_projected_waveform(self, x_phys, ifos, time_dict, f22_start=11, f_ref=11):
-
         delta_t = time_dict[ifos[0]][1] - time_dict[ifos[0]][0]
 
         hp, hc = self.get_hplus_hcross(x_phys, delta_t, f22_start=f22_start, f_ref=f_ref)
+        # set times in geocenter time
+        hp.t0 = x_phys['geocenter_time'] + hp.t0.value
+        hc.t0 = x_phys['geocenter_time'] + hc.t0.value
 
-        TP_dict = self.antenna_and_time_manager.get_tpeak_dict(x_phys, ifos)
         AP_dict = self.antenna_and_time_manager.get_antenna_pattern_dict(x_phys, ifos)
+        time_delay_dict = self.antenna_and_time_manager.get_time_delay_dict(x_phys, ifos)
 
         # Cycle through ifos
         projected_waveform_dict = {}
         for ifo in ifos:
-            # Antenna patterns and tpeak
+            h_td = hp.value - 1j * hc.value
+
             Fp, Fc = AP_dict[ifo]
-            tt = TP_dict[ifo]  # triggertime = peak time, NOT tcut (cutoff time)
 
-            # Generate waveform
-            h = rwf.generate_lal_waveform(hplus=hp, hcross=hc,
-                                          times=time_dict[ifo],
-                                          triggertime=tt)
+            h_ifo = Fp * h_td.real - Fc * h_td.imag
 
-            # Project onto detector
-            h_ifo = Fp * h.real - Fc * h.imag
+            # convert h_ifo to detector_time
+            time_delay = time_delay_dict[ifo]
 
-            projected_waveform_dict[ifo] = h_ifo
+            # convert geocenter timeseries to detector timeseries by adding time delay
+            # then interpolating that timeseries to the actual, sampled detector times
+            h_projected = interpolate_timeseries(hp.times.value + time_delay, h_ifo, time_dict[ifo])
+            projected_waveform_dict[ifo] = h_projected
 
         return projected_waveform_dict
 
