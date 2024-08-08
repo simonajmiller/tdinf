@@ -411,7 +411,7 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
              scatter_2D_list=None, 
              alpha_reconstruct=0.02, make_legend=True, 
              inset_down=False, param_ylims=None, hist_kwargs=None,
-             plot_data_with_modes=False):
+             plot_data_with_modes=False, figsize=(11.538, 2.4)):
     """
     tc_floats: time cuts, desired order 
     wfs_at_tc_list: list (corresponding to time cuts) of dict of waveforms with {'post': [list of wf_dicts]}
@@ -485,7 +485,7 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
         # Make figure
         
         fig, axes = plt.subplots(1, len(plot_param) + int(inset_down) + len(modes) + len(scatter_2D_list),
-                                 figsize=(15 / 1.3, 25 / 8 / 1.3))
+                                 figsize=figsize)
 
         for ax in axes:
             ax.set_rasterization_zorder(2)
@@ -575,7 +575,7 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
                 try:
                     ax.axvline(reference_df[param], color='black', linestyle='dashed', zorder=0)
                 except Exception as e:
-                    print('excpetion is', e)
+                    print('cannot plot reference excpetion is', e)
                     pass
                     
             if prior_df is not None:
