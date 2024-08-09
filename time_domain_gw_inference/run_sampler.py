@@ -404,12 +404,6 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
         time_dict[ifo] = time_dict[ifo][idx - Npre:idx + Npost]
         data_dict[ifo] = data_dict[ifo][idx - Npre:idx + Npost]
 
-    # Calculate ACF
-    rho_dict, cond_psds = utils.get_ACF(pe_psds, time_dict, f_low=args.flow, f_max=args.fmax, return_psds=True)
-
-    for ifo, rho in rho_dict.items():
-        assert len(rho) == len(data_dict[ifo]), 'Length for ACF is not the same as for the data'
-
     return time_dict, data_dict, pe_psds
 
 
