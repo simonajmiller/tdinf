@@ -4,6 +4,7 @@
 import argparse
 import numpy as np
 import emcee
+import json
 import pandas as pd
 from multiprocessing import Pool
 from contextlib import closing
@@ -199,12 +200,12 @@ def get_injected_parameters(args, initial_run_dir='', verbose=False):
         # Use reference parameter from max logL in PE file...
         if args.reference_parameters is None:
             pe_posterior_h5_file = os.path.join(initial_run_dir, args.pe_posterior_h5_file)
-            pe_samples = utils.get_pe_samples(pe_posterior_h5_file)
+            ref_pe_samples = utils.get_pe_samples(pe_posterior_h5_file)
 
             # "Injected parameters" = max(P) draw from the samples associated with this data
-            log_prob = pe_samples['log_likelihood'] + pe_samples['log_prior']
+            log_prob = ref_pe_samples['log_likelihood'] + ref_pe_samples['log_prior']
             max_L_index = np.argmax(log_prob)
-            reference_parameters = {field: pe_samples[field][max_L_index] for field in pe_samples.dtype.names}
+            reference_parameters = {field: ref_pe_samples[field][max_L_index] for field in ref_pe_samples.dtype.names}
         # set reference parameters to the passed in reference_parameters
         else:
             reference_parameters = utils.parse_injected_parameters(args.reference_parameters,
@@ -220,12 +221,15 @@ def get_injected_parameters(args, initial_run_dir='', verbose=False):
         # Check that the reference freqs line up
         err_msg = f"Injection fref={reference_parameters['f_ref']} does not equal sampler fref={args.fref}"
         assert reference_parameters['f_ref'] == args.fref, err_msg
+        
+        ref_pe_samples = None
 
     reference_parameters = modify_parameters(reference_parameters, args)
 
     if verbose:
         print('reference_parameters are', reference_parameters)
-    return reference_parameters
+        
+    return reference_parameters, ref_pe_samples
 
 
 def initialize_kwargs(args, reference_parameters):
@@ -353,10 +357,11 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
     """
     # icut = index corresponding to cutoff time
     time_dict, data_dict, icut_dict = utils.condition(raw_time_dict, raw_data_dict, tcut_dict,
-                                                      args.sampling_rate, f_min=args.flow, f_max=args.fmax, verbose=verbose)
+                                                      args.sampling_rate, f_min=args.flow * 3 / 4,
+                                                      f_max=args.fmax, verbose=verbose)
 
     # Time spacing of data
-    dt = time_dict['H1'][1] - time_dict['H1'][0]
+    dt = time_dict[ifos[0]][1] - time_dict[ifos[0]][0]
 
     # Decide how much data to analyze based of off run mode
     if run_mode == 'full':
@@ -399,12 +404,6 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
         time_dict[ifo] = time_dict[ifo][idx - Npre:idx + Npost]
         data_dict[ifo] = data_dict[ifo][idx - Npre:idx + Npost]
 
-    # Calculate ACF
-    rho_dict = utils.get_ACF(pe_psds, time_dict, f_low=args.flow, f_max=args.fmax)
-
-    for ifo, rho in rho_dict.items():
-        assert len(rho) == len(data_dict[ifo]), 'Length for ACF is not the same as for the data'
-
     return time_dict, data_dict, pe_psds
 
 
@@ -417,7 +416,7 @@ def main():
 
     backend_path = args.output_h5  # where emcee spits its output
 
-    reference_parameters = get_injected_parameters(args, verbose=verbose)
+    reference_parameters, ref_pe_samples = get_injected_parameters(args, verbose=verbose)
     kwargs = initialize_kwargs(args, reference_parameters)
 
     wf_manager = make_waveform_manager(args, **kwargs)
@@ -430,6 +429,7 @@ def main():
     if verbose:
         print(f"kwargs are:")
         print(kwargs)
+        
     """
     Set up likelihood 
     """
@@ -480,12 +480,16 @@ def main():
                 backend = emcee.backends.HDFBackend(backend_path)
                 backend.reset(nwalkers, ndim)
 
-            p0 = likelihood_manager.log_prior.initialize_walkers(nwalkers, reference_parameters, verbose=verbose)
+            p0 = likelihood_manager.log_prior.initialize_walkers(
+                nwalkers, reference_parameters, reference_posteriors=ref_pe_samples, verbose=verbose
+            )
 
     else:
         # Reset the backend
         backend.reset(nwalkers, ndim)
-        p0 = likelihood_manager.log_prior.initialize_walkers(nwalkers, reference_parameters)
+        p0 = likelihood_manager.log_prior.initialize_walkers(
+            nwalkers, reference_parameters, reference_posteriors=ref_pe_samples, verbose=verbose
+        )
 
     # Deactivate numpy default number of cores to avoid using too many
     if args.ncpu > 1:

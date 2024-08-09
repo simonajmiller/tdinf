@@ -184,7 +184,7 @@ def generate_lal_hphc(approximant_key, m1_msun, m2_msun, chi1, chi2, dist_mpc=1,
     """
     Generate the plus and cross polarizations for given waveform parameters and approximant
     """
-    print('approximant is ', approximant_key)
+    #print('approximant is ', approximant_key)
     approximant = lalsim.SimInspiralGetApproximantFromString(approximant_key)
 
     m1_kg = m1_msun * lal.MSUN_SI
