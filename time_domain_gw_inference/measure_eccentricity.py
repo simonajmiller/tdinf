@@ -99,15 +99,7 @@ def calculate_eccentricity(row, lm, delta_t, fref_in=None, tref_in=None, **kwarg
     return row
 
 
-# def get_new_dataframe_name(run_directory, run_key):
-#     """ pass in directory where runs are stored, not the waveform directory"""
-#     return os.path.join(waveform_dir, f'{run_key}_waveforms.h5')
-
-
-#def __main__():
-if __name__ == "__main__":
-    print('starting!')
-
+def create_measure_eccentricity_arg_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('--fref_in', type=float, default=None,
                         help="frequency hz to measure eccentricity from, default None"
@@ -152,26 +144,31 @@ if __name__ == "__main__":
         - "FrequencyFits": Uses omega22(t) and iteratively subtracts a
           PN-inspired fit of the extrema of omega22(t) from it, and finds
           extrema of the residual.
-    
+
         The available list of methods can be also obtained from
         gw_eccentricity.get_available_methods().
         Detailed description of these methods can be found in Sec. III of
         arXiv:2302.11257.
-    
+
         The Amplitude and Frequency methods can struggle for very small
         eccentricities, especially near the merger, as the
         secular amplitude/frequency growth dominates the modulations due to
         eccentricity, making extrema finding difficult.
-    
+
         The ResidualAmplitude/ResidualFrequency/AmplitudeFits/FrequencyFits
         methods avoid this limitation by removing the secular growth before
         finding extrema. However, methods that use the frequency for finding
         extrema (Frequency/ResidualFrequency/FrequencyFits) can be more
         sensitive to junk radiation in NR data.
-    
+
         Therefore, the recommended methods are
         ResidualAmplitude/AmplitudeFits/Amplitude""")
+    return parser
 
+
+if __name__ == "__main__":
+    print('starting!')
+    parser = create_measure_eccentricity_arg_parser()
     args = parser.parse_args()
 
     tref_in = args.tref_in
@@ -209,7 +206,8 @@ if __name__ == "__main__":
     dataframe = group_postprocess.load_dataframe(directory, sub_directory)
 
     if args.append and os.path.exists(new_sample_path):
-        new_df = group_postprocess.load_dataframe_and_parameters(new_sample_path)
+        new_df = pd.read_csv(new_sample_path, delimiter='\s+')
+        new_df = group_postprocess.calc_additional_parameters(new_df)
     else:
         new_df = dataframe.copy()
 
