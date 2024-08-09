@@ -263,6 +263,27 @@ def initialize_kwargs(args, reference_parameters):
     return kwargs
 
 
+def make_waveform_manager(args, **kwargs):
+    """
+    :param args: argument parser args
+    :param kwargs:
+    :return:
+    """
+    if args.approx == 'TEOBResumSDALI':
+        wf_manager = utils.NewWaveformManager(args.ifos,
+                                              use_higher_order_modes=args.use_higher_order_modes,
+                                              vary_time=args.vary_time,
+                                              vary_skypos=args.vary_skypos,
+                                              vary_eccentricity=args.vary_eccentricity, **kwargs)
+    else:
+        wf_manager = utils.WaveformManager(args.ifos,
+                                           vary_time=args.vary_time,
+                                           vary_skypos=args.vary_skypos,
+                                           vary_eccentricity=args.vary_eccentricity,
+                                           **kwargs)
+    return wf_manager
+
+
 def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initial_run_dir='', verbose=False):
     # Check that a cutoff time is given
     assert args.Tcut_cycles is not None or args.Tcut_seconds is not None, "must give a cutoff time"
@@ -356,7 +377,9 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
         print(f"Warning! Seconds analyzed after cut is less than 0!: {TPost} from {tcut_geocent} to {args.Tend}")
 
     # Duration --> number of time samples to look at
-    Npre = int(round(TPre / dt))
+    # Note Npre cannot be greater than idx or else our times index from [-1: idx],
+    # (so itll be empty), to avoid this off by 1 error we use np.floor
+    Npre = int(np.floor(TPre / dt))
     Npost = int(
         round(TPost / dt)) + 1  # must add one so that the target time is actually included, even if Tpost = 0,
     # otherwise WF placement gets messed up
@@ -369,6 +392,9 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
 
     # Crop analysis data to specified duration.
     for ifo, idx in icut_dict.items():
+        if Npre > idx:
+            print("ERROR! You cannot have more points pre-cutoff time than there are points "
+                    "between the start and the cutoff time")
         # idx = sample closest to desired time
         time_dict[ifo] = time_dict[ifo][idx - Npre:idx + Npost]
         data_dict[ifo] = data_dict[ifo][idx - Npre:idx + Npost]
@@ -394,18 +420,7 @@ def main():
     reference_parameters = get_injected_parameters(args, verbose=verbose)
     kwargs = initialize_kwargs(args, reference_parameters)
 
-    if args.approx == 'TEOBResumSDALI':
-        wf_manager = utils.NewWaveformManager(args.ifos,
-                                              use_higher_order_modes=args.use_higher_order_modes,
-                                              vary_time=args.vary_time,
-                                              vary_skypos=args.vary_skypos,
-                                              vary_eccentricity=args.vary_eccentricity, **kwargs)
-    else:
-        wf_manager = utils.WaveformManager(args.ifos,
-                                           vary_time=args.vary_time,
-                                           vary_skypos=args.vary_skypos,
-                                           vary_eccentricity=args.vary_eccentricity,
-                                           **kwargs)
+    wf_manager = make_waveform_manager(args, **kwargs)
 
     time_dict, data_dict, psd_dict = get_conditioned_time_and_data(args,
                                                                    wf_manager=wf_manager,

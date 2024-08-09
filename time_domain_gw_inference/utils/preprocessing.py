@@ -73,7 +73,8 @@ def condition(raw_time_dict, raw_data_dict, t_dict, desired_sample_rate, f_min=1
             print('\nRolling {:s} by {:d} samples'.format(ifo, ir))
         raw_data = np.roll(raw_data_dict[ifo], -ir)
         raw_time = np.roll(raw_time_dict[ifo], -ir)
-        
+
+        # Nyquist frequency
         fny = 0.5/(raw_time[1] - raw_time[0])
         # Filter
         if f_min and not f_max:
@@ -99,7 +100,7 @@ def condition(raw_time_dict, raw_data_dict, t_dict, desired_sample_rate, f_min=1
         else: 
             time = raw_time
         
-        
+
 
         # Subtract mean and store
         data_dict[ifo] = data - np.mean(data)
@@ -114,57 +115,56 @@ def condition(raw_time_dict, raw_data_dict, t_dict, desired_sample_rate, f_min=1
     return time_dict, data_dict, i_dict
 
 
-def injectWaveform(injection_approx, **kwargs):
-    # TODO modify this function so that it directly invokes the waveformManager we wrote before
-    # Also, this currently does not depend on skypos and i think it maybe should? something to look into
-    # Unpack inputs
-    p = kwargs.pop('parameters')
-    time_dict = kwargs.pop('time_dict')
-    tpeak_dict = kwargs.pop('tpeak_dict')
-    ap_dict = kwargs.pop('ap_dict')
-    skypos = kwargs.pop('skypos')
-    f22_start = kwargs.pop('f22_start')
-    f_ref = kwargs.pop('f_ref')
-    ifos = kwargs.pop('ifos', ['H1', 'L1', 'V1'])
-    
-    # Get dt 
-    dt = time_dict['H1'][1] - time_dict['H1'][0]
-    
-    # Change spin convention
-    iota, s1x, s1y, s1z, s2x, s2y, s2z = transform_spins(p['theta_jn'], p['phi_jl'], p['tilt_1'], p['tilt_2'],
-                                          p['phi_12'], p['a_1'], p['a_2'], p['mass_1'], p['mass_2'],
-                                          f_ref, p['phase'])
-    if p['phi_jl'] == 0:
-        s1x, s1y, s2x, s2y = 0, 0, 0, 0
-
-    # Get strain
-    hp, hc = rwf.generate_lal_hphc(injection_approx,
-                                   p['mass_1'], p['mass_2'],
-                                   [s1x, s1y, s1z], 
-                                   [s2x, s2y, s2z],
-                                   dist_mpc=p['luminosity_distance'], 
-                                   dt=dt,
-                                   f22_start=f22_start,
-                                   f_ref=f_ref,
-                                   inclination=iota,
-                                   phi_ref=p['phase']
-                                  )
-    
-    # Project into each detector 
-    h_ifos = {}
-    for ifo in ifos:
-
-        # Time align 
-        h = rwf.generate_lal_waveform(hplus=hp, hcross=hc, times=time_dict[ifo], triggertime=tpeak_dict[ifo])
-
-        # Project using antenna partterns
-        Fp, Fc = ap_dict[ifo]
-        h_ifo = Fp*h.real - Fc*h.imag
-        
-        h_ifos[ifo] = h_ifo
-        
-    return h_ifos
-
+# def injectWaveform(injection_approx, **kwargs):
+#     # TODO modify this function so that it directly invokes the waveformManager we wrote before
+#     # Also, this currently does not depend on skypos and i think it maybe should? something to look into
+#     # Unpack inputs
+#     p = kwargs.pop('parameters')
+#     time_dict = kwargs.pop('time_dict')
+#     tpeak_dict = kwargs.pop('tpeak_dict')
+#     ap_dict = kwargs.pop('ap_dict')
+#     skypos = kwargs.pop('skypos')
+#     f22_start = kwargs.pop('f22_start')
+#     f_ref = kwargs.pop('f_ref')
+#     ifos = kwargs.pop('ifos', ['H1', 'L1', 'V1'])
+#
+#     # Get dt
+#     dt = time_dict['H1'][1] - time_dict['H1'][0]
+#
+#     # Change spin convention
+#     iota, s1x, s1y, s1z, s2x, s2y, s2z = transform_spins(p['theta_jn'], p['phi_jl'], p['tilt_1'], p['tilt_2'],
+#                                           p['phi_12'], p['a_1'], p['a_2'], p['mass_1'], p['mass_2'],
+#                                           f_ref, p['phase'])
+#     if p['phi_jl'] == 0:
+#         s1x, s1y, s2x, s2y = 0, 0, 0, 0
+#
+#     # Get strain
+#     hp, hc = rwf.generate_lal_hphc(injection_approx,
+#                                    p['mass_1'], p['mass_2'],
+#                                    [s1x, s1y, s1z],
+#                                    [s2x, s2y, s2z],
+#                                    dist_mpc=p['luminosity_distance'],
+#                                    dt=dt,
+#                                    f22_start=f22_start,
+#                                    f_ref=f_ref,
+#                                    inclination=iota,
+#                                    phi_ref=p['phase']
+#                                   )
+#
+#     # Project into each detector
+#     h_ifos = {}
+#     for ifo in ifos:
+#
+#         # Time align
+#         h = rwf.generate_lal_waveform(hplus=hp, hcross=hc, times=time_dict[ifo], triggertime=tpeak_dict[ifo])
+#
+#         # Project using antenna partterns
+#         Fp, Fc = ap_dict[ifo]
+#         h_ifo = Fp*h.real - Fc*h.imag
+#
+#         h_ifos[ifo] = h_ifo
+#
+#     return h_ifos
 
 def get_Tcut_from_Ncycles(waveform_dict, time_dict, ifo, Ncycles, ra, dec):
     

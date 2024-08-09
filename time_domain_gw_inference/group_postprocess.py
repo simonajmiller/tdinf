@@ -15,7 +15,7 @@ import scipy
 import copy
 
 
-def load_run_settings_from_directory(directory, filename_dict=None):
+def load_run_settings_from_directory(directory, filename_dict=None, args_and_kwargs_only=True):
     """
     Given a directory with runs created via the pipeline, load in args, kwargs, likelihood_manager, and dataframe
     :param directory: directory containing runs
@@ -43,43 +43,74 @@ def load_run_settings_from_directory(directory, filename_dict=None):
         directory = settings['dir']
         for key in td_settings.keys():
             print(f'key: {key}')
+            _args_and_kwargs_only = args_and_kwargs_only
+            if key == 'full':
+                _args_and_kwargs_only = False
             try:
-                td_settings[key]['args'], \
-                td_settings[key]['kwargs'], \
-                td_settings[key]['likelihood_manager'] = get_settings_from_command_line_file(
-                    os.path.join(directory, 'command_line.sh'),
+                output = get_settings_from_command_line_file(
+                    os.path.join(directory, 'command_line.sh'), 
                     filename_dict[key],
                     directory + '/',
-                    parser, verbose=True)
+                    parser, verbose=True, args_and_kwargs_only=_args_and_kwargs_only)
+                if _args_and_kwargs_only: 
+                    args, kwargs = output 
+                else:
+                    args, kwargs, lm = output
+                    td_settings[key]['likelihood_manager'] = lm
+                td_settings[key]['args'] = args
+                td_settings[key]['kwargs'] = kwargs 
             except TypeError as e:
                 print(e)
                 print(f'unable to make {run} {key}')
 
-            filename = os.path.join(directory, filename_dict[key] + '.dat')
-            if not os.path.exists(filename):
-                filename = os.path.join(directory, filename_dict[key] + '/' + filename_dict[key] + '.dat')
-
-            try:
-                td_samples[key] = pd.read_csv(filename, delimiter='\s+')
-            except:
+            df = load_dataframe(directory, filename_dict[key])
+            if df is None:
                 continue
-            td_samples[key] = calc_additional_parameters(td_samples[key])
+
+            td_samples[key] = df
     return settings
 
 
-def get_settings_from_command_line_string(command_line_string, initial_run_dir, parser, verbose=False):
+def load_dataframe(directory, run_directory_name):
+
+    filename = os.path.join(directory, run_directory_name + '.dat')
+    if not os.path.exists(filename):
+        filename = os.path.join(directory, run_directory_name + '/' + run_directory_name + '.dat')
+
+    try:
+        df = pd.read_csv(filename, delimiter='\s+')
+    except:
+        return None
+    df = calc_additional_parameters(df)
+    return df
+
+
+def get_settings_from_command_line_string(command_line_string, initial_run_dir, parser, args_and_kwargs_only=False, verbose=False):
     skip_initial_arg = command_line_string.split()[1:]
     args = parser.parse_args(skip_initial_arg)
-    reference_parameters = run_sampler.get_injected_parameters(args, initial_run_dir, verbose=verbose)
+    return get_settings_from_args(args, initial_run_dir, verbose=verbose, args_and_kwargs_only=args_and_kwargs_only)
+
+def get_settings_from_args(args, initial_run_dir, args_and_kwargs_only=False, verbose=False):
+    """
+    Returns args, kwargs, likelihood manager for a run
+    :param args: argparser object, created from create_run_sampler_arg_parser()
+    :param initial_run_dir: directory in which the paths in args are wrt to.
+    :param verbose:
+    :return:
+    """
+
+    reference_parameters = run_sampler.get_injected_parameters(args,
+                                                               initial_run_dir,
+                                                               verbose=verbose)
     kwargs = run_sampler.initialize_kwargs(args, reference_parameters)
+    
+    if args_and_kwargs_only:
+        return args, kwargs
 
     if verbose:
         print('making wf manager')
-    wf_manager = utils.NewWaveformManager(args.ifos,
-                                          vary_time=args.vary_time,
-                                          vary_skypos=args.vary_skypos,
-                                          vary_eccentricity=args.vary_eccentricity, 
-                                          use_higher_order_modes=args.use_higher_order_modes, **kwargs)
+
+    wf_manager = run_sampler.make_waveform_manager(args, **kwargs)
     if verbose:
         print('getting conditioned time and data')
     time_dict, data_dict, psd_dict = run_sampler.get_conditioned_time_and_data(args,
@@ -105,7 +136,8 @@ def get_settings_from_command_line_string(command_line_string, initial_run_dir, 
     return args, kwargs, likelihood_manager
 
 
-def get_settings_from_command_line_file(command_line_file, file_prefix, initial_run_dir, parser, **kwargs):
+def get_settings_from_command_line_file(command_line_file, file_prefix, initial_run_dir, parser, 
+                                        **kwargs):
     with open(command_line_file, 'r') as f:
         lines = f.readlines()
         for line in lines:
@@ -142,7 +174,7 @@ def get_tc_from_name(name):
     return nseconds
 
 
-def generate_filename_dict(directory):
+def generate_filename_dict(directory, pattern=r'(post|pre|full)_(-?\d+\.\d+)seconds'):
     filename_dict = {}
     pattern = re.compile(r'(post|pre|full)_(-?\d+\.\d+)seconds')
 
@@ -291,7 +323,7 @@ def plot_percentiles(xs, array_list, ax=None, color=None, label=None, zorder=Non
        
     ax.plot(xs, median, color=color, label=label, **kwargs)
 
- 
+    
 def plot_pre_and_post(ax, mode, times, tc_M, data, reference_wf, wf_dict_list, xlim, color, likelihood_manager, 
                       ylim=None, time_label=None,
                       alpha_reconstruct=0.02, ifo='L1', 
@@ -361,19 +393,48 @@ def add_time_label(ax, time_label, tc_M, xlim, ylim):
 
     ax.text(textloc, ylim[1] - 0.20 * yrange, f'${time_label}$', color='k', fontsize=15, zorder=5)
 
+def flatten_comprehension(matrix):
+    # flatten list 
+    return [item for row in matrix for item in row]
+
 
 def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full_df,
              full_likelihood_manager,
              plot_param, prior_df = None, 
-             ifo='L1', save_dir = None, loc='lower', 
+             ifo='L1', save_dir = None, 
              ylim=None, inset_ylim=None, 
              xlim=None, 
              percentiles=True, reference_df=None, plot_inset=True,
              plot_whitened=False,
              param_xlims=None, modes = None, hist_modes = None,
+             scatter_2D_list=None, 
              alpha_reconstruct=0.02, make_legend=True, 
-             inset_down=False, param_ylims=None,
-             plot_data_with_modes=False):
+             inset_down=False, param_ylims=None, hist_kwargs=None,
+             plot_data_with_modes=False, figsize=(11.538, 2.4)):
+    """
+    tc_floats: time cuts, desired order 
+    wfs_at_tc_list: list (corresponding to time cuts) of dict of waveforms with {'post': [list of wf_dicts]}
+        where wf_dict = {'H1': projected_wf, 'L1':projected wf, ...}
+    dfs_at_tc: for each time cut (in tc_floats), {'pre': df_pre, 'post':df_post}
+    plot_param: param [str] or list of params to plot 
+    prior_df: dataframe of prior draws
+    ifo: which ifo to plot waveforms in 
+    save_dir: name of directory to save plot in
+    ylim: lim for pre and post waveforms plot 
+    percentiles: if true, plots 50th and 90th percentile of wfs_at_tc_list, if false plots draws 
+    reference_df: if a plot_param is in reference_df, will plot reference_df[param] as a vertical line 
+    plot_inset: plot whitened waveform as a little inset 
+    plot_whitened: if true, plots whitened waveforms instead of colored 
+    param_xlims: dict of xlims to use for different parameter hists  
+    modes: list of which modes to plot, options are from 'pre' and 'post' or []
+    hist_modes: which modes to plot on each parameter histogram, options are 'pre', post or []
+    scatter_2D_list=list of paired params to scatter against each other 
+    inset_down: if true, instead of plotting inset as a little inset, plots it as a full plot 
+    param_ylims: dict of ylims to use for different parameter hists 
+    hist_kwargs: kwargs to pass on to each histogram
+    plot_data_with_modes: Whether or not to plot the real data along side the modes plots 
+    
+    """
     cp = sns.color_palette('muted')
     cp2 = sns.color_palette('pastel')
     pre_color = cp[0]
@@ -382,6 +443,10 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
         modes = ['pre', 'post']
     if hist_modes is None: 
         hist_modes = ['pre', 'post']
+    if hist_kwargs is None:
+        hist_kwargs = {}
+    if scatter_2D_list is None:
+        scatter_2D_list = []
 
     mode_kwargs = dict(pre={'color': pre_color}, post={'color': post_color})
 
@@ -405,10 +470,12 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
     else:
         hist_ylims = [param_ylims.get(param, None) for param in plot_param]
         
+    all_params = flatten_comprehension(scatter_2D_list) + plot_param
+        
     if param_xlims is None:
-        hist_xlims = [None for p in plot_param]
+        hist_xlims = {key: None for key in all_params}
     else:
-        hist_xlims = [param_ylims.get(param, None) for param in plot_param]
+        hist_xlims = {param:param_ylims.get(param, None) for key in all_params}
         
 
     for j, tc in enumerate(tc_floats):
@@ -416,7 +483,8 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
 
         # Make figure
         
-        fig, axes = plt.subplots(1, len(plot_param) + int(inset_down) + len(modes), figsize=(15 / 1.3, 25 / 8 / 1.3))
+        fig, axes = plt.subplots(1, len(plot_param) + int(inset_down) + len(modes) + len(scatter_2D_list),
+                                 figsize=figsize)
 
         for ax in axes:
             ax.set_rasterization_zorder(2)
@@ -431,7 +499,7 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
             xlim = (-100, 70)
 
         if inset_down:
-            ax = axes[len(plot_param)]
+            ax = axes[len(plot_param) + len(scatter_2D_list)]
             plot_pre_post_data_and_reference(ax, 
                                              time_dict_M[ifo], 
                                              whitened_data_dict[ifo], whitened_reference_wf[ifo], tc_M, 
@@ -447,7 +515,7 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
 
         
         
-        for mode, ax in zip(modes, axes[len(plot_param) + int(inset_down):]):
+        for mode, ax in zip(modes, axes[len(plot_param) + len(scatter_2D_list) + int(inset_down):]):
             try:
                 wf_dict_list = wfs_at_tc_list[j][mode]
             except KeyError:
@@ -482,13 +550,13 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
 
             if len(modes) == 2:
                 axes[-2].set_yticklabels([])
-                dx = -0.05 / len(plot_param)
+                dx = -0.05 / (len(plot_param) + len(scatter_2D_list))
                 x0, y0, x1, y1 = axes[-2].get_position().bounds
-                axes[-2].set_position([x0 + dx + 0.0375 / len(plot_param), y0, x1, y1])
+                axes[-2].set_position([x0 + dx + 0.0375 / (len(plot_param) + len(scatter_2D_list)), y0, x1, y1])
                 x0, y0, x1, y1 = axes[-1].get_position().bounds
                 axes[-1].set_position([x0 + dx, y0, x1, y1])
             
-        hist_kwargs = dict(density=True, bins='auto')
+        hist_kwargs.update(dict(density=True, bins='auto'))
         # -------------------------------------------------------------------------
         # Righthand plots, plot posteriors
         for param, ax, i in zip(plot_param, axes[:len(plot_param)], range(len(plot_param))):
@@ -499,13 +567,14 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
                                  **hist_kwargs)
                 except KeyError:
                     pass
-            ax.hist(full_df[param], lw=1.5, histtype='step',
+            ax.hist(full_df[param], lw=1.5, #histtype='step',
                          color='k', zorder=2, **hist_kwargs)
 
             if reference_df is not None:
                 try:
                     ax.axvline(reference_df[param], color='black', linestyle='dashed', zorder=0)
-                except:
+                except Exception as e:
+                    print('cannot plot reference excpetion is', e)
                     pass
                     
             if prior_df is not None:
@@ -514,21 +583,57 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
 
             ax.set_xlabel(format_name(param), fontsize=16)
             ax.set_yticks([])
-            if hist_xlims[i] is None: 
-                hist_xlims[i] = ax.get_xlim()
-            ax.set_xlim(hist_xlims[i])
+            if hist_xlims[param] is None: 
+                hist_xlims[param] = ax.get_xlim()
+            ax.set_xlim(hist_xlims[param])
             
             if hist_ylims[i] is None:
                 hist_ylims[i] = ax.get_ylim()
             ax.set_ylim(hist_ylims[i])
+        
+        # Plot 2D scatter plots 
+        for param_pair, ax, i in zip(scatter_2D_list, axes[len(plot_param):len(plot_param) + len(scatter_2D_list)], range(len(scatter_2D_list))):
+            param_x = param_pair[0]
+            param_y = param_pair[1]
+
+            for mode in hist_modes: 
+                try:
+                    df_x = dfs_at_tc[j][mode][param_x]
+                    df_y = dfs_at_tc[j][mode][param_y]
+                    ax.plot(df_x, df_y, ',', #lw=1.5, zorder=1,
+                                 **mode_kwargs[mode],)
+                except KeyError:
+                    pass
+            ax.plot(full_df[param_x], full_df[param_y], ',',
+                         color='k', zorder=2,)
+
+            if reference_df is not None:
+                try:
+                    ax.axvline(reference_df[param_x], color='black', linestyle='dashed', zorder=0)
+                    ax.axhline(reference_df[param_y], color='black', linestyle='dashed', zorder=0)
+                except Exception as e:
+                    print('excpetion is', e)
+                    pass
+                    
+            #if prior_df is not None:
+            #    ax.hist(prior_df[param], histtype='step', bins=30, lw=1.5, zorder=0, 
+            #      density=True, **prior_kws)
             
+            ax.set_xlabel(format_name(param_x), fontsize=16)
+            ax.set_ylabel(format_name(param_y), fontsize=16)
+            #ax.set_yticks([])
+            if hist_xlims[param_x] is None: 
+                hist_xlims[param_x] = ax.get_xlim()
+            ax.set_xlim(hist_xlims[param_x])
+            if hist_xlims[param_y] is None: 
+                hist_xlims[param_y] = ax.get_ylim()
+            ax.set_ylim(hist_xlims[param_y])
 
         if plot_inset:
             # add inset plot to leftmost 
             # -------------------------------------------------------------------------
             axin = make_inset_plot(axes[0], time_dict_M[ifo], whitened_data_dict[ifo], whitened_reference_wf[ifo], tc_M, 
                                 l=0.4, w=0.3, dx=0.04, xlim=xlim, inset_ylim=inset_ylim)
-            print(axin.get_ylim())
 
         for ax in axes:
             x0, y0, x1, y1 = ax.get_position().bounds
@@ -791,6 +896,10 @@ def format_name(name):
         return r'$D_{L}$'
     if name == 'total_mass':
         return r'$M_{\mathrm{tot}} [M_{\odot}]$'
+    if name == 'right_ascension':
+        return r'$\alpha$'
+    if name == 'declination':
+        return r'$\delta$'
     return name
     
 
