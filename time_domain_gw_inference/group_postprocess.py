@@ -85,7 +85,6 @@ def load_dataframe(directory, run_directory_name):
     return df
 
 
-
 def get_settings_from_command_line_string(command_line_string, initial_run_dir, parser, args_and_kwargs_only=False, verbose=False):
     skip_initial_arg = command_line_string.split()[1:]
     args = parser.parse_args(skip_initial_arg)
