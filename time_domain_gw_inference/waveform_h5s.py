@@ -58,9 +58,7 @@ def get_waveform_filename(directory, run_key):
     waveform_dir = os.path.join(directory, 'waveforms')
     return os.path.join(waveform_dir, f'{run_key}_waveforms.h5')
 
-
-if __name__ == "__main__":
-    # Initialize ArgumentParser
+def make_waveform_h5_arg_parser():
     parser = argparse.ArgumentParser(description="Script to save waveforms to file")
 
     # Add arguments
@@ -71,6 +69,12 @@ if __name__ == "__main__":
                         help="Flag to overwrite existing files (default: False)")
     parser.add_argument("--N_waveforms", type=int, default=300, help="Number of waveforms (default: 300)")
     parser.add_argument("--ncpu", type=int, default=mp.cpu_count(), help="Number of parallel processes to start")
+    return parser
+
+
+if __name__ == "__main__":
+    # Initialize ArgumentParser
+    parser = make_waveform_h5_arg_parser()
 
     # Parse arguments
     args = parser.parse_args()
