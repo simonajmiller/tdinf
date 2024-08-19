@@ -66,8 +66,10 @@ def interpolate_timeseries(time, values, new_time_grid):
     Returns:
     - value_on_grid: array-like, the interpolated values at the new time grid
     """
-    #value_on_grid = np.interp(new_time_grid, time, values, left=0, right=0)
+#     # linear interp:
+#     value_on_grid = np.interp(new_time_grid, time, values, left=0, right=0) 
     
+    # cubic interp:
     values_interpolator = interp1d(time, values, kind='cubic', fill_value=0, bounds_error=False)
     value_on_grid = values_interpolator(new_time_grid)
     
