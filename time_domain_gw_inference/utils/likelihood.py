@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.linalg import solve_toeplitz
+from scipy.interpolate import interp1d
 import lal
 import lalsimulation as lalsim
 import sys
@@ -55,7 +56,7 @@ def check_spin_settings_of_approx(approx_name):
 
 def interpolate_timeseries(time, values, new_time_grid):
     """
-    Interpolates a timeseries to a new grid of points
+    Interpolates a timeseries to a new grid of points using cubic interpolation
 
     Parameters:
     - time: array-like, the original time grid
@@ -65,7 +66,11 @@ def interpolate_timeseries(time, values, new_time_grid):
     Returns:
     - value_on_grid: array-like, the interpolated values at the new time grid
     """
-    value_on_grid = np.interp(new_time_grid, time, values, left=0, right=0)
+    #value_on_grid = np.interp(new_time_grid, time, values, left=0, right=0)
+    
+    values_interpolator = interp1d(time, values, kind='cubic', fill_value=0, bounds_error=False)
+    value_on_grid = values_interpolator(new_time_grid)
+    
     return value_on_grid
 
 
