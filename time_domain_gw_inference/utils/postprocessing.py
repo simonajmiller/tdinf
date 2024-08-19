@@ -65,6 +65,16 @@ def postprocess_samples(sampler, log_prior, getRidOfFixed=False, **kwargs):
     # Add prior values to the sample_dict
     samples_lnprior = np.asarray([log_prior.get_lnprior(x) for x in samples])
     samples_dict['ln_prior'] = samples_lnprior
+    
+    # Add likelihood values 
+    samples_dict['ln_likelihood'] = samples_lnp - samples_lnprior
+    
+    # Finally, generate SNRs and add them to the samples 
+    try:
+        SNRs_dict = likelihood_manager.get_SNRs(samples)
+        sample_dict.update(SNRs_dict)
+    except: 
+        print('SNR calculation failed. Need to debug.')
 
     # Get rid of the fixed parameters if we want
     if getRidOfFixed:

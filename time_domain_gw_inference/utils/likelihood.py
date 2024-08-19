@@ -5,14 +5,14 @@ import lalsimulation as lalsim
 import sys
 from gwpy.timeseries import TimeSeries
 
-try:
-    import reconstructwf as rwf
-    from spins_and_masses import m1m2_from_mtotq
-    from misc import logit, inv_logit, logit_jacobian
-except:
-    from . import reconstructwf as rwf
-    from .spins_and_masses import m1m2_from_mtotq
-    from .misc import logit, inv_logit, logit_jacobian
+# try:
+#     import reconstructwf as rwf
+#     from spins_and_masses import m1m2_from_mtotq
+#     from misc import logit, inv_logit, logit_jacobian
+# except:
+from . import reconstructwf as rwf
+from .spins_and_masses import m1m2_from_mtotq
+from .misc import logit, inv_logit, logit_jacobian, calc_mf_SNR, calc_opt_SNR, calc_network_SNR
 
 from .parameter import LogisticParameter, CartesianAngle, TrigLogisticParameter
 from .preprocessing import get_ACF
@@ -620,3 +620,52 @@ class LnLikelihoodManager(LogisticParameterManager):
 
         # Return posterior
         return lnprob
+    
+    def get_SNRs(self, samples): 
+                
+        # set up arrays
+        per_detector_opt_snrs = np.zeros((len(self.ifos), len(samples)))
+        per_detector_mf_snrs = np.zeros((len(self.ifos), len(samples)))
+        network_opt_snrs = np.zeros(len(samples))
+        network_mf_snrs = np.zeros(len(samples))
+        
+        # cycle through the input samples
+        for i,x_phys in enumerate(samples):
+            
+            # get waveforms for this sample
+            projected_wf_dict = self.waveform_manager.get_projected_waveform(
+                    x_phys, self.ifos, self.time_dict,
+                    f22_start=self.f22_start,
+                    f_ref=self.f_ref
+                )
+            
+            # lists for per-detector snrs
+            opt_snrs = []
+            mf_snrs = []
+            
+            # cycle through the interferometers
+            for ifo in self.ifos:
+            
+                sig = projected_wf_dict[ifo]
+                data = self.data_dict[ifo]
+                rho = self.rho_dict[ifo]
+                
+                opt_snrs.append(calc_opt_SNR(sig, rho))
+                mf_snrs.append(calc_mf_SNR(data, sig, rho))
+                
+            # add to arrays 
+            per_detector_opt_snrs[:,i] = opt_snrs
+            per_detector_mf_snrs[:,i] = mf_snrs
+            
+            # calculate network snrs
+            network_opt_snrs[i] = calc_network_SNR(opt_snrs)
+            network_mf_snrs[i] = calc_network_SNR(mf_snrs)
+        
+        # create dict with all and return 
+        SNRs_dict = {
+            'network_optimal_SNR':network_opt_snrs,
+            'network_matched_filter_SNR':network_mf_snrs
+            **{f'{ifo}_optimal_SNR':per_detector_opt_snrs[i] for i,ifo in enumerate(self.ifos)}, 
+            **{f'{ifo}_matched_filter_SNR':per_detector_mf_snrs[i] for i,ifo in enumerate(self.ifos)}
+        }
+        return SNRs_dict

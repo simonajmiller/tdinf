@@ -33,7 +33,7 @@ def calc_mf_SNR(d, s, rho):
 def calc_opt_SNR(s, rho): 
     return np.sqrt(inner_product(s, s, rho))
 
-def calc_network_mf_SNR(snr_list):
+def calc_network_SNR(snr_list):
     snrs_sq = [snr ** 2 for snr in snr_list]
     network_snr = np.sqrt(sum(snrs_sq))
     return network_snr
