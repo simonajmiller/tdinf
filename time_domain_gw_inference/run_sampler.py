@@ -553,9 +553,7 @@ def main():
     print(sampler.get_chain().shape)
 
     # Postprocessing
-    df = utils.postprocess_samples(sampler,
-                                   likelihood_manager.log_prior,
-                                   **kwargs)
+    df = utils.postprocess_samples(sampler,likelihood_manager,**kwargs)
 
     # Save
     sample_path = backend_path.replace('h5', 'dat')

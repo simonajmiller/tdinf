@@ -220,82 +220,111 @@ class LogisticParameterManager:
 class LnPriorManager(LogisticParameterManager):
 
     def initialize_walkers(self, nwalkers, injected_parameters, reference_posteriors=None, verbose=False):
-        # Initialize walkers
-        # (code sees unit scale quantities; use logit transformations
-        # to take boundaries to +/- infinity)
-        p0_arr = np.asarray([[np.random.normal() for j in range(self.num_parameters)] for i in range(nwalkers)])
-
-        # we have initialized walkers inside their logistic prior, now for injected parameters
-        # we will inject them closer
+            
+        # get logistic vs cartesian parameters
         logistic_params = self.logistic_parameters
         logistic_names_phys = [x.physical_name for x in logistic_params]
-        
-        for param in logistic_params:
-            p = self.sampled_keys.index(param.logistic_name)
-            param_kw = param.physical_name
-            try:
-                param_phys = injected_parameters[param_kw]
-                # If given (e.g. declination, get sin declination like we need)
-                if type(param) == TrigLogisticParameter:
-                    param_phys = param.trig_function(param_phys)
-                if verbose:
-                    print('injected', param_phys, param_kw)
-            except ValueError:
-                if verbose:
-                    print(f"{param_kw} not in injected_parameters dict, continuing anyways")
-                continue
-            except KeyError:
-                if verbose:
-                    print(f"{param_kw} not in injected_parameters dict, continuing anyways")
-                continue
-            if param_phys in param.limit:
-                print(f'reference value of {param_kw} is on boundary of acceptable range,'
-                      f' drawing random value from within range, '
-                      f"We are not going to draw around that value because we'll get infs!")
-                continue
-            elif param_phys < param.limit[0] or param_phys > param.limit[1]:
-                print(f"WARNING: Injected value ({param_phys}) for {param_kw} is outside limit {param.limit}."
-                      f" We will not set initial values around this value")
-                continue
-
-            # transform into logistic space
-            param_logit = param.physical_to_logistic(param_phys)
-
-            # draw gaussian ball in logistic space
-            p0_arr[:, p] = np.asarray([np.random.normal(loc=param_logit, scale=0.05) for i in range(nwalkers)])
-
-        # if time of coalescence sampled over need to include this separately since it isn't a unit scaled quantity
-        if self.vary_time:
-            index = self.sampled_keys.index('geocenter_time')
-            initial_t_walkers = np.random.normal(loc=self.reference_time, scale=self.sigma_time, size=nwalkers)
-            p0_arr[:, index] = initial_t_walkers  # time always saved as the final param
-            
-        # if sampling in skyposition, option to draw ra and dec from the skyring given in the 
-        # reference posteriors
         cartesian_params = self.cartesian_angles
         cartesian_names_phys = [x.physical_name for x in cartesian_params]
-        if self.vary_skypos and reference_posteriors is not None:
+        
+        # Initialize walkers randomly
+        # (code sees unit scale quantities; use logit transformations to take boundaries to +/- infinity)
+        p0_arr = np.asarray([[np.random.normal() for j in range(self.num_parameters)] for i in range(nwalkers)])
+        
+        if reference_posteriors is None:
+            # we want the initial walkers to be drawn from "balls" tightly around the injected parameters
+            # in logistic space
+            for param in logistic_params:
+                
+                # cycle through the logistic parameters
+                p = self.sampled_keys.index(param.logistic_name)
+                param_kw = param.physical_name
+                
+                try:
+                    param_phys = injected_parameters[param_kw]
+                    # If given (e.g. declination, get sin declination like we need)
+                    if type(param) == TrigLogisticParameter:
+                        param_phys = param.trig_function(param_phys)
+                    if verbose:
+                        print('injected', param_phys, param_kw)
+                except ValueError:
+                    if verbose:
+                        print(f"{param_kw} not in injected_parameters dict, continuing anyways")
+                    continue
+                except KeyError:
+                    if verbose:
+                        print(f"{param_kw} not in injected_parameters dict, continuing anyways")
+                    continue
+                if param_phys in param.limit:
+                    print(f'reference value of {param_kw} is on boundary of acceptable range,'
+                          f' drawing random value from within range, '
+                          f"We are not going to draw around that value because we'll get infs!")
+                    continue
+                elif param_phys < param.limit[0] or param_phys > param.limit[1]:
+                    print(f"WARNING: Injected value ({param_phys}) for {param_kw} is outside limit {param.limit}."
+                          f" We will not set initial values around this value")
+                    continue
+                
+                # transform into logistic space
+                param_logit = param.physical_to_logistic(param_phys)
+
+                # draw gaussian ball in logistic space
+                p0_arr[:, p] = np.asarray([np.random.normal(loc=param_logit, scale=0.05) for i in range(nwalkers)])
+
+            # if time of coalescence sampled over need to include this separately since it isn't a unit scaled quantity
+            if self.vary_time:
+                initial_t_walkers = np.random.normal(loc=self.reference_time, scale=self.sigma_time, size=nwalkers)
+                p0_arr[:, self.sampled_keys.index('geocenter_time')] = initial_t_walkers
             
-            # select random set of walkers from the ref posteriors
+        else: 
+            # if instead given a reference posterior, choose initial walkers from it for most parameters.
+            # select random set of indices from the given reference posterior
             idxs = np.random.choice(range(len(reference_posteriors['ra'])), size=nwalkers) 
             
-            # physical ra --> ra_x and ra_y 
-            ra = cartesian_params[cartesian_names_phys.index('right_ascension')] 
-            initial_ra_x, initial_ra_y = ra.radian_to_cartesian(reference_posteriors['ra'][idxs]) 
-            p0_arr[:, self.sampled_keys.index('right_ascension_x')] = -1.0*initial_ra_x
-            p0_arr[:, self.sampled_keys.index('right_ascension_y')] = -1.0*initial_ra_y
+            # translation between the bilby keys and the keys used here
+            reference_keys_dict = {
+                'total_mass':'total_mass',
+                'mass_ratio':'mass_ratio',
+                'luminosity_distance':'luminosity_distance',
+                'inclination':'iota',
+                'spin1_magnitude':'a_1',
+                'spin2_magnitude':'a_2',
+                'declination':'dec', 
+                'phase':'phase',
+                'right_ascension':'ra', 
+                'polarization':'psi'
+            }
             
-            # physical dec --> sin dec
-            dec = logistic_params[logistic_names_phys.index('declination')] 
-            initial_x_sin_dec = dec.physical_to_logistic(reference_posteriors['dec'][idxs])
-            p0_arr[:, self.sampled_keys.index('x_sin_declination')] = initial_x_sin_dec
-            
-            # physical pol --> psi_x and psi_y
-            psi = cartesian_params[cartesian_names_phys.index('polarization')] 
-            initial_psi_x, initial_psi_y = psi.radian_to_cartesian(reference_posteriors['psi'][idxs]) 
-            p0_arr[:, self.sampled_keys.index('polarization_x')] = -1.0*initial_psi_x
-            p0_arr[:, self.sampled_keys.index('polarization_y')] = -1.0*initial_psi_y
+            # cycle through logistic params
+            for param in logistic_params:
+                                
+                ref_kw = reference_keys_dict[param.physical_name]
+                walkers_phys = reference_posteriors[ref_kw][idxs]
+                                 
+                # transform into logistic space
+                walkers_logit = param.physical_to_logistic(walkers_phys) 
                 
+                # put in p0 array
+                p0_arr[:, self.sampled_keys.index(param.logistic_name)] = walkers_logit
+           
+            # cycle through cartesian params
+            for param in cartesian_params:
+                
+                param_kw = param.physical_name
+                ref_kw = reference_keys_dict[param_kw]
+                walkers_phys = reference_posteriors[ref_kw][idxs]
+                
+                # get x and y components
+                initial_x, initial_y = param.radian_to_cartesian(walkers_phys) 
+                
+                # put in p0 array
+                p0_arr[:, self.sampled_keys.index(f'{param_kw}_x')] = -1.0*initial_x
+                p0_arr[:, self.sampled_keys.index(f'{param_kw}_y')] = -1.0*initial_y
+        
+            # finally, if sampling time ... 
+            if self.vary_time:
+                p0_arr[:, self.sampled_keys.index('geocenter_time')] = reference_posteriors['geocent_time'][idxs]
+        
         p0 = p0_arr.tolist()
         return p0
 
@@ -627,8 +656,12 @@ class LnLikelihoodManager(LogisticParameterManager):
 
         # Return posterior
         return lnprob
-    
+            
     def get_SNRs(self, samples): 
+        
+        '''
+        Get SNRs for a list of samples
+        '''
                 
         # set up arrays
         per_detector_opt_snrs = np.zeros((len(self.ifos), len(samples)))
@@ -637,7 +670,8 @@ class LnLikelihoodManager(LogisticParameterManager):
         network_mf_snrs = np.zeros(len(samples))
         
         # cycle through the input samples
-        for i,x_phys in enumerate(samples):
+        samples_phys = [self.samp_to_phys(x) for x in samples]
+        for i,x_phys in enumerate(samples_phys):
             
             # get waveforms for this sample
             projected_wf_dict = self.waveform_manager.get_projected_waveform(
@@ -671,7 +705,7 @@ class LnLikelihoodManager(LogisticParameterManager):
         # create dict with all and return 
         SNRs_dict = {
             'network_optimal_SNR':network_opt_snrs,
-            'network_matched_filter_SNR':network_mf_snrs
+            'network_matched_filter_SNR':network_mf_snrs,
             **{f'{ifo}_optimal_SNR':per_detector_opt_snrs[i] for i,ifo in enumerate(self.ifos)}, 
             **{f'{ifo}_matched_filter_SNR':per_detector_mf_snrs[i] for i,ifo in enumerate(self.ifos)}
         }
