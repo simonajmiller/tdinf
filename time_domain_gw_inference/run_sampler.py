@@ -495,19 +495,12 @@ def main():
     if args.ncpu > 1:
         os.environ["OMP_NUM_THREADS"] = "1"
 
-    # We'll track how the average autocorrelation time estimate changes
-    index = 0
-    autocorr = np.empty(nsteps)
-
-    # This will be useful for testing convergence
-    old_tau = np.inf
-
-    # now use multiprocessing
+    # for multiprocessing
     def sort_on_runtime(pos):
         p = np.atleast_2d(pos)
         idx = np.argsort(p[:, 0])[::-1]
         return p[idx], idx
-
+   
     """
     Run sampler
     """
@@ -522,6 +515,13 @@ def main():
 
         # If there are still iterations left to run ... 
         if nsteps > 0:
+            
+            # We'll track how the average autocorrelation time estimate changes
+            index = 0
+            autocorr = np.empty(nsteps)
+
+            # This will be useful for testing convergence
+            old_tau = np.inf
 
             # Cycle through remaining iterations
             for sample in sampler.sample(p0, iterations=nsteps, progress=True):
@@ -553,9 +553,7 @@ def main():
     print(sampler.get_chain().shape)
 
     # Postprocessing
-    df = utils.postprocess_samples(sampler,
-                                   likelihood_manager.log_prior,
-                                   **kwargs)
+    df = utils.postprocess_samples(sampler,likelihood_manager,**kwargs)
 
     # Save
     sample_path = backend_path.replace('h5', 'dat')

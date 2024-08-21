@@ -35,7 +35,7 @@ def get_dict_from_samples(samples, parameter_manager, **kwargs):
     return pandas.DataFrame(samps_phys)
 
 
-def postprocess_samples(sampler, log_prior, getRidOfFixed=False, **kwargs):
+def postprocess_samples(sampler, likelihood_manager, getRidOfFixed=False, **kwargs):
 
     """
     Post-process emcee sample chains
@@ -43,28 +43,42 @@ def postprocess_samples(sampler, log_prior, getRidOfFixed=False, **kwargs):
     input: sampler = emcee sampler object
     """
     
+    print('\nPOSTPROCESSING:')
+    
     # Get autocorrelation time
     tau = sampler.get_autocorr_time(quiet=True)
     try:
         burnin = max(int(5 * np.max(tau)), 0)
         thin = max(int(0.5 * np.min(tau)), 1)
+        print(f'burnin = {burnin}, thin = {thin}')
     except:
         print('WARNING thinning by 1, 0 burnin!')
         burnin = 0
         thin = 1
-
+        
     samples = sampler.get_chain(discard=burnin, flat=True, thin=thin)
+    print('samples shape:', samples.shape)
     
     # Convert samples into their physical quantities
-    samples_dict = get_dict_from_samples(samples, log_prior, **kwargs)
+    samples_dict = get_dict_from_samples(samples, likelihood_manager.log_prior, **kwargs)
 
     # Add posterior values the sample_dict
     samples_lnp = sampler.get_log_prob(discard=burnin, flat=True, thin=thin)
     samples_dict['ln_posterior'] = samples_lnp
     
     # Add prior values to the sample_dict
-    samples_lnprior = np.asarray([log_prior.get_lnprior(x) for x in samples])
+    samples_lnprior = np.asarray([likelihood_manager.log_prior.get_lnprior(x) for x in samples])
     samples_dict['ln_prior'] = samples_lnprior
+    
+    # Add likelihood values 
+    samples_dict['ln_likelihood'] = samples_lnp - samples_lnprior
+    
+    # Finally, generate SNRs and add them to the samples 
+    SNRs_dict = likelihood_manager.get_SNRs(samples)
+    for k in SNRs_dict: 
+        samples_dict[k] = SNRs_dict[k]
+        
+    print(samples_dict.keys())
 
     # Get rid of the fixed parameters if we want
     if getRidOfFixed:
