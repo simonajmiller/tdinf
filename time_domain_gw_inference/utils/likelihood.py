@@ -225,26 +225,58 @@ class LogisticParameterManager:
 class LnPriorManager(LogisticParameterManager):
 
     def initialize_walkers(self, nwalkers, injected_parameters, reference_posteriors=None, verbose=False):
-            
-        # get logistic vs cartesian parameters
+
         logistic_params = self.logistic_parameters
-        logistic_names_phys = [x.physical_name for x in logistic_params]
         cartesian_params = self.cartesian_angles
-        cartesian_names_phys = [x.physical_name for x in cartesian_params]
-        
+
         # Initialize walkers randomly
-        # (code sees unit scale quantities; use logit transformations to take boundaries to +/- infinity)
         p0_arr = np.asarray([[np.random.normal() for j in range(self.num_parameters)] for i in range(nwalkers)])
-        
-        if reference_posteriors is None:
-            # we want the initial walkers to be drawn from "balls" tightly around the injected parameters
-            # in logistic space
-            for param in logistic_params:
-                
-                # cycle through the logistic parameters
-                p = self.sampled_keys.index(param.logistic_name)
-                param_kw = param.physical_name
-                
+
+        if reference_posteriors is not None:
+            idxs = np.random.choice(range(len(reference_posteriors['right_ascension'])), size=nwalkers)
+
+        for param in logistic_params + cartesian_params:
+            param_kw = param.physical_name
+            param_logistic = isinstance(param, LogisticParameter) or isinstance(param, TrigLogisticParameter)
+            p = self.sampled_keys.index(param.logistic_name if param_logistic else f"{param_kw}_x")
+
+            # Flag to decide whether to use reference posterior or injected parameters
+            use_reference_posterior = False
+
+            if reference_posteriors is not None and param_kw in reference_posteriors:
+                walkers_phys = reference_posteriors[param_kw].copy()
+                # Check if reference posterior is constant (e.g., zero spread)
+                if not np.allclose(walkers_phys, walkers_phys[0]):
+                    use_reference_posterior = True  # Only use reference posterior if there's sufficient spread
+                    # there are no prior bounds for cartesian angles, so don't check them
+                    if not param_logistic:
+                        break
+                    # check if the reference posterior is outisde the prior
+                    for i, param_phys in enumerate(walkers_phys):
+
+                        if param_phys < param.limit[0] or param_phys > param.limit[1]:
+                            new_param_phys = np.random.uniform(param.limit[0], param.limit[1], size=1)[0]
+                            print(f"WARNING: Injected value ({param_phys}) for {param_kw} is outside limit {param.limit} for value in posterior, setting it to {new_param_phys}")
+                            reference_posteriors.at[i, param_kw] = new_param_phys
+
+            if use_reference_posterior:
+                walkers_phys = reference_posteriors[param_kw][idxs]
+
+                if type(param) == TrigLogisticParameter:
+                    walkers_phys = param.trig_function(walkers_phys)
+
+                if param_logistic:
+                    # Logistic parameter transformation
+                    walkers_logit = param.physical_to_logistic(walkers_phys)
+                    p0_arr[:, p] = walkers_logit
+                else:
+                    # Cartesian parameter transformation
+                    initial_x, initial_y = param.radian_to_cartesian(walkers_phys)
+                    p0_arr[:, p] = -1.0 * initial_x
+                    p0_arr[:, self.sampled_keys.index(f"{param_kw}_y")] = -1.0 * initial_y
+
+            else:
+                # Use injected parameter as fallback
                 try:
                     param_phys = injected_parameters[param_kw]
                     # If given (e.g. declination, get sin declination like we need)
@@ -252,84 +284,34 @@ class LnPriorManager(LogisticParameterManager):
                         param_phys = param.trig_function(param_phys)
                     if verbose:
                         print('injected', param_phys, param_kw)
-                except ValueError:
+                except (ValueError, KeyError):
                     if verbose:
                         print(f"{param_kw} not in injected_parameters dict, continuing anyways")
                     continue
-                except KeyError:
-                    if verbose:
-                        print(f"{param_kw} not in injected_parameters dict, continuing anyways")
-                    continue
-                if param_phys in param.limit:
-                    print(f'reference value of {param_kw} is on boundary of acceptable range,'
-                          f' drawing random value from within range, '
-                          f"We are not going to draw around that value because we'll get infs!")
-                    continue
-                elif param_phys < param.limit[0] or param_phys > param.limit[1]:
-                    print(f"WARNING: Injected value ({param_phys}) for {param_kw} is outside limit {param.limit}."
-                          f" We will not set initial values around this value")
-                    continue
-                
-                # transform into logistic space
-                param_logit = param.physical_to_logistic(param_phys)
 
-                # draw gaussian ball in logistic space
-                p0_arr[:, p] = np.asarray([np.random.normal(loc=param_logit, scale=0.05) for i in range(nwalkers)])
+                # only need to check boundaries for logistic params, not for cartesian angles
+                if param_logistic:
+                    # Check for boundary conditions
+                    if param_phys in param.limit:
+                        print(f'reference value of {param_kw} is on boundary of acceptable range, '
+                              f'drawing random value from within range, avoiding infinity!')
+                        continue
+                    elif param_phys <= param.limit[0] or param_phys >= param.limit[1]:
+                        print(f"WARNING: Injected value ({param_phys}) for {param_kw} is outside limit {param.limit}. "
+                              f"Will not set initial values around this value")
+                        continue
 
-            # if time of coalescence sampled over need to include this separately since it isn't a unit scaled quantity
-            if self.vary_time:
+                    param_logit = param.physical_to_logistic(param_phys)
+                    p0_arr[:, p] = np.random.normal(loc=param_logit, scale=0.05, size=nwalkers)
+
+        # Handle time separately if varying it
+        if self.vary_time:
+            if reference_posteriors is not None and 'geocenter_time' in reference_posteriors:
+                p0_arr[:, self.sampled_keys.index('geocenter_time')] = reference_posteriors['geocenter_time'][idxs]
+            else:
                 initial_t_walkers = np.random.normal(loc=self.reference_time, scale=self.sigma_time, size=nwalkers)
                 p0_arr[:, self.sampled_keys.index('geocenter_time')] = initial_t_walkers
-            
-        else: 
-            # if instead given a reference posterior, choose initial walkers from it for most parameters.
-            # select random set of indices from the given reference posterior
-            idxs = np.random.choice(range(len(reference_posteriors['ra'])), size=nwalkers) 
-            
-            # translation between the bilby keys and the keys used here
-            reference_keys_dict = {
-                'total_mass':'total_mass',
-                'mass_ratio':'mass_ratio',
-                'luminosity_distance':'luminosity_distance',
-                'inclination':'iota',
-                'spin1_magnitude':'a_1',
-                'spin2_magnitude':'a_2',
-                'declination':'dec', 
-                'phase':'phase',
-                'right_ascension':'ra', 
-                'polarization':'psi'
-            }
-            
-            # cycle through logistic params
-            for param in logistic_params:
-                                
-                ref_kw = reference_keys_dict[param.physical_name]
-                walkers_phys = reference_posteriors[ref_kw][idxs]
-                                 
-                # transform into logistic space
-                walkers_logit = param.physical_to_logistic(walkers_phys) 
-                
-                # put in p0 array
-                p0_arr[:, self.sampled_keys.index(param.logistic_name)] = walkers_logit
-           
-            # cycle through cartesian params
-            for param in cartesian_params:
-                
-                param_kw = param.physical_name
-                ref_kw = reference_keys_dict[param_kw]
-                walkers_phys = reference_posteriors[ref_kw][idxs]
-                
-                # get x and y components
-                initial_x, initial_y = param.radian_to_cartesian(walkers_phys) 
-                
-                # put in p0 array
-                p0_arr[:, self.sampled_keys.index(f'{param_kw}_x')] = -1.0*initial_x
-                p0_arr[:, self.sampled_keys.index(f'{param_kw}_y')] = -1.0*initial_y
-        
-            # finally, if sampling time ... 
-            if self.vary_time:
-                p0_arr[:, self.sampled_keys.index('geocenter_time')] = reference_posteriors['geocent_time'][idxs]
-        
+
         p0 = p0_arr.tolist()
         return p0
 

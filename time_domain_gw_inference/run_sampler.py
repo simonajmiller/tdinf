@@ -176,6 +176,10 @@ def modify_parameters(data, args):
     equivocate_columns(df, 'spin1_magnitude', 'a_1')
     equivocate_columns(df, 'spin2_magnitude', 'a_2')
 
+    if 'spin1_magnitude' not in df.columns:
+        df['spin1_magnitude'] = np.sqrt(df['spin1_x']**2 + df['spin1_y']**2 + df['spin1_z']**2)
+        df['spin2_magnitude'] = np.sqrt(df['spin2_x']**2 + df['spin2_y']**2 + df['spin2_z']**2)
+
     if isinstance(data, pd.DataFrame):
         return df
     elif isinstance(data, dict):
@@ -209,6 +213,8 @@ def get_injected_parameters(args, initial_run_dir='', verbose=False):
             log_prob = ref_pe_samples['log_likelihood'] + ref_pe_samples['log_prior']
             max_L_index = np.argmax(log_prob)
             reference_parameters = {field: ref_pe_samples[field][max_L_index] for field in ref_pe_samples.dtype.names}
+            ref_pe_samples = modify_parameters(pd.DataFrame(ref_pe_samples), args)
+
         # set reference parameters to the passed in reference_parameters
         else:
             reference_parameters = utils.parse_injected_parameters(args.reference_parameters,
