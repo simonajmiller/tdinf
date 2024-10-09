@@ -425,7 +425,6 @@ def main():
                                                                    wf_manager=wf_manager,
                                                                    reference_parameters=reference_parameters,
                                                                    verbose=verbose)
-
     if verbose:
         print(f"kwargs are:")
         print(kwargs)

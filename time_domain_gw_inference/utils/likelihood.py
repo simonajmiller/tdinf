@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.signal import tukey
 from scipy.linalg import solve_toeplitz
 from scipy.interpolate import interp1d
 import lal
@@ -53,7 +54,6 @@ def check_spin_settings_of_approx(approx_name):
         print("WARNING, UNSURE IF WAVEFORM HAS SPINS")
     return aligned_spins, no_spins
 
-
 def interpolate_timeseries(time, values, new_time_grid):
     """
     Interpolates a timeseries to a new grid of points using cubic interpolation
@@ -75,6 +75,11 @@ def interpolate_timeseries(time, values, new_time_grid):
     
     return value_on_grid
 
+def apply_window(timeseries): 
+    nsamps = len(timeseries)
+    window = tukey(nsamps)
+    window[int(0.5*nsamps):] = 1.
+    return timeseries*window
 
 class LogisticParameterManager:
     def __init__(self, vary_time=False, vary_skypos=False, vary_eccentricity=False, **kwargs):
@@ -462,10 +467,18 @@ class WaveformManager(LogisticParameterManager):
                                         mean_anomaly_periastron=x_phys['mean_anomaly'])
         return TimeSeries.from_lal(hp), TimeSeries.from_lal(hc)
 
-    def get_projected_waveform(self, x_phys, ifos, time_dict, f22_start=11, f_ref=11):
+    def get_projected_waveform(self, x_phys, ifos, time_dict, f22_start=11, f_ref=11, window=False):
         delta_t = time_dict[ifos[0]][1] - time_dict[ifos[0]][0]
 
+        # get hplus and hcross
         hp, hc = self.get_hplus_hcross(x_phys, delta_t, f22_start=f22_start, f_ref=f_ref)
+
+        # apply tukey window if desired 
+        if window:
+            print
+            hp = apply_window(hp)
+            hc = apply_window(hc)
+        
         # set times in geocenter time
         hp.t0 = x_phys['geocenter_time'] + hp.t0.value
         hc.t0 = x_phys['geocenter_time'] + hc.t0.value
@@ -603,10 +616,12 @@ class LnLikelihoodManager(LogisticParameterManager):
     def get_log_posterior(self, x_phys, verbose=False, **kwargs):
         if verbose:
             print('getting wf')
+        
         projected_wf_dict = self.waveform_manager.get_projected_waveform(
             x_phys, self.ifos, self.time_dict,
-            f22_start=self.f22_start,
-            f_ref=self.f_ref
+            f22_start=kwargs.get('f22_start', self.f22_start),
+            f_ref=kwargs.get('f_ref', self.f_ref),
+            window=kwargs.get('window', False)
         )
         if verbose:
             print('done getting wf')
@@ -643,7 +658,7 @@ class LnLikelihoodManager(LogisticParameterManager):
 
         # Calculate posterior
         if not self.only_prior:
-            lnprob += self.get_log_posterior(x_phys, verbose=verbose, **kwargs)
+            lnprob += self.get_log_posterior(x_phys, verbose=verbose)
 
         # Calculate prior
         lnprob += self.log_prior.get_lnprior(x, phys_dict=x_phys)
