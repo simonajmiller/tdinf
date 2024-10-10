@@ -100,8 +100,6 @@ def condition(raw_time_dict, raw_data_dict, t_dict, desired_sample_rate, f_min=1
         else: 
             time = raw_time
         
-
-
         # Subtract mean and store
         data_dict[ifo] = data - np.mean(data)
         time_dict[ifo] = time
