@@ -357,7 +357,7 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
     """
     # icut = index corresponding to cutoff time
     time_dict, data_dict, icut_dict = utils.condition(raw_time_dict, raw_data_dict, tcut_dict,
-                                                      args.sampling_rate, f_min=args.flow * 3 / 4,
+                                                      args.sampling_rate, f_min=args.flow, #* 3 / 4,
                                                       f_max=args.fmax, verbose=verbose)
 
     # Time spacing of data
