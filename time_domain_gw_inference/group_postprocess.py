@@ -167,6 +167,10 @@ def calc_additional_parameters(df):
 
     df['chi_effective'] = chieffs
     df['chi_precessing'] = chips
+    
+    # fix phase and polarization
+    df['phase'] = (df['phase'] + 2 * np.pi) % (2 * np.pi) 
+    df['polarization'] = np.abs(df['polarization'])
 
     return df
 

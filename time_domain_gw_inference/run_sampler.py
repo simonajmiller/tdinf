@@ -172,6 +172,9 @@ def modify_parameters(data, args):
                 row['mass_1'], row['mass_2'],
                 row['f_ref'], row['phase'])
             ), axis=1)
+        
+    equivocate_columns(df, 'spin1_magnitude', 'a_1')
+    equivocate_columns(df, 'spin2_magnitude', 'a_2')
 
     if isinstance(data, pd.DataFrame):
         return df
@@ -403,6 +406,21 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
         # idx = sample closest to desired time
         time_dict[ifo] = time_dict[ifo][idx - Npre:idx + Npost]
         data_dict[ifo] = data_dict[ifo][idx - Npre:idx + Npost]
+        
+#     # Calculate ACF
+#     rho_dict, cond_psds = utils.get_ACF(pe_psds, time_dict, f_low=args.flow, f_max=args.fmax, return_psds=True)
+    
+#     # Save ACF 
+#     save_ACF=True
+#     if save_ACF:
+#         acf_path = backend_path.replace('.h5', '_ACF.json')
+#         with open(acf_path, "w") as f:
+#             json.dump(rho_dict, f) 
+
+#         # Save conditioned PSDs 
+#         cond_psd_path = backend_path.replace('.h5', '_cond_psds.json')
+#         with open(cond_psd_path, "w") as f:
+#             json.dump(cond_psds, f) 
 
     return time_dict, data_dict, pe_psds
 
