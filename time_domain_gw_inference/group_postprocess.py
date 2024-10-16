@@ -93,7 +93,8 @@ def get_settings_from_command_line_string(command_line_string, initial_run_dir, 
                                   return_ref_pe=return_ref_pe)
 
 
-def get_settings_from_args(args, initial_run_dir, return_ref_pe=False, args_and_kwargs_only=False, verbose=False):
+def get_settings_from_args(args, initial_run_dir, return_ref_pe=False, args_and_kwargs_only=False, verbose=False, 
+                          custom_time_and_skypos=None):
     """
     Returns args, kwargs, likelihood manager for a run
     :param args: argparser object, created from create_run_sampler_arg_parser()
@@ -103,6 +104,15 @@ def get_settings_from_args(args, initial_run_dir, return_ref_pe=False, args_and_
     """
 
     reference_parameters, ref_pe_samples = run_sampler.get_injected_parameters(args, initial_run_dir, verbose=verbose)
+    if custom_time_and_skypos is not None:  # for debugging
+        reference_parameters['geocent_time'] = custom_time_and_skypos['tgps_geocent']
+        reference_parameters['geocenter_time'] = custom_time_and_skypos['tgps_geocent']
+        reference_parameters['ra'] = custom_time_and_skypos['ra']
+        reference_parameters['right_ascension'] = custom_time_and_skypos['ra']
+        reference_parameters['dec'] = custom_time_and_skypos['dec']
+        reference_parameters['declination'] = custom_time_and_skypos['dec']
+        reference_parameters['psi'] = custom_time_and_skypos['psi']
+        reference_parameters['polarization'] = custom_time_and_skypos['psi']
 
     kwargs = run_sampler.initialize_kwargs(args, reference_parameters)
 
