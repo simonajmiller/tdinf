@@ -76,23 +76,27 @@ def condition(raw_time_dict, raw_data_dict, t_dict, desired_sample_rate, f_min=1
 
         # Nyquist frequency
         fny = 0.5/(raw_time[1] - raw_time[0])
+        
         # Filter
-        if f_min and not f_max:
-            b, a = sig.butter(4, f_min/fny, btype='highpass', output='ba')
-        elif f_max and not f_min:
-            b, a = sig.butter(4, f_max/fny, btype='lowpass', output='ba')
-        elif f_min and f_max:
-            b, a = sig.butter(4, (f_min/fny, f_max/fny), btype='bandpass',
-                              output='ba')
+        # if f_min and not f_max:
+        #     b, a = sig.butter(4, f_min/fny, btype='highpass', output='ba')
+        # elif f_max and not f_min:
+        #     b, a = sig.butter(4, f_max/fny, btype='lowpass', output='ba')
+        # elif f_min and f_max:
+        #     b, a = sig.butter(4, (f_min/fny, f_max/fny), btype='bandpass',
+        #                       output='ba')
+        # if f_min or f_max:
+        #     data = sig.filtfilt(b, a, raw_data)
+        # else:
+        #     data = raw_data.copy()
 
-        if f_min or f_max:
-            data = sig.filtfilt(b, a, raw_data)
-        else:
-            data = raw_data.copy()
+        b, a = sig.butter(4, f_min/fny, btype='highpass', output='ba')
+        data = sig.filtfilt(b, a, raw_data)
         
         # Decimate
         if downsample_factor > 1:
             if scipy_decimate:
+                # sig.decimate includes a lowpass filter at target fny!
                 data = sig.decimate(data, downsample_factor, zero_phase=True)
             else:
                 data = data[::downsample_factor]
@@ -238,19 +242,24 @@ def get_ACF(pe_psds, time_dict, f_low=11, f_max=None, nan_inf_replacement=1e10, 
             psd, nan=nan_inf_replacement, posinf=nan_inf_replacement, neginf=nan_inf_replacement
         )
 
-        # cut out frequencies above upper bound (defaults nyquist)
+        # patch frequencies outside of bounds 
         nyquist_freq = 0.5 / dt
         if f_max is not None:
             if f_max > nyquist_freq:
                 raise(ValueError, f"WARNING: f_max {f_max} cannot be greater than the nyquist frequency {nyquist_freq}")
         fmax = f_max if f_max is not None else nyquist_freq
-        m_upper = freq <= fmax
-        freq = freq[m_upper]
-        psd = psd[m_upper]
+
+        # get rid of everything above nyquist frequency
+        m_ny = freq <= nyquist_freq
+        freq = freq[m_ny]
+        psd = psd[m_ny]
 
         # set values below f_low to be equal to 100*max(psd)
         m_lower = freq >= f_low
-        psd[~m_lower] = 100 * max(psd[m_lower])
+        m_upper = freq <= fmax
+        mask = m_lower & m_upper
+        patch = 100 * max(psd[mask])
+        psd[~mask] = 100 * patch
         
         # Compute ACF from PSD
         rho = 0.5 * np.fft.irfft(psd) / dt  # dt comes from numpy fft conventions
