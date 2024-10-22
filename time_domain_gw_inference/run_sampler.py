@@ -210,6 +210,7 @@ def get_injected_parameters(args, initial_run_dir='', verbose=False):
         else:
             reference_parameters = utils.parse_injected_parameters(args.reference_parameters,
                                                                   initial_run_dir=initial_run_dir)
+            ref_pe_samples = None
 
         if 'f_ref' not in reference_parameters.keys():
             reference_parameters['f_ref'] = args.fref
