@@ -13,16 +13,24 @@ import argparse
 import tqdm
 
 
-def save_waveform_h5py(output_file, waveform_dict_list):
+def save_waveform_h5py(output_file, waveform_dict_list, maxL_waveform_dict):
     """
     save list of waveform dicts
     """
     # Save output to HDF5
     with h5py.File(output_file, 'w') as f:
+        
+        # maxL 
+        group = f.create_group('maxL')
+        for key, value in maxL_waveform_dict.items():
+            group.create_dataset(key, data=value) 
+        
+        # random draws
         for i, wf_dict in enumerate(waveform_dict_list):
             group = f.create_group(f'waveform_{i}')
             for key, value in wf_dict.items():
                 group.create_dataset(key, data=value)
+        
 
 
 def load_waveform_h5py(output_file):
@@ -101,6 +109,8 @@ if __name__ == "__main__":
         filename_dict['full'],
         directory + '/',
         full_parser, verbose=True)
+    
+    print(filename_dict)
 
     sub_directory = filename_dict[args.run_key]
     dataframe = group_postprocess.load_dataframe(directory, sub_directory)
@@ -108,11 +118,25 @@ if __name__ == "__main__":
     waveform_dir = os.path.join(directory, 'waveforms')
     if not os.path.exists(waveform_dir):
         os.mkdir(waveform_dir)
-
-    rand_ints = np.random.randint(len(dataframe), size=N_waveforms)
-
-    delta_t = full_likelihood_manager.time_dict[full_likelihood_manager.ifos[0]][1] - \
-              full_likelihood_manager.time_dict[full_likelihood_manager.ifos[0]][0]
+        
+    # Find maxL waveform
+    i_max_logL = np.argmax(dataframe['ln_posterior'] - dataframe['ln_prior'])
+    max_logL_params = dataframe.iloc[i_max_logL]
+    
+    maxL_wf_dict = full_likelihood_manager.waveform_manager.get_projected_waveform(
+        max_logL_params,
+        full_likelihood_manager.ifos, 
+        time_dict = full_likelihood_manager.time_dict ,
+        f22_start = full_likelihood_manager.f22_start, 
+        f_ref = full_likelihood_manager.f_ref
+    )
+        
+    # Generate a bunch
+    if N_waveforms == len(dataframe): 
+        print('generating reconstructions for all the waveforms')
+        rand_ints = np.arange(N_waveforms)
+    else:
+        rand_ints = np.random.randint(len(dataframe), size=N_waveforms)
 
     # Prepare the arguments for starmap
     parallel_args = [(i, dataframe, full_likelihood_manager) for i in rand_ints]
@@ -121,5 +145,5 @@ if __name__ == "__main__":
         # Use pool.starmap to parallelize the computation
         results = list(pool.starmap(compute_waveform, tqdm.tqdm(parallel_args, total=N_waveforms)))
 
-    save_waveform_h5py(waveform_filename, results)
+    save_waveform_h5py(waveform_filename, results, maxL_wf_dict)
     print("all done! waveforms saved to:", waveform_filename)
