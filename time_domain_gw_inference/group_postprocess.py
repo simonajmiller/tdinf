@@ -37,46 +37,76 @@ def load_run_settings_from_directory(directory, filename_dict=None, args_and_kwa
 
     parser = run_sampler.create_run_sampler_arg_parser()
 
-    for run in settings.keys():
-        td_settings = settings['runs']
-        td_samples = settings['dfs']
-        directory = settings['dir']
-        for key in td_settings.keys():
-            print(f'key: {key}')
-            _args_and_kwargs_only = args_and_kwargs_only
-            if key == 'full':
-                _args_and_kwargs_only = False
-            try:
-                output = get_settings_from_command_line_file(
-                    os.path.join(directory, 'command_line.sh'),
-                    filename_dict[key],
-                    directory + '/',
-                    parser, verbose=True, args_and_kwargs_only=_args_and_kwargs_only)
-                if _args_and_kwargs_only:
-                    args, kwargs = output
-                else:
-                    args, kwargs, lm = output
-                    td_settings[key]['likelihood_manager'] = lm
-                td_settings[key]['args'] = args
-                td_settings[key]['kwargs'] = kwargs
-            except TypeError as e:
-                print(e)
-                print(f'unable to make {run} {key}')
+    #for run in settings.keys():
+    td_settings = settings['runs']
+    td_samples = settings['dfs']
+    directory = settings['dir']
 
-            df = load_dataframe(directory, filename_dict[key])
-            if df is None:
-                continue
+    # Set up reading in reference parameters, this saves us from having to load in reference parameters a bunch of times, which is very slow 
+    if 'full' in settings['runs'].keys():
+        reference_key = 'full'
+    else:
+        reference_key = list(settings['runs'].keys())[0]
 
-            td_samples[key] = df
+    args, kwargs, lm, reference_parameters, ref_pe_samples = get_settings_from_command_line_file(
+                os.path.join(directory, 'command_line.sh'),
+                filename_dict[reference_key],
+                directory + '/',
+                parser, verbose=True, args_and_kwargs_only=False, return_ref_pe=True)
+    td_settings[reference_key]['likelihood_manager'] = lm
+    td_settings[reference_key]['args'] = args
+    td_settings[reference_key]['kwargs'] = kwargs
+    df = load_dataframe(directory, filename_dict[reference_key])
+    if df is not None:
+        td_samples[reference_key] = df
+    
+    # Load in the rest of the keys now that we don't have to load reference parameters 
+    for key in tqdm(td_settings.keys()):
+        if key == reference_key:
+            # we have already loaded in reference key 
+            continue
+        print(f'key: {key}')
+        _args_and_kwargs_only = args_and_kwargs_only
+        if key == 'full':
+            _args_and_kwargs_only = False
+        try:
+            output = get_settings_from_command_line_file(
+                os.path.join(directory, 'command_line.sh'),
+                filename_dict[key],
+                directory + '/',
+                parser, verbose=True, reference_parameters=reference_parameters, args_and_kwargs_only=_args_and_kwargs_only)
+            if _args_and_kwargs_only:
+                args, kwargs = output
+            else:
+                args, kwargs, lm = output
+                td_settings[key]['likelihood_manager'] = lm
+            td_settings[key]['args'] = args
+            td_settings[key]['kwargs'] = kwargs
+        except TypeError as e:
+            print(e)
+            print(f'unable to make settings for {key}')
+
+        df = load_dataframe(directory, filename_dict[key])
+        if df is None:
+            continue
+
+        td_samples[key] = df
     return settings
 
 
 def load_dataframe(directory, run_directory_name):
+    """
+    Loads pandas dataframes, loads dataframe containing eccentricity samples if exists
+    """
+    data_filenames = [f'new_{run_directory_name}.dat', f'{run_directory_name}.dat']
+    
+    for data_filename in data_filenames: 
+        filename = os.path.join(directory, data_filename)
+        if not os.path.exists(filename):
+            filename = os.path.join(directory, run_directory_name + '/' + data_filename)
 
-    filename = os.path.join(directory, run_directory_name + '.dat')
-    if not os.path.exists(filename):
-        filename = os.path.join(directory, run_directory_name + '/' + run_directory_name + '.dat')
-
+        if os.path.exists(filename):
+            break
     try:
         df = pd.read_csv(filename, delimiter='\s+')
     except:
@@ -86,15 +116,15 @@ def load_dataframe(directory, run_directory_name):
 
 
 def get_settings_from_command_line_string(command_line_string, initial_run_dir, parser, args_and_kwargs_only=False,
-                                          return_ref_pe=False, verbose=False):
+                                          return_ref_pe=False, verbose=False, reference_parameters=None):
     skip_initial_arg = command_line_string.split()[1:]
     args = parser.parse_args(skip_initial_arg)
     return get_settings_from_args(args, initial_run_dir, verbose=verbose, args_and_kwargs_only=args_and_kwargs_only,
-                                  return_ref_pe=return_ref_pe)
+                                  return_ref_pe=return_ref_pe, reference_parameters=reference_parameters)
 
 
 def get_settings_from_args(args, initial_run_dir, return_ref_pe=False, args_and_kwargs_only=False, verbose=False, 
-                          custom_time_and_skypos=None):
+                          custom_time_and_skypos=None, reference_parameters=None):
     """
     Returns args, kwargs, likelihood manager for a run
     :param args: argparser object, created from create_run_sampler_arg_parser()
@@ -102,8 +132,8 @@ def get_settings_from_args(args, initial_run_dir, return_ref_pe=False, args_and_
     :param verbose:
     :return:
     """
-
-    reference_parameters, ref_pe_samples = run_sampler.get_injected_parameters(args, initial_run_dir, verbose=verbose)
+    if reference_parameters is None:
+        reference_parameters, ref_pe_samples = run_sampler.get_injected_parameters(args, initial_run_dir, verbose=verbose)
     if custom_time_and_skypos is not None:  # for debugging
         reference_parameters['geocent_time'] = custom_time_and_skypos['tgps_geocent']
         reference_parameters['geocenter_time'] = custom_time_and_skypos['tgps_geocent']
@@ -446,12 +476,12 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
              ifo='L1', save_dir = None,
              ylim=None, inset_ylim=None, 
              xlim=None, 
-             percentiles=True, reference_df=None, plot_inset=True,
+             percentiles=True, reference_df=None, plot_inset=True, loc='upper',
              plot_whitened=False,
              param_xlims=None, modes = None, hist_modes = None,
              scatter_2D_list=None,
              alpha_reconstruct=0.02, make_legend=True,
-             inset_down=False, param_ylims=None, hist_kwargs=None,
+             inset_down=False, param_ylims=None, hist_kwargs=None, 
              plot_data_with_modes=False, figsize=(11.538, 2.4)):
     """
     tc_floats: time cuts, desired order
@@ -466,6 +496,7 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
     percentiles: if true, plots 50th and 90th percentile of wfs_at_tc_list, if false plots draws
     reference_df: if a plot_param is in reference_df, will plot reference_df[param] as a vertical line
     plot_inset: plot whitened waveform as a little inset
+    loc: Location of inset (default, 'upper')
     plot_whitened: if true, plots whitened waveforms instead of colored
     param_xlims: dict of xlims to use for different parameter hists
     modes: list of which modes to plot, options are from 'pre' and 'post' or []
@@ -675,7 +706,7 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
             # add inset plot to leftmost 
             # -------------------------------------------------------------------------
             axin = make_inset_plot(axes[0], time_dict_M[ifo], whitened_data_dict[ifo], whitened_reference_wf[ifo], tc_M, 
-                                l=0.4, w=0.3, dx=0.04, xlim=xlim, inset_ylim=inset_ylim)
+                                l=0.4, w=0.3, dx=0.04, xlim=xlim, inset_ylim=inset_ylim,loc=loc)
 
         for ax in axes:
             x0, y0, x1, y1 = ax.get_position().bounds
@@ -1104,6 +1135,7 @@ def make_corner_gif(individual_run,
 
     
         axes = np.array(fig.axes).reshape((len(plot_keys), len(plot_keys)))
+        
         # corner does weird shit with histograms, replot here 
         for i in range(len(plot_keys)):
             parameter = plot_keys[i]
@@ -1117,7 +1149,7 @@ def make_corner_gif(individual_run,
             ax.set_ylim(ylims[i])
 
         ax = axes[0, -1]
-        
+
         axin = make_inset_plot(ax, time_dict_M[ifo], whitened_data_dict[ifo], whitened_reference_wf[ifo],
                         time_to_mass(t_cut), l=0.5, **kwargs)
         
