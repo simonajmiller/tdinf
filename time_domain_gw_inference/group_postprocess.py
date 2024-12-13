@@ -132,6 +132,7 @@ def get_settings_from_args(args, initial_run_dir, return_ref_pe=False, args_and_
     :param verbose:
     :return:
     """
+    ref_pe_samples = None
     if reference_parameters is None:
         reference_parameters, ref_pe_samples = run_sampler.get_injected_parameters(args, initial_run_dir, verbose=verbose)
     if custom_time_and_skypos is not None:  # for debugging
