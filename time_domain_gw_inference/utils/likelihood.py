@@ -75,7 +75,7 @@ def interpolate_timeseries(time, values, new_time_grid):
     
     return value_on_grid
 
-def apply_window(timeseries): 
+def apply_window(timeseries):
     nsamps = len(timeseries)
     window = tukey(nsamps)
     window[int(0.5*nsamps):] = 1.
@@ -251,6 +251,11 @@ class LnPriorManager(LogisticParameterManager):
                     # there are no prior bounds for cartesian angles, so don't check them
                     if not param_logistic:
                         break
+
+                    walkers_phys = reference_posteriors[param_kw][idxs]
+                    if type(param) == TrigLogisticParameter:
+                        walkers_phys = param.trig_function(walkers_phys)
+
                     # check if the reference posterior is outisde the prior
                     for i, param_phys in enumerate(walkers_phys):
 
@@ -260,10 +265,6 @@ class LnPriorManager(LogisticParameterManager):
                             reference_posteriors.at[i, param_kw] = new_param_phys
 
             if use_reference_posterior:
-                walkers_phys = reference_posteriors[param_kw][idxs]
-
-                if type(param) == TrigLogisticParameter:
-                    walkers_phys = param.trig_function(walkers_phys)
 
                 if param_logistic:
                     # Logistic parameter transformation
@@ -457,7 +458,6 @@ class WaveformManager(LogisticParameterManager):
 
         # apply tukey window if desired 
         if window:
-            print
             hp = apply_window(hp)
             hc = apply_window(hc)
         
@@ -603,7 +603,7 @@ class LnLikelihoodManager(LogisticParameterManager):
             x_phys, self.ifos, self.time_dict,
             f22_start=kwargs.get('f22_start', self.f22_start),
             f_ref=kwargs.get('f_ref', self.f_ref),
-            window=kwargs.get('window', False)
+            #window=kwargs.get('window', False)
         )
         if verbose:
             print('done getting wf')
