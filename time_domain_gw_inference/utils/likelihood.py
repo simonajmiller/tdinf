@@ -450,16 +450,16 @@ class WaveformManager(LogisticParameterManager):
                                         mean_anomaly_periastron=x_phys['mean_anomaly'])
         return TimeSeries.from_lal(hp), TimeSeries.from_lal(hc)
 
-    def get_projected_waveform(self, x_phys, ifos, time_dict, f22_start=11, f_ref=11, window=False):
+    def get_projected_waveform(self, x_phys, ifos, time_dict, f22_start=11, f_ref=11):#, window=False):
         delta_t = time_dict[ifos[0]][1] - time_dict[ifos[0]][0]
 
         # get hplus and hcross
         hp, hc = self.get_hplus_hcross(x_phys, delta_t, f22_start=f22_start, f_ref=f_ref)
 
         # apply tukey window if desired 
-        if window:
-            hp = apply_window(hp)
-            hc = apply_window(hc)
+        # if window:
+        #     hp = apply_window(hp)
+        #     hc = apply_window(hc)
         
         # set times in geocenter time
         hp.t0 = x_phys['geocenter_time'] + hp.t0.value
