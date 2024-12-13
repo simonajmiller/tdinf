@@ -44,9 +44,11 @@ def load_waveform_h5py(output_file):
     return waveform_dict_list
 
 
-def compute_waveform(i, data_frame, likelihood_manager):
-    params = data_frame.iloc[i]
-    return group_postprocess.get_waveform_dict(params, likelihood_manager, ifos=likelihood_manager.ifos)
+def get_projected_waveform_parallel(waveform_manager, x_phys, ifos, time_dict, f22_start, f_ref):
+    """
+    Wrapper function to make `get_projected_waveform` compatible with starmap.
+    """
+    return waveform_manager.get_projected_waveform(x_phys, ifos, time_dict, f22_start, f_ref)
 
 
 def load_or_get_N_waveforms(dataframe, likelihood_manager, output_file=None, overwrite=False, **kwargs):
@@ -138,12 +140,17 @@ if __name__ == "__main__":
     else:
         rand_ints = np.random.randint(len(dataframe), size=N_waveforms)
 
-    # Prepare the arguments for starmap
-    parallel_args = [(i, dataframe, full_likelihood_manager) for i in rand_ints]
+    waveform_managers = [utils.NewWaveformManager(full_likelihood_manager.ifos,
+                             full_args.use_higher_order_modes, **full_kwargs) for i in range(args.ncpu)]
 
-    with mp.Pool(processes=args.ncpu) as pool:
-        # Use pool.starmap to parallelize the computation
-        results = list(pool.starmap(compute_waveform, tqdm.tqdm(parallel_args, total=N_waveforms)))
+    # Processes are split by ::ncpu, so by doing this we can ensure that we only pass 1 waveform manager per cpu
+    parallel_args = [(waveform_managers[i % args.ncpu],
+                     dataframe.iloc[index],
+                     full_likelihood_manager.ifos,
+                     full_likelihood_manager.time_dict, full_likelihood_manager.f22_start, full_likelihood_manager.f_ref) for i, index in enumerate(rand_ints)]
+
+    with mp.Pool(processes=args.ncpu) as pool:  # Adjust the number of processes as needed
+        results = pool.starmap(get_projected_waveform_parallel, tqdm.tqdm(parallel_args, total=N_waveforms))
 
     save_waveform_h5py(waveform_filename, results, maxL_wf_dict)
     print("all done! waveforms saved to:", waveform_filename)
