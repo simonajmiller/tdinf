@@ -132,7 +132,6 @@ def get_settings_from_args(args, initial_run_dir, return_ref_pe=False, args_and_
     :param verbose:
     :return:
     """
-    ref_pe_samples = None
     if reference_parameters is None:
         reference_parameters, ref_pe_samples = run_sampler.get_injected_parameters(args, initial_run_dir, verbose=verbose)
     if custom_time_and_skypos is not None:  # for debugging
@@ -197,11 +196,18 @@ def calc_additional_parameters(df):
     # Calculate component masses
     m1s, m2s = utils.m1m2_from_mtotq(df['total_mass'], df['mass_ratio'])
 
-    # Calculate chi-eff
-    chieffs = utils.chi_effective(m1s, df['spin1_magnitude'], df['tilt1'], m2s, df['spin2_magnitude'], df['tilt2'])
-
-    # Calculate chi-p
-    chips = utils.chi_precessing(m1s, df['spin1_magnitude'], df['tilt1'], m2s, df['spin2_magnitude'], df['tilt2'])
+    try:
+        # Calculate chi-eff
+        chieffs = utils.chi_effective(m1s, df['spin1_magnitude'], df['tilt1'], m2s, df['spin2_magnitude'], df['tilt2'])
+    
+        # Calculate chi-p
+        chips = utils.chi_precessing(m1s, df['spin1_magnitude'], df['tilt1'], m2s, df['spin2_magnitude'], df['tilt2'])
+    except(KeyError):
+        # Calculate chi-eff
+        chieffs = utils.chi_effective(m1s, df['spin1_magnitude'], df['tilt_1'], m2s, df['spin2_magnitude'], df['tilt_2'])
+    
+        # Calculate chi-p
+        chips = utils.chi_precessing(m1s, df['spin1_magnitude'], df['tilt_1'], m2s, df['spin2_magnitude'], df['tilt_2'])
 
     df['mass1'] = m1s
     df['mass2'] = m2s
@@ -292,11 +298,11 @@ def whiten_waveform_dict(wf_dict, likelihood_manager):
         whitened_wf_dict[ifo] = whiten_waveform(wf_dict[ifo], likelihood_manager, ifo)
     return whitened_wf_dict
 
-def whiten_waveform_list(wf_dict_list, likelihood_manager):
+def whiten_waveform_list(wf_dict_list, likelihood_manager, turn_off_tqdm_print=False):
     whitened_waveform_list = []
     
     # print out progress
-    with tqdm(total=len(wf_dict_list)) as t:
+    with tqdm(total=len(wf_dict_list), disable=turn_off_tqdm_print) as t:
     
         # cycle through the waveforms and whiten each one
         for wf_dict in wf_dict_list:
@@ -408,7 +414,7 @@ def plot_pre_and_post(ax, mode, times, tc_M, data, reference_wf, wf_dict_list, x
         scale_const = 1
         _data = whiten_waveform(data, likelihood_manager, ifo)
         _reference_wf = whiten_waveform(reference_wf, likelihood_manager, ifo)
-        _wf_dict_list = whiten_waveform_list(wf_dict_list, likelihood_manager)
+        _wf_dict_list = whiten_waveform_list(wf_dict_list, likelihood_manager, True)
         
     
     else:
@@ -640,6 +646,8 @@ def make_gif(tc_floats, wfs_at_tc_list, reference_waveform_dict, dfs_at_tc, full
                                  **mode_kwargs[mode],
                                  **hist_kwargs)
                 except KeyError:
+                    pass
+                except TypeError:
                     pass
             ax.hist(full_df[param], lw=1.5, #histtype='step',
                          color='k', zorder=2, **hist_kwargs)
