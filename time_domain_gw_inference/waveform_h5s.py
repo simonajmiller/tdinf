@@ -141,7 +141,10 @@ if __name__ == "__main__":
         rand_ints = np.random.randint(len(dataframe), size=N_waveforms)
 
     waveform_managers = [utils.NewWaveformManager(full_likelihood_manager.ifos,
-                             full_args.use_higher_order_modes, **full_kwargs) for i in range(args.ncpu)]
+                             full_args.use_higher_order_modes,
+                                vary_time=full_args.vary_time,
+                                vary_eccentricity=full_args.vary_eccentricity,
+                                vary_skypos=full_args.vary_skypos, **full_kwargs) for i in range(args.ncpu)]
 
     # Processes are split by ::ncpu, so by doing this we can ensure that we only pass 1 waveform manager per cpu
     parallel_args = [(waveform_managers[i % args.ncpu],
