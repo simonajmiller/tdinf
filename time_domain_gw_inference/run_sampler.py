@@ -283,7 +283,10 @@ def make_waveform_manager(args, **kwargs):
     :param kwargs:
     :return:
     """
-    if args.approx == 'TEOBResumSDALI':
+    if args.approx == 'TEOBResumSDALI' or args.approx == 'SEOBNRv5EHM':
+        if not args.vary_eccentricity:
+            print("WARNING: using eccentric waveforms but you have turned off eccentricity varying! use --vary-eccentricity to turn it back on")
+
         wf_manager = utils.NewWaveformManager(args.ifos,
                                               use_higher_order_modes=args.use_higher_order_modes,
                                               vary_time=args.vary_time,
