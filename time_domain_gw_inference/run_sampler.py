@@ -88,6 +88,7 @@ def create_run_sampler_arg_parser():
 
     # Do we want to resume an old run?
     p.add_argument('--resume', action='store_true')
+    p.add_argument('--skip-compute-SNR', action='store_true')
 
     # Debugging
     p.add_argument('--verbose', action='store_true')
@@ -580,7 +581,7 @@ def main():
     print(sampler.get_chain().shape)
 
     # Postprocessing
-    df = utils.postprocess_samples(sampler,likelihood_manager,**kwargs)
+    df = utils.postprocess_samples(sampler,likelihood_manager, args.skip_compute_SNR, **kwargs)
 
     # Save
     sample_path = backend_path.replace('h5', 'dat')

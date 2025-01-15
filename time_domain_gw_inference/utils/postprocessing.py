@@ -35,7 +35,8 @@ def get_dict_from_samples(samples, parameter_manager, **kwargs):
     return pandas.DataFrame(samps_phys)
 
 
-def postprocess_samples(sampler, likelihood_manager, getRidOfFixed=False, **kwargs):
+
+def postprocess_samples(sampler, likelihood_manager, skip_compute_SNR, getRidOfFixed=False, **kwargs):
 
     """
     Post-process emcee sample chains
@@ -72,12 +73,13 @@ def postprocess_samples(sampler, likelihood_manager, getRidOfFixed=False, **kwar
     
     # Add likelihood values 
     samples_dict['ln_likelihood'] = samples_lnp - samples_lnprior
-    
-    # Finally, generate SNRs and add them to the samples 
-    SNRs_dict = likelihood_manager.get_SNRs(samples)
-    for k in SNRs_dict: 
-        samples_dict[k] = SNRs_dict[k]
-        
+
+    if not skip_compute_SNR:
+        # Finally, generate SNRs and add them to the samples
+        SNRs_dict = likelihood_manager.get_SNRs(samples)
+        for k in SNRs_dict:
+            samples_dict[k] = SNRs_dict[k]
+
     print(samples_dict.keys())
 
     # Get rid of the fixed parameters if we want
