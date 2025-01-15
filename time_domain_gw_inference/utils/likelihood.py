@@ -1,5 +1,8 @@
 import numpy as np
-from scipy.signal import tukey
+try:
+    from scipy.signal import tukey
+except ImportError:
+    from scipy.signal.windows import tukey
 from scipy.linalg import solve_toeplitz
 from scipy.interpolate import interp1d
 import lal
@@ -22,18 +25,36 @@ from .preprocessing import get_ACF
 import astropy.units as u
 
 try:
-    import gwsignal
-    from gwsignal.models.teobresums import TEOBResumSDALI
+    import lalsimulation.gwsignal as gwsignal
     from gwsignal.core import waveform as wfm
+
+except ImportError:
+    try:
+        import gwsignal
+        from gwsignal.core import waveform as wfm
+
+    except:
+        print("WARNING: Unable to import GWsignal! won't be able to use DALI or SEOBNRv5EHM")
+
+try:
+    from gwsignal.models.teobresums import TEOBResumSDALI
 except ImportError:
     print("Warning! Will not be able to use TEOBResumSDALI approximation")
 
+try:
+    from lalsimulation.gwsignal.models import gwsignal_get_waveform_generator
+    #from pyseobnr.generate_waveform import generate_modes_opt, GenerateWaveform
+except ImportError:
+    print("Warning! Will not be able to use SEOBNRv5EHM approximation")
 
 def check_spin_settings_of_approx(approx_name):
     aligned_spins = False
     no_spins = False
 
     if approx_name == 'TEOBResumSDALI':
+        aligned_spins = True
+        return aligned_spins, no_spins
+    elif approx_name == 'SEOBNRv5EHM':
         aligned_spins = True
         return aligned_spins, no_spins
 
@@ -218,6 +239,7 @@ class LogisticParameterManager:
         # TODO, maybe it should check if we have an eccentric waveform?
         if 'eccentricity' in physical_dict:
             param_dict['eccentricity'] = physical_dict['eccentricity'] * u.dimensionless_unscaled
+            # TODO, different param for SEOB? 
             param_dict['meanPerAno'] = physical_dict['mean_anomaly'] * u.rad
         return param_dict
 
@@ -490,14 +512,26 @@ class WaveformManager(LogisticParameterManager):
 
 class NewWaveformManager(LogisticParameterManager):
     def __init__(self, ifos, use_higher_order_modes, *args, **kwargs):
+        print("args:", args)
+        print("kwargs:", kwargs)
         super(NewWaveformManager, self).__init__(*args, **kwargs)
         self.approx_name = kwargs['approx']
+        print('approx name is ', self.approx_name)
+        self.waveform_kwargs = {}
         if self.approx_name == 'TEOBResumSDALI':
             if use_higher_order_modes:
                 print('generator using higher order modes')
                 self.generator = TEOBResumSDALI(modes_to_use=[[2, 2], [2, 1], [3, 3], [4, 4]])
             else:
                 self.generator = TEOBResumSDALI(modes_to_use=[[2, 2]])
+        elif self.approx_name == 'SEOBNRv5EHM':
+            self.generator = gwsignal_get_waveform_generator(self.approx_name)
+            if use_higher_order_modes:
+                print('generator using higher order modes')
+                #self.waveform_kwargs['return_modes'] = [(2,2), (2,1), (3,2), (3,3), (4,3), (4,4)]
+            else:
+                pass
+                #self.waveform_kwargs['return_modes'] = [(2,2)]
         else:
             self.generator = gwsignal.core.waveform.LALCompactBinaryCoalescenceGenerator(self.approx_name)
 
@@ -514,6 +548,7 @@ class NewWaveformManager(LogisticParameterManager):
         params['deltaT'] = delta_t * u.s
         params['f22_ref'] = f_ref * u.Hz
         params['condition'] = 0
+        params.update(self.waveform_kwargs)
 
         return wfm.GenerateTDWaveform(params, self.generator)
 
@@ -654,20 +689,22 @@ class LnLikelihoodManager(LogisticParameterManager):
         # Return posterior
         return lnprob
             
-    def get_SNRs(self, samples): 
+    def get_SNRs(self, samples, samples_phys=None): 
         
         '''
         Get SNRs for a list of samples
         '''
+        if samples_phys is None:
+            samples_phys = [self.samp_to_phys(x) for x in samples]
                 
         # set up arrays
-        per_detector_opt_snrs = np.zeros((len(self.ifos), len(samples)))
-        per_detector_mf_snrs = np.zeros((len(self.ifos), len(samples)))
-        network_opt_snrs = np.zeros(len(samples))
-        network_mf_snrs = np.zeros(len(samples))
+        per_detector_opt_snrs = np.zeros((len(self.ifos), len(samples_phys)))
+        per_detector_mf_snrs = np.zeros((len(self.ifos), len(samples_phys)))
+        network_opt_snrs = np.zeros(len(samples_phys))
+        network_mf_snrs = np.zeros(len(samples_phys))
+    
+            
         
-        # cycle through the input samples
-        samples_phys = [self.samp_to_phys(x) for x in samples]
         for i,x_phys in enumerate(samples_phys):
             
             # get waveforms for this sample
