@@ -120,9 +120,16 @@ class LogisticParameterManager:
                                     TrigLogisticParameter('inclination', 'cos', [-1, 1], None)
                                     ]
         if not self.no_spins:
-            self.logistic_parameters.extend([
-                LogisticParameter('spin1_magnitude', kwargs['chi_lim'], None),
-                LogisticParameter('spin2_magnitude', kwargs['chi_lim'], None)])
+            # for aligned spins, "spin magnitude" acts as spin zs, so they can be positive or negative
+            if self.aligned_spins:
+                self.logistic_parameters.extend([
+                    LogisticParameter('spin1_z', [-kwargs['chi_lim'][1], kwargs['chi_lim'][1]], None),
+                    LogisticParameter('spin2_z', [-kwargs['chi_lim'][1], kwargs['chi_lim'][1]], None)])
+            # for precessing
+            else:
+                self.logistic_parameters.extend([
+                    LogisticParameter('spin1_magnitude', kwargs['chi_lim'], None),
+                    LogisticParameter('spin2_magnitude', kwargs['chi_lim'], None)])
 
         if self.vary_eccentricity:
             self.logistic_parameters.append(LogisticParameter('eccentricity', kwargs['eccentricity_lim'], None))
@@ -133,9 +140,8 @@ class LogisticParameterManager:
         self.sampled_keys = [p.logistic_name for p in self.logistic_parameters]
 
         if not self.no_spins:
-            if self.aligned_spins:
-                self.sampled_keys.extend(['c1_z', 'c2_z'])
-            else:
+            # for precessing spins, samples magnitude and components independently
+            if not self.aligned_spins:
                 self.sampled_keys.extend(
                     ['c1_x', 'c1_y', 'c1_z',
                      'c2_x', 'c2_y', 'c2_z'])
@@ -190,6 +196,8 @@ class LogisticParameterManager:
     def get_physical_spins(self, spin_magnitude, c_x, c_y, c_z):
         if self.no_spins:
             return 0, 0, 0
+        if self.aligned_spins:
+            return 0, 0, c_z
 
         chi_norm = spin_magnitude / np.sqrt(c_x ** 2 + c_y ** 2 + c_z ** 2)
 
@@ -206,11 +214,15 @@ class LogisticParameterManager:
 
         # normalize spins
         for i in ['1', '2']:
-            physical_dict[f'spin{i}_x'], physical_dict[f'spin{i}_y'], physical_dict[f'spin{i}_z'] = \
-                self.get_physical_spins(physical_dict.get(f'spin{i}_magnitude', 0),
-                                        x_dict.get(f'c{i}_x', 0),
-                                        x_dict.get(f'c{i}_y', 0),
-                                        x_dict.get(f'c{i}_z', 0))
+            if self.aligned_spins:
+                physical_dict[f'spin{i}_x'], physical_dict[f'spin{i}_y'], physical_dict[f'spin{i}_z'] = 0, 0, physical_dict.get(f'spin{i}_z', 0)
+            # for precessing spins, realign
+            else:
+                physical_dict[f'spin{i}_x'], physical_dict[f'spin{i}_y'], physical_dict[f'spin{i}_z'] = \
+                    self.get_physical_spins(physical_dict.get(f'spin{i}_magnitude', 0),
+                                            x_dict.get(f'c{i}_x', 0),
+                                            x_dict.get(f'c{i}_y', 0),
+                                            x_dict.get(f'c{i}_z', 0))
         if self.vary_time:
             physical_dict['geocenter_time'] = x_dict['geocenter_time']
 
@@ -361,10 +373,8 @@ class LnPriorManager(LogisticParameterManager):
 
         # Spins
         if not self.no_spins:
-            if self.aligned_spins:
-                lnprior += -0.5 * (x_dict['c1_z'] ** 2)
-                lnprior += -0.5 * (x_dict['c2_z'] ** 2)
-            else:
+            # precessing spins make flat in spin components
+            if not self.aligned_spins:
                 lnprior += -0.5 * (x_dict['c1_x'] ** 2 + x_dict['c1_y'] ** 2 + x_dict['c1_z'] ** 2)
                 lnprior += -0.5 * (x_dict['c2_x'] ** 2 + x_dict['c2_y'] ** 2 + x_dict['c2_z'] ** 2)
 
@@ -688,7 +698,7 @@ class LnLikelihoodManager(LogisticParameterManager):
 
         # Return posterior
         return lnprob
-            
+
     def get_SNRs(self, samples, samples_phys=None): 
         
         '''
@@ -702,29 +712,27 @@ class LnLikelihoodManager(LogisticParameterManager):
         per_detector_mf_snrs = np.zeros((len(self.ifos), len(samples_phys)))
         network_opt_snrs = np.zeros(len(samples_phys))
         network_mf_snrs = np.zeros(len(samples_phys))
-    
-            
         
         for i,x_phys in enumerate(samples_phys):
-            
+
             # get waveforms for this sample
             projected_wf_dict = self.waveform_manager.get_projected_waveform(
                     x_phys, self.ifos, self.time_dict,
                     f22_start=self.f22_start,
                     f_ref=self.f_ref
                 )
-            
+
             # lists for per-detector snrs
             opt_snrs = []
             mf_snrs = []
-            
+
             # cycle through the interferometers
             for ifo in self.ifos:
-            
+
                 sig = projected_wf_dict[ifo]
                 data = self.data_dict[ifo]
                 rho = self.rho_dict[ifo]
-                
+
                 opt_snrs.append(calc_opt_SNR(sig, rho))
                 mf_snrs.append(calc_mf_SNR(data, sig, rho))
                 
