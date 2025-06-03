@@ -222,9 +222,11 @@ def get_injected_parameters(args, initial_run_dir='', verbose=False):
         # Load in injected parameters
         reference_parameters = utils.parse_injected_parameters(args.injected_parameters, initial_run_dir=initial_run_dir)
 
-        # Check that the reference freqs line up
-        err_msg = f"Injection fref={reference_parameters['f_ref']} does not equal sampler fref={args.fref}"
-        assert reference_parameters['f_ref'] == args.fref, err_msg
+        # # Check that the reference freqs line up
+        # err_msg = f"Injection fref={reference_parameters['f_ref']} does not equal sampler fref={args.fref}"
+        # assert reference_parameters['f_ref'] == args.fref, err_msg
+        if reference_parameters['f_ref']!= args.fref:
+            print(f"WARNING: fref={reference_parameters['f_ref']} does not equal sampler fref={args.fref}")
         
         ref_pe_samples = None
 

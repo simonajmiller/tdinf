@@ -268,8 +268,6 @@ def get_ACF(pe_psds, time_dict, f_low=11, f_max=None, nan_inf_replacement=1e10, 
         cond_psds[ifo] = np.transpose([freq, psd])
         
     if return_psds: 
-        rho_dict_copy = {k:v.tolist() for k,v in rho_dict.items()}
-        cond_psds_copy = {k:v.tolist() for k,v in cond_psds.items()}       
-        return rho_dict_copy, cond_psds_copy
+        return rho_dict, cond_psds
     else:
         return rho_dict

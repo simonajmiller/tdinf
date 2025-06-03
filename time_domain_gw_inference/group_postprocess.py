@@ -252,8 +252,12 @@ def get_N_waveforms(df, likelihood_manager, ifos=None, N_waveforms=None):
     return wf_dict_list 
     
 def whiten_waveform(wf_array, likelihood_manager, ifo): 
-    return utils.whitenData(wf_array, likelihood_manager.time_dict[ifo],
-                                             likelihood_manager.psd_dict[ifo][:, 1], likelihood_manager.psd_dict[ifo][:, 0])
+    return utils.whitenData(
+        wf_array, 
+        likelihood_manager.time_dict[ifo],
+        likelihood_manager.conditioned_psd_dict[ifo][:, 1], 
+        likelihood_manager.conditioned_psd_dict[ifo][:, 0]
+    )
 
 def whiten_waveform_dict(wf_dict, likelihood_manager):
     whitened_wf_dict = {}

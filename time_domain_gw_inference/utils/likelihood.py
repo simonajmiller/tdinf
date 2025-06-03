@@ -18,6 +18,7 @@ from .misc import logit, inv_logit, logit_jacobian, calc_mf_SNR, calc_opt_SNR, c
 
 from .parameter import LogisticParameter, CartesianAngle, TrigLogisticParameter
 from .preprocessing import get_ACF
+from .whiten import whitenData
 
 import astropy.units as u
 
@@ -581,6 +582,8 @@ class LnLikelihoodManager(LogisticParameterManager):
         for ifo, rho in self.rho_dict.items():
             assert len(rho) == len(self.data_dict[ifo]), 'Length for ACF is not the same as for the data'
         self.only_prior = only_prior
+        self.conditioned_psd_dict = self._make_conditioned_psd_dict()
+        self.whitened_data_dict = self._make_whitened_data_dict()
         try:
             self.waveform_manager = NewWaveformManager(self.ifos, use_higher_order_modes, *args, **kwargs)
         except Exception as e:
@@ -593,6 +596,17 @@ class LnLikelihoodManager(LogisticParameterManager):
 
     def _make_autocorrolation_dict(self):
         return get_ACF(self.psd_dict, self.time_dict, f_low=self.f_low, f_max=self.f_max)
+
+    def _make_conditioned_psd_dict(self):
+        return get_ACF(self.psd_dict, self.time_dict, f_low=self.f_low, f_max=self.f_max, return_psds=True)[1]
+
+    def _make_whitened_data_dict(self): 
+        return {
+            ifo : whitenData(
+                self.data_dict[ifo], self.time_dict[ifo], 
+                self.conditioned_psd_dict[ifo][:,1], self.conditioned_psd_dict[ifo][:,0]
+            ) for ifo in self.ifos
+        }
 
     def waveform_has_error(self, phys_dict, waveform_ifo, residual):
         # check for various errors before continuing
