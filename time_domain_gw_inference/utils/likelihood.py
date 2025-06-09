@@ -441,7 +441,8 @@ class WaveformManager(LogisticParameterManager):
 
         param_dict = lal.CreateDict()
 
-        hp, hc = lalsim.SimInspiralChooseTDWaveform(m1_kg, m2_kg,
+        try:
+            hp, hc = lalsim.SimInspiralChooseTDWaveform(m1_kg, m2_kg,
                                                     chi1[0], chi1[1], chi1[2],
                                                     chi2[0], chi2[1], chi2[2],
                                                     distance, inclination,
@@ -449,6 +450,26 @@ class WaveformManager(LogisticParameterManager):
                                                     delta_t, f22_start, f_ref,
                                                     param_dict,
                                                     self.approximant)
+        except Exception as e:
+            if "Input domain error" in str(e):
+                print("Caught Input domain error")
+                print("m1_kg =", m1_kg)
+                print("m2_kg =", m2_kg)
+                print("chi1 =", chi1)
+                print("chi2 =", chi2)
+                print("distance =", distance)
+                print("inclination =", inclination)
+                print("phi_ref =", phi_ref)
+                print("eccentricity =", eccentricity)
+                print("mean_anomaly_periastron =", mean_anomaly_periastron)
+                print("delta_t =", delta_t)
+                print("f22_start =", f22_start)
+                print("f_ref =", f_ref)
+                print("Exception:", e)
+                hp, hc = np.nan, np.nan # return nans
+            else:
+                raise  # Re-raise other errors
+            
         return hp, hc
 
     def get_hplus_hcross(self, x_phys, delta_t, f22_start=11, f_ref=11):
@@ -466,6 +487,11 @@ class WaveformManager(LogisticParameterManager):
                                         phi_ref=x_phys['phase'],
                                         eccentricity=x_phys['eccentricity'],
                                         mean_anomaly_periastron=x_phys['mean_anomaly'])
+        
+        # for catching waveform errors
+        if isinstance(hp, float) and hp!=hp:
+            return np.nan, np.nan
+        
         return TimeSeries.from_lal(hp), TimeSeries.from_lal(hc)
 
     def get_projected_waveform(self, x_phys, ifos, time_dict, f22_start=11, f_ref=11, window=False):
@@ -473,6 +499,10 @@ class WaveformManager(LogisticParameterManager):
 
         # get hplus and hcross
         hp, hc = self.get_hplus_hcross(x_phys, delta_t, f22_start=f22_start, f_ref=f_ref)
+        
+        # for catching waveform errors
+        if isinstance(hp, float) and hp!=hp:
+            return np.nan
 
         # apply tukey window if desired 
         if window:
@@ -627,7 +657,7 @@ class LnLikelihoodManager(LogisticParameterManager):
 
         return False
 
-    def get_log_posterior(self, x_phys, verbose=False, **kwargs):
+    def get_log_posterior(self, x_phys, verbose=False, **kwargs): # log likelihood
         if verbose:
             print('getting wf')
         
@@ -639,6 +669,10 @@ class LnLikelihoodManager(LogisticParameterManager):
         )
         if verbose:
             print('done getting wf')
+            
+        # Return NaN if "Input domain error" for waveform
+        if isinstance(projected_wf_dict, float) and projected_wf_dict!=projected_wf_dict:
+            return -np.inf
 
         ln_posterior = 0
 
@@ -648,6 +682,7 @@ class LnLikelihoodManager(LogisticParameterManager):
             # Truncate and compute residuals
             r = data - projected_wf_dict[ifo]
 
+            # Check for other waveform errors
             if self.waveform_has_error(x_phys, projected_wf_dict[ifo], r):
                 return -np.inf
 
@@ -656,6 +691,7 @@ class LnLikelihoodManager(LogisticParameterManager):
 
             # Compute log likelihood for ifo
             ln_posterior -= 0.5 * np.dot(r, rwt)
+            
         return ln_posterior
 
     def get_lnprob(self, x, verbose=False,
