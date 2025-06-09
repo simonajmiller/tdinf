@@ -29,7 +29,7 @@ def create_run_sampler_arg_parser():
     p.add_argument('-ts', '--Tcut-seconds', type=float, default=None)
 
     # Start & end times for segment of data to analyze
-    p.add_argument('--Tstart', type=float, default=1242442966.9077148)
+    p.add_argument('--Tstart', type=float, default=1242442966.9077148) # the defaults are for gw190521
     p.add_argument('--Tend', type=float, default=1242442967.607715)
 
     # Place where input data is stored
