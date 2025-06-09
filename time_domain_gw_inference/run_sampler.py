@@ -221,9 +221,7 @@ def get_injected_parameters(args, initial_run_dir='', verbose=False):
         # Load in injected parameters
         reference_parameters = utils.parse_injected_parameters(args.injected_parameters, initial_run_dir=initial_run_dir)
 
-        # # Check that the reference freqs line up
-        # err_msg = f"Injection fref={reference_parameters['f_ref']} does not equal sampler fref={args.fref}"
-        # assert reference_parameters['f_ref'] == args.fref, err_msg
+        # Print a warning if that the reference freqs for inj/recovery do not line up
         if reference_parameters['f_ref']!= args.fref:
             print(f"WARNING: fref={reference_parameters['f_ref']} does not equal sampler fref={args.fref}")
         
@@ -408,21 +406,6 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
         # idx = sample closest to desired time
         time_dict[ifo] = time_dict[ifo][idx - Npre:idx + Npost]
         data_dict[ifo] = data_dict[ifo][idx - Npre:idx + Npost]
-        
-#     # Calculate ACF
-#     rho_dict, cond_psds = utils.get_ACF(pe_psds, time_dict, f_low=args.flow, f_max=args.fmax, return_psds=True)
-    
-#     # Save ACF 
-#     save_ACF=True
-#     if save_ACF:
-#         acf_path = backend_path.replace('.h5', '_ACF.json')
-#         with open(acf_path, "w") as f:
-#             json.dump(rho_dict, f) 
-
-#         # Save conditioned PSDs 
-#         cond_psd_path = backend_path.replace('.h5', '_cond_psds.json')
-#         with open(cond_psd_path, "w") as f:
-#             json.dump(cond_psds, f) 
 
     return time_dict, data_dict, pe_psds
 
