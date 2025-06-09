@@ -86,3 +86,33 @@ def get_antenna_pattern_dict(tgps_geocent, ifos, ra, dec, psi):
         ap_dict[ifo] = lal.ComputeDetAMResponse(lal.cached_detector_by_prefix[ifo].response,
                                                 ra, dec, psi, gmst)
     return ap_dict
+
+def get_tgps_and_ap_dicts(tgps_geocent, ifos, ra, dec, psi):
+
+    """
+    Get the time and antenna pattern at each detector at the given geocenter time and
+    sky position
+
+    Parameters
+    ----------
+    tgps_geocent : float
+        geocenter time
+    ifos : tuple of strings (optional)
+        which interometers to load data from (some combination of 'H1', 'L1',
+        and 'V1')
+    ra : float
+        right ascension
+    dec : float
+        declination
+    psi : float
+        polarization angle
+
+    Returns
+    -------
+    tgps_dict : dictionary
+        time at each detector at the given geocenter time and sky position
+    ap_dict : dictionary
+        antenna pattern for each interferometer at the given geocenter time and sky
+        position
+    """
+    return get_tgps_dict(tgps_geocent, ifos, ra, dec), get_antenna_pattern_dict(tgps_geocent, ifos, ra, dec, psi)

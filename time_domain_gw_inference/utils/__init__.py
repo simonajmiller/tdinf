@@ -3,7 +3,7 @@ from .likelihood import *
 from .misc import *
 from .postprocessing import *
 from .preprocessing import *
-from .reconstructwf import *
+from .detector_times_and_antenna_patterns import *
 from .spins_and_masses import *
 from .whiten import *
 from .parameter import *

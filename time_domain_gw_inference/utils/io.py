@@ -1,7 +1,6 @@
 import lal
 import numpy as np
 import h5py
-from . import reconstructwf as rwf
 from .spins_and_masses import *
 import scipy.signal as sig
 import json

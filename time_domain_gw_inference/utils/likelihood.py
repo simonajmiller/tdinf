@@ -7,7 +7,7 @@ import lalsimulation as lalsim
 import sys
 from gwpy.timeseries import TimeSeries
 
-from . import reconstructwf as rwf
+from . import detector_times_and_antenna_patterns as t_and_AP
 from .spins_and_masses import m1m2_from_mtotq
 from .misc import logit, inv_logit, logit_jacobian, calc_mf_SNR, calc_opt_SNR, calc_network_SNR
 
@@ -17,21 +17,9 @@ from .whiten import whitenData
 
 import astropy.units as u
 
-try:
-    import gwsignal
-    from gwsignal.models.teobresums import TEOBResumSDALI
-    from gwsignal.core import waveform as wfm
-except ImportError:
-    print("Warning! Will not be able to use TEOBResumSDALI approximation")
-
-
 def check_spin_settings_of_approx(approx_name):
     aligned_spins = False
     no_spins = False
-
-    if approx_name == 'TEOBResumSDALI':
-        aligned_spins = True
-        return aligned_spins, no_spins
 
     approx = lalsim.GetApproximantFromString(approx_name)
 
@@ -357,14 +345,14 @@ class AntennaAndTimeManager(LogisticParameterManager):
         if not self.vary_skypos:
             # antenna pattern is fixed if sky location is fixed
             # (it will vary a tiny amount over different geocenter times)
-            self.antenna_pattern_dict = rwf.get_antenna_pattern_dict(self.reference_time, ifos,
+            self.antenna_pattern_dict = t_and_AP.get_antenna_pattern_dict(self.reference_time, ifos,
                                                                      self.fixed['right_ascension'],
                                                                      self.fixed['declination'],
                                                                      self.fixed['polarization'])
 
             if not self.vary_time:
                 # tpeak dict is only fixed if both sky location and time are fixed
-                self.peak_time_dict = rwf.get_tgps_dict(
+                self.peak_time_dict = t_and_AP.get_tgps_dict(
                     self.reference_time, ifos,
                     self.fixed['right_ascension'], self.fixed['declination'])
 
@@ -391,12 +379,12 @@ class AntennaAndTimeManager(LogisticParameterManager):
     def get_tpeak_dict(self, x_phys, ifos):
         if self.peak_time_dict is not None:
             return self.peak_time_dict
-        return rwf.get_tgps_dict(x_phys['geocenter_time'], ifos, x_phys['right_ascension'], x_phys['declination'])
+        return t_and_AP.get_tgps_dict(x_phys['geocenter_time'], ifos, x_phys['right_ascension'], x_phys['declination'])
 
     def get_antenna_pattern_dict(self, x_phys, ifos):
         if self.antenna_pattern_dict is not None:
             return self.antenna_pattern_dict
-        return rwf.get_antenna_pattern_dict(x_phys['geocenter_time'], ifos,
+        return t_and_AP.get_antenna_pattern_dict(x_phys['geocenter_time'], ifos,
                                             x_phys['right_ascension'], x_phys['declination'], x_phys['polarization'])
 
 
