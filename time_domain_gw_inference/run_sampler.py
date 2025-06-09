@@ -200,16 +200,14 @@ def get_injected_parameters(args, initial_run_dir='', verbose=False):
 
     # if using real data
     if args.injected_parameters is None:
-        # Use reference parameter from max logL in PE file...
+        
+        # Use reference parameter from a full PE file...
         if args.reference_parameters is None:
             pe_posterior_h5_file = os.path.join(initial_run_dir, args.pe_posterior_h5_file)
             ref_pe_samples = utils.get_pe_samples(pe_posterior_h5_file)
-
-            # "Injected parameters" = max(P) draw from the samples associated with this data
-            log_prob = ref_pe_samples['log_likelihood'] + ref_pe_samples['log_prior']
-            max_L_index = np.argmax(log_prob)
-            reference_parameters = {field: ref_pe_samples[field][max_L_index] for field in ref_pe_samples.dtype.names}
-        # set reference parameters to the passed in reference_parameters
+            reference_parameters = utils.get_reference_parameters_from_posterior(ref_pe_samples)
+            
+        # Set reference parameters to the passed in reference_parameters
         else:
             reference_parameters = utils.parse_injected_parameters(args.reference_parameters,
                                                                   initial_run_dir=initial_run_dir)
@@ -217,6 +215,7 @@ def get_injected_parameters(args, initial_run_dir='', verbose=False):
 
         if 'f_ref' not in reference_parameters.keys():
             reference_parameters['f_ref'] = args.fref
+            
     # Else, generate an injection (currently, only set up for no noise case)
     else:
         # Load in injected parameters

@@ -7,6 +7,7 @@ import scipy.signal as sig
 import json
 import os
 from collections import OrderedDict
+import re
 
 def condition(raw_time_dict, raw_data_dict, t_dict, desired_sample_rate, f_min=11, f_max=None,
               scipy_decimate=True, verbose=True):
@@ -78,18 +79,6 @@ def condition(raw_time_dict, raw_data_dict, t_dict, desired_sample_rate, f_min=1
         fny = 0.5/(raw_time[1] - raw_time[0])
         
         # Filter
-        # if f_min and not f_max:
-        #     b, a = sig.butter(4, f_min/fny, btype='highpass', output='ba')
-        # elif f_max and not f_min:
-        #     b, a = sig.butter(4, f_max/fny, btype='lowpass', output='ba')
-        # elif f_min and f_max:
-        #     b, a = sig.butter(4, (f_min/fny, f_max/fny), btype='bandpass',
-        #                       output='ba')
-        # if f_min or f_max:
-        #     data = sig.filtfilt(b, a, raw_data)
-        # else:
-        #     data = raw_data.copy()
-
         b, a = sig.butter(4, f_min/fny, btype='highpass', output='ba')
         data = sig.filtfilt(b, a, raw_data)
         
@@ -117,56 +106,43 @@ def condition(raw_time_dict, raw_data_dict, t_dict, desired_sample_rate, f_min=1
     return time_dict, data_dict, i_dict
 
 
-# def injectWaveform(injection_approx, **kwargs):
-#     # TODO modify this function so that it directly invokes the waveformManager we wrote before
-#     # Also, this currently does not depend on skypos and i think it maybe should? something to look into
-#     # Unpack inputs
-#     p = kwargs.pop('parameters')
-#     time_dict = kwargs.pop('time_dict')
-#     tpeak_dict = kwargs.pop('tpeak_dict')
-#     ap_dict = kwargs.pop('ap_dict')
-#     skypos = kwargs.pop('skypos')
-#     f22_start = kwargs.pop('f22_start')
-#     f_ref = kwargs.pop('f_ref')
-#     ifos = kwargs.pop('ifos', ['H1', 'L1', 'V1'])
-#
-#     # Get dt
-#     dt = time_dict['H1'][1] - time_dict['H1'][0]
-#
-#     # Change spin convention
-#     iota, s1x, s1y, s1z, s2x, s2y, s2z = transform_spins(p['theta_jn'], p['phi_jl'], p['tilt_1'], p['tilt_2'],
-#                                           p['phi_12'], p['a_1'], p['a_2'], p['mass_1'], p['mass_2'],
-#                                           f_ref, p['phase'])
-#     if p['phi_jl'] == 0:
-#         s1x, s1y, s2x, s2y = 0, 0, 0, 0
-#
-#     # Get strain
-#     hp, hc = rwf.generate_lal_hphc(injection_approx,
-#                                    p['mass_1'], p['mass_2'],
-#                                    [s1x, s1y, s1z],
-#                                    [s2x, s2y, s2z],
-#                                    dist_mpc=p['luminosity_distance'],
-#                                    dt=dt,
-#                                    f22_start=f22_start,
-#                                    f_ref=f_ref,
-#                                    inclination=iota,
-#                                    phi_ref=p['phase']
-#                                   )
-#
-#     # Project into each detector
-#     h_ifos = {}
-#     for ifo in ifos:
-#
-#         # Time align
-#         h = rwf.generate_lal_waveform(hplus=hp, hcross=hc, times=time_dict[ifo], triggertime=tpeak_dict[ifo])
-#
-#         # Project using antenna partterns
-#         Fp, Fc = ap_dict[ifo]
-#         h_ifo = Fp*h.real - Fc*h.imag
-#
-#         h_ifos[ifo] = h_ifo
-#
-#     return h_ifos
+def get_reference_parameters_from_posterior(ref_pe_samples): 
+    
+    """
+    Find reference parameters from a set of samples (`ref_pe_samples`). This determines t0. 
+    
+    To do this:
+    1. Calculate standard deviation of the posterior for time in each detector
+    2. Find which time posterior is the narrowest
+    3. Take its median.
+    4. Whichever sample has the closest time to that median is the reference sample.
+    """
+    
+    # get the parameter names from the posterior
+    parameter_names = ref_pe_samples.dtype.names
+    
+    # find H1_time, L1_time, and/or V1_time
+    pattern = re.compile(r'.*1_time$')
+    ifo_time_posteriors = [s for s in parameter_names if pattern.match(s)]
+    
+    # get widths of time posteriors
+    ifo_time_posterior_widths = [np.std(ref_pe_samples[ifo]) for ifo in ifo_time_posteriors]
+
+    # find the narrowest one
+    narrowest = ifo_time_posteriors[np.argmin(ifo_time_posterior_widths)]
+    narrowest_posterior = ref_pe_samples[narrowest]
+    
+    print(f"Using {narrowest} posterior to calculate t0.")
+    
+    # Calculate it's median
+    med = np.median(narrowest_posterior)
+    
+    # Use this to get the reference sample
+    ii = np.argmin(np.abs(narrowest_posterior - med))
+    reference_parameters = {field:ref_pe_samples[field][ii] for field in parameter_names}
+    
+    return reference_parameters
+    
 
 def get_Tcut_from_Ncycles(waveform_dict, time_dict, ifo, Ncycles, ra, dec):
     
