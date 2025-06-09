@@ -10,7 +10,6 @@ from htcondor.dags import SimpleFormatter
 import argparse
 import subprocess
 from time_domain_gw_inference.run_sampler import create_run_sampler_arg_parser
-from time_domain_gw_inference.measure_eccentricity import create_measure_eccentricity_arg_parser
 from time_domain_gw_inference.waveform_h5s import make_waveform_h5_arg_parser, get_waveform_filename
 
 def get_option_from_list(option_name: str, option_list: list[Option]):
@@ -58,7 +57,7 @@ class AbstractPipelineDAG(abc.ABC):
 
     def __post_init__(self):
         self.executables, self.condor_settings, self.time_domain_gw_inference_settings, \
-        self.measure_eccentricity_settings, self.waveform_h5_settings = self.parse_config(self.config_file)
+        self.waveform_h5_settings = self.parse_config(self.config_file)
 
     def default_condor_settings(self):
         condor_settings = {
@@ -149,11 +148,6 @@ class AbstractPipelineDAG(abc.ABC):
         run_settings = dict(config.items("time_domain_gw_inference"))
 
         try:
-            measure_eccentricity_settings = dict(config.items("measure_eccentricity"))
-        except configparser.NoSectionError:
-            measure_eccentricity_settings = None
-
-        try:
             waveform_h5_settings = dict(config.items("waveform_h5s"))
         except configparser.NoSectionError:
             waveform_h5_settings = None
@@ -161,7 +155,7 @@ class AbstractPipelineDAG(abc.ABC):
         self.validate_condor_settings(condor_settings)
         self.validate_run_settings(run_settings)
 
-        return executables, condor_settings, run_settings, measure_eccentricity_settings, waveform_h5_settings
+        return executables, condor_settings, run_settings, waveform_h5_settings
 
     def submit_dag_or_print_instructions(self, dag_file):
         if self.submit:
@@ -276,13 +270,6 @@ class RunSamplerDag(AbstractPipelineDAG):
                                                         self.condor_settings,
                                                         transfer_files=self.transfer_files,
                                                         additional_options=data_options)
-        measureEccentricityLayerManager = None
-        if self.measure_eccentricity_settings is not None:
-            measureEccentricityLayerManager = MeasureEccentricityLayerManager(self.measure_eccentricity_settings,
-                                                            self.executables['measure_eccentricity'],
-                                                            self.condor_settings,
-                                                            transfer_files=self.transfer_files,
-                                                            additional_options=[])
 
         makeWaveformsLayerManager = None
         if self.waveform_h5_settings is not None:
@@ -308,8 +295,6 @@ class RunSamplerDag(AbstractPipelineDAG):
 
                 for run_mode in run_modes:
                     runSamplerLayerManager.add_job(self.output_directory, run_mode, cycle, 'cycles')
-                    if measureEccentricityLayerManager is not None:
-                        measureEccentricityLayerManager.add_job(self.output_directory, run_mode, cycle, 'cycles')
                     if makeWaveformsLayerManager is not None:
                         makeWaveformsLayerManager.add_job(self.output_directory, run_mode, cycle, 'cycles')
 
@@ -328,18 +313,12 @@ class RunSamplerDag(AbstractPipelineDAG):
 
                 for run_mode in run_modes:
                     runSamplerLayerManager.add_job(self.output_directory, run_mode, time, 'times')
-                    if measureEccentricityLayerManager is not None:
-                        measureEccentricityLayerManager.add_job(self.output_directory, run_mode, time, 'times')
                     if makeWaveformsLayerManager is not None:
                         makeWaveformsLayerManager.add_job(self.output_directory, run_mode, time, 'times')
 
         dag.attach(runSamplerLayerManager.layer)
         if makeWaveformsLayerManager is not None:
-            # TODO, this makes parent child relationship to measureEccentricityLayerManager that I don't want
             dag.attach(makeWaveformsLayerManager.layer)
-        if measureEccentricityLayerManager is not None:
-            dag.attach(measureEccentricityLayerManager.layer)
-
 
 @dataclass
 class AbstractLayerManager(abc.ABC):
@@ -502,84 +481,6 @@ class RunSamplerLayerManager(AbstractLayerManager):
             variables={'run_prefix': self.get_output_filename_prefix(run_mode, cutoff, unit)}
         )
 
-
-@dataclass
-class MeasureEccentricityLayerManager(AbstractLayerManager):
-    @property
-    def method_name(self) -> str:
-        return "measure_eccentricity"
-
-    @property
-    def condor_settings(self):
-        condor_settings = self.shared_condor_settings
-        additional_settings = {
-            "request_memory": "2GB",
-            "request_disk": "5GB",
-            "request_cpus": self.argument_parser.get_default('ncpu'),
-        }
-        run_options = self.get_run_options()
-        N_cpu = get_option_from_list('ncpu', run_options)
-        if N_cpu is not None:
-            additional_settings['request_cpus'] = N_cpu.argument[0]
-
-        condor_settings.update(additional_settings)
-        return condor_settings
-
-    @property
-    def argument_parser(self) -> argparse.ArgumentParser:
-        return create_run_sampler_arg_parser()
-
-    def get_run_options(self, additional_options=None, **kwargs) -> List[Option]:
-        """
-        Get the command line options for the run_sampler executable
-        :return:
-        """
-        run_options = [Option(key, value) for key, value in self.run_settings_dict.items()]
-        # add additional options not in run settings dict
-        run_options.extend(self.additional_options)
-
-        if additional_options is not None:
-            self.update_options_list(run_options, additional_options)
-
-        self.raise_option_exists_error("directory", run_options)
-        self.raise_option_exists_error("run_key", run_options)
-        return run_options
-
-    def get_inputs(self, relative_output_dir_name):
-        # Since we have already transferred the input into the data_directory, we just need to pass data_directory
-        return [
-            Option('data-directory', 'data_directory', suppress=True),
-            Option('command_line', 'command_line.sh', suppress=True),  # need to transfer this so it can be parsed
-            Option('output-directory', relative_output_dir_name, suppress=True)
-            ]
-
-    def get_outputs(self, relative_output_dir_name):
-        return [Option('output-directory', relative_output_dir_name, suppress=True)]
-
-    def add_job(self, output_directory, run_mode, cutoff, cutoff_mode, additional_options=None) -> None:
-        run_options = self.get_run_options(additional_options)
-        run_options.append(Option('run_key', RunSamplerLayerManager.get_run_key(run_mode, cutoff)))
-        run_options.append(Option('directory', '.'))
-        if cutoff_mode == 'cycles':
-            unit = 'cycles'
-
-        elif cutoff_mode == 'times':
-            unit = 'seconds'
-        else:
-            raise AssertionError("cutoff mode must be either 'cycles' or 'times'")
-
-        relative_output_dir_name = RunSamplerLayerManager.get_output_filename_prefix(run_mode, cutoff, unit)
-
-        inputs = self.get_inputs(relative_output_dir_name)
-        outputs = self.get_outputs(relative_output_dir_name)
-
-        self.layer += Node(
-            arguments=run_options,
-            inputs=inputs,
-            outputs=outputs,
-            variables={'run_prefix': RunSamplerLayerManager.get_output_filename_prefix(run_mode, cutoff, unit)}
-        )
-
 @dataclass
 class MakeWaveformsLayerManager(AbstractLayerManager):
     @property
@@ -657,7 +558,6 @@ class MakeWaveformsLayerManager(AbstractLayerManager):
             outputs=outputs,
             variables={'run_prefix': RunSamplerLayerManager.get_output_filename_prefix(run_mode, cutoff, unit)}
         )
-
 
 
 if __name__ == "__main__":

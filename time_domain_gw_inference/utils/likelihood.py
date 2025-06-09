@@ -7,11 +7,6 @@ import lalsimulation as lalsim
 import sys
 from gwpy.timeseries import TimeSeries
 
-# try:
-#     import reconstructwf as rwf
-#     from spins_and_masses import m1m2_from_mtotq
-#     from misc import logit, inv_logit, logit_jacobian
-# except:
 from . import reconstructwf as rwf
 from .spins_and_masses import m1m2_from_mtotq
 from .misc import logit, inv_logit, logit_jacobian, calc_mf_SNR, calc_opt_SNR, calc_network_SNR
@@ -83,15 +78,13 @@ def apply_window(timeseries):
     return timeseries*window
 
 class LogisticParameterManager:
-    def __init__(self, vary_time=False, vary_skypos=False, vary_eccentricity=False, **kwargs):
+    def __init__(self, vary_time=False, vary_skypos=False, **kwargs):
 
         self.vary_time = vary_time
         self.vary_skypos = vary_skypos
 
         # get allowed spin settings of waveform model
         self.aligned_spins, self.no_spins = check_spin_settings_of_approx(kwargs['approx'])
-
-        self.vary_eccentricity = vary_eccentricity
 
         # TODO put in injected values
         self.logistic_parameters = [LogisticParameter('total_mass', kwargs['mtot_lim'], None),
@@ -103,9 +96,6 @@ class LogisticParameterManager:
             self.logistic_parameters.extend([
                 LogisticParameter('spin1_magnitude', kwargs['chi_lim'], None),
                 LogisticParameter('spin2_magnitude', kwargs['chi_lim'], None)])
-
-        if self.vary_eccentricity:
-            self.logistic_parameters.append(LogisticParameter('eccentricity', kwargs['eccentricity_lim'], None))
 
         if self.vary_skypos:
             self.logistic_parameters.append(TrigLogisticParameter('declination', 'sin', [-1, 1], None))
@@ -132,8 +122,6 @@ class LogisticParameterManager:
                 CartesianAngle('right_ascension', phase_offset=np.pi),
                 CartesianAngle('polarization')
             ])
-        if self.vary_eccentricity:
-            self.cartesian_angles.append(CartesianAngle('mean_anomaly'))
 
         for cartesian_angle in self.cartesian_angles:
             self.sampled_keys.extend([cartesian_angle.x_name, cartesian_angle.y_name])
@@ -149,10 +137,6 @@ class LogisticParameterManager:
         if not self.vary_time:
             self.fixed['geocenter_time'] = kwargs['geocenter_time']
         self.reference_time = kwargs['geocenter_time']
-
-        if not self.vary_eccentricity:
-            self.fixed['eccentricity'] = 0
-            self.fixed['mean_anomaly'] = 0
 
     def get_logistic_dict(self, x):
         return {self.sampled_keys[i]: x[i] for i in range(self.num_parameters)}
@@ -216,10 +200,6 @@ class LogisticParameterManager:
             'distance': physical_dict['luminosity_distance'] * u.Mpc,
             'inclination': physical_dict['inclination'] * u.rad,
         }
-        # TODO, maybe it should check if we have an eccentric waveform?
-        if 'eccentricity' in physical_dict:
-            param_dict['eccentricity'] = physical_dict['eccentricity'] * u.dimensionless_unscaled
-            param_dict['meanPerAno'] = physical_dict['mean_anomaly'] * u.rad
         return param_dict
 
 
@@ -428,8 +408,7 @@ class WaveformManager(LogisticParameterManager):
         self.antenna_and_time_manager = AntennaAndTimeManager(ifos, *args, **kwargs)
 
     def generate_lal_hphc(self, m1_msun, m2_msun, chi1, chi2, delta_t, dist_mpc=1,
-                          f22_start=20, f_ref=11, inclination=0, phi_ref=0., eccentricity=0,
-                          mean_anomaly_periastron=0):
+                          f22_start=20, f_ref=11, inclination=0, phi_ref=0.):
         """
         Generate the plus and cross polarizations for given waveform parameters and approximant
         """
@@ -446,7 +425,7 @@ class WaveformManager(LogisticParameterManager):
                                                     chi1[0], chi1[1], chi1[2],
                                                     chi2[0], chi2[1], chi2[2],
                                                     distance, inclination,
-                                                    phi_ref, 0., eccentricity, mean_anomaly_periastron,
+                                                    phi_ref, 0., 0, 0,
                                                     delta_t, f22_start, f_ref,
                                                     param_dict,
                                                     self.approximant)
@@ -460,8 +439,6 @@ class WaveformManager(LogisticParameterManager):
                 print("distance =", distance)
                 print("inclination =", inclination)
                 print("phi_ref =", phi_ref)
-                print("eccentricity =", eccentricity)
-                print("mean_anomaly_periastron =", mean_anomaly_periastron)
                 print("delta_t =", delta_t)
                 print("f22_start =", f22_start)
                 print("f_ref =", f_ref)
@@ -484,9 +461,7 @@ class WaveformManager(LogisticParameterManager):
                                         dist_mpc=x_phys['luminosity_distance'],
                                         f22_start=f22_start, f_ref=f_ref,
                                         inclination=x_phys['inclination'],
-                                        phi_ref=x_phys['phase'],
-                                        eccentricity=x_phys['eccentricity'],
-                                        mean_anomaly_periastron=x_phys['mean_anomaly'])
+                                        phi_ref=x_phys['phase'])
         
         # for catching waveform errors
         if isinstance(hp, float) and hp!=hp:
@@ -537,69 +512,9 @@ class WaveformManager(LogisticParameterManager):
         return projected_waveform_dict
 
 
-class NewWaveformManager(LogisticParameterManager):
-    def __init__(self, ifos, use_higher_order_modes, *args, **kwargs):
-        super(NewWaveformManager, self).__init__(*args, **kwargs)
-        self.approx_name = kwargs['approx']
-        if self.approx_name == 'TEOBResumSDALI':
-            if use_higher_order_modes:
-                print('generator using higher order modes')
-                self.generator = TEOBResumSDALI(modes_to_use=[[2, 2], [2, 1], [3, 3], [4, 4]])
-            else:
-                self.generator = TEOBResumSDALI(modes_to_use=[[2, 2]])
-        else:
-            self.generator = gwsignal.core.waveform.LALCompactBinaryCoalescenceGenerator(self.approx_name)
-
-        self.antenna_and_time_manager = AntennaAndTimeManager(ifos, *args, **kwargs)
-
-        return
-
-    def get_hplus_hcross(self, x_phys, delta_t, f22_start=11, f_ref=11):
-        """
-        get complex waveform at geocenter
-        """
-        params = self.physical_dict_to_waveform_dict(x_phys)
-        params['f22_start'] = f22_start * u.Hz
-        params['deltaT'] = delta_t * u.s
-        params['f22_ref'] = f_ref * u.Hz
-        params['condition'] = 0
-
-        return wfm.GenerateTDWaveform(params, self.generator)
-
-    def get_projected_waveform(self, x_phys, ifos, time_dict, f22_start=11, f_ref=11):
-        delta_t = time_dict[ifos[0]][1] - time_dict[ifos[0]][0]
-
-        hp, hc = self.get_hplus_hcross(x_phys, delta_t, f22_start=f22_start, f_ref=f_ref)
-        # set times in geocenter time
-        hp.t0 = x_phys['geocenter_time'] + hp.t0.value
-        hc.t0 = x_phys['geocenter_time'] + hc.t0.value
-
-        AP_dict = self.antenna_and_time_manager.get_antenna_pattern_dict(x_phys, ifos)
-        time_delay_dict = self.antenna_and_time_manager.get_time_delay_dict(x_phys, ifos)
-
-        # Cycle through ifos
-        projected_waveform_dict = {}
-        for ifo in ifos:
-            h_td = hp.value - 1j * hc.value
-
-            Fp, Fc = AP_dict[ifo]
-
-            h_ifo = Fp * h_td.real - Fc * h_td.imag
-
-            # convert h_ifo to detector_time
-            time_delay = time_delay_dict[ifo]
-
-            # convert geocenter timeseries to detector timeseries by adding time delay
-            # then interpolating that timeseries to the actual, sampled detector times
-            h_projected = interpolate_timeseries(hp.times.value + time_delay, h_ifo, time_dict[ifo])
-            projected_waveform_dict[ifo] = h_projected
-
-        return projected_waveform_dict
-
-
 class LnLikelihoodManager(LogisticParameterManager):
-    def __init__(self, psd_dict, time_dict, data_dict, f_low, f_ref, f22_start, f_max=None, only_prior=False,
-                 use_higher_order_modes=False, *args, **kwargs):
+    def __init__(self, psd_dict, time_dict, data_dict, f_low, f_ref, f22_start, 
+                 f_max=None, only_prior=False, *args, **kwargs):
         self.time_dict = time_dict
         self.data_dict = data_dict
         self.f_low = f_low
@@ -614,12 +529,7 @@ class LnLikelihoodManager(LogisticParameterManager):
         self.only_prior = only_prior
         self.conditioned_psd_dict = self._make_conditioned_psd_dict()
         self.whitened_data_dict = self._make_whitened_data_dict()
-        try:
-            self.waveform_manager = NewWaveformManager(self.ifos, use_higher_order_modes, *args, **kwargs)
-        except Exception as e:
-            print(e)
-            print("warning, new waveform manager has failed to be created, using old waveform manager")
-            self.waveform_manager = WaveformManager(self.ifos, *args, **kwargs)
+        self.waveform_manager = WaveformManager(self.ifos, *args, **kwargs)
         self.log_prior = LnPriorManager(*args, **kwargs)
 
         super().__init__(*args, **kwargs)
