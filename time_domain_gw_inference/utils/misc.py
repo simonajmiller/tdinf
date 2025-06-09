@@ -37,3 +37,33 @@ def calc_network_SNR(snr_list):
     snrs_sq = [snr ** 2 for snr in snr_list]
     network_snr = np.sqrt(sum(snrs_sq))
     return network_snr
+
+
+"""
+Other
+"""
+
+def interpolate_timeseries(time, values, new_time_grid):
+    """
+    Interpolates a timeseries to a new grid of points using cubic interpolation
+
+    Parameters:
+    - time: array-like, the original time grid
+    - values: array-like, the values of the timeseries at the original time grid
+    - new_time_grid: array-like, the new time grid
+
+    Returns:
+    - value_on_grid: array-like, the interpolated values at the new time grid
+    """
+    
+    # cubic interp:
+    values_interpolator = interp1d(time, values, kind='cubic', fill_value=0, bounds_error=False)
+    value_on_grid = values_interpolator(new_time_grid)
+    
+    return value_on_grid
+
+def apply_window(timeseries): 
+    nsamps = len(timeseries)
+    window = tukey(nsamps)
+    window[int(0.5*nsamps):] = 1.
+    return timeseries*window

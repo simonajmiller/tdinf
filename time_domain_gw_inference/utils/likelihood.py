@@ -9,7 +9,7 @@ from gwpy.timeseries import TimeSeries
 
 from . import detector_times_and_antenna_patterns as t_and_AP
 from .spins_and_masses import m1m2_from_mtotq
-from .misc import logit, inv_logit, logit_jacobian, calc_mf_SNR, calc_opt_SNR, calc_network_SNR
+from .misc import *
 
 from .parameter import LogisticParameter, CartesianAngle, TrigLogisticParameter
 from .preprocessing import get_ACF
@@ -37,33 +37,6 @@ def check_spin_settings_of_approx(approx_name):
     else:
         print("WARNING, UNSURE IF WAVEFORM HAS SPINS")
     return aligned_spins, no_spins
-
-def interpolate_timeseries(time, values, new_time_grid):
-    """
-    Interpolates a timeseries to a new grid of points using cubic interpolation
-
-    Parameters:
-    - time: array-like, the original time grid
-    - values: array-like, the values of the timeseries at the original time grid
-    - new_time_grid: array-like, the new time grid
-
-    Returns:
-    - value_on_grid: array-like, the interpolated values at the new time grid
-    """
-#     # linear interp:
-#     value_on_grid = np.interp(new_time_grid, time, values, left=0, right=0) 
-    
-    # cubic interp:
-    values_interpolator = interp1d(time, values, kind='cubic', fill_value=0, bounds_error=False)
-    value_on_grid = values_interpolator(new_time_grid)
-    
-    return value_on_grid
-
-def apply_window(timeseries): 
-    nsamps = len(timeseries)
-    window = tukey(nsamps)
-    window[int(0.5*nsamps):] = 1.
-    return timeseries*window
 
 class LogisticParameterManager:
     def __init__(self, vary_time=False, vary_skypos=False, **kwargs):
