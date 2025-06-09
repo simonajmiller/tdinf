@@ -7,7 +7,7 @@ to use the code: clone the repository and from the root run
 pip install -e .
 ```
 
-then run 
+then run the following executable. this is an example of running on S2501124ax on `simona.miller`'s CIT account, for full and pre/post $t=0$.
 ```
 ./example_runpipe.sh
 ```
