@@ -3,6 +3,7 @@ from scipy.stats import gaussian_kde
 from gwpy.timeseries import TimeSeries
 from gwpy.signal import filter_design
 import scipy.linalg as sl
+from scipy.interpolate import interp1d
 
 """
 Logit transformations, used in likelihood

@@ -1,7 +1,6 @@
 import numpy as np
 from scipy.signal import tukey
 from scipy.linalg import solve_toeplitz
-from scipy.interpolate import interp1d
 import lal
 import lalsimulation as lalsim
 import sys

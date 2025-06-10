@@ -1,1 +1,0 @@
-time_domain_gw_inference_pipe.py --times_list 0 --output_directory test --config_file example_config.ini --run_in_place
