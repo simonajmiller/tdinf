@@ -122,36 +122,36 @@ def main(args=None):
             else: 
                 return [k for k in args.modes if k!="full"]
                 
-        def prefix(mode, cut, unit):
+        def run_label(mode, cut, unit):
             return f"{mode}_{cut}{unit}"
             
         # Build tasks for cycles
         for cut in cycle_list:
             modes = get_modes(cut)
             for mode in modes:
-                pre = prefix(mode, cut, "cycles")
+                run_lbl = run_label(mode, cut, "cycles")
                 # make directory for run output
-                os.makedirs(os.path.join(outdir, pre), exist_ok=True)
+                os.makedirs(os.path.join(outdir, run_lbl), exist_ok=True)
                 # run_sampler command
-                run_cmd = [executables["run_sampler"], "--output-h5", f"{pre}/{pre}.h5", "--mode", mode, "--Tcut-cycles", str(cut), run_options]
+                run_cmd = [executables["run_sampler"], "--output-h5", f"{run_lbl}/{run_lbl}.h5", "--mode", mode, "--Tcut-cycles", str(cut), run_options]
                 tf_run.write(" ".join(run_cmd) + "\n")
                 # make_waveforms
                 if "waveform_h5s" in executables:
-                    wf_cmd = [executables["waveform_h5s"], "--directory", pre, "--run_key", pre, wf_options]
+                    wf_cmd = [executables["waveform_h5s"], "--directory", run_lbl, "--run_key", run_lbl, wf_options]
                     tf_wave.write(" ".join(wf_cmd) + "\n")
 
         # Build tasks for times
         for cut in times_list:
             modes = get_modes(cut)
             for mode in modes:
-                pre = prefix(mode, cut, "seconds")
+                run_lbl = run_label(mode, cut, "seconds")
                 # make directory for run output
-                os.makedirs(os.path.join(outdir, pre), exist_ok=True)
-                run_cmd = [executables["run_sampler"], "--output-h5", f"{pre}/{pre}.h5", "--mode", mode, "--Tcut-seconds", str(cut), run_options]
+                os.makedirs(os.path.join(outdir, run_lbl), exist_ok=True)
+                run_cmd = [executables["run_sampler"], "--output-h5", f"{run_lbl}/{run_lbl}.h5", "--mode", mode, "--Tcut-seconds", str(cut), run_options]
                 tf_run.write(" ".join(run_cmd) + "\n")
                 # make_waveforms
                 if "waveform_h5s" in executables:
-                    wf_cmd = [executables["waveform_h5s"], "--directory", pre, "--run_key", pre, wf_options]
+                    wf_cmd = [executables["waveform_h5s"], "--directory", run_lbl, "--run_key", run_lbl, wf_options]
                     tf_wave.write(" ".join(wf_cmd) + "\n")
 
     # Create submission script with dependencies between stages
