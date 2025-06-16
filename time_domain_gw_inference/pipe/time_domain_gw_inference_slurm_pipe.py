@@ -133,7 +133,8 @@ def main(args=None):
                 # make directory for run output
                 os.makedirs(os.path.join(outdir, run_lbl), exist_ok=True)
                 # run_sampler command
-                run_cmd = [executables["run_sampler"], "--output-h5", f"{run_lbl}/{run_lbl}.h5", "--mode", mode, "--Tcut-cycles", str(cut), run_options]
+                run_cmd = [executables["run_sampler"], "--output-h5", f"{run_lbl}/{run_lbl}.h5", "--mode", mode, 
+                           "--Tcut-cycles", str(cut), run_options, f"&>> {run_lbl}/{run_lbl}.log"]
                 tf_run.write(" ".join(run_cmd) + "\n")
                 # make_waveforms
                 if "waveform_h5s" in executables:
@@ -147,7 +148,8 @@ def main(args=None):
                 run_lbl = run_label(mode, cut, "seconds")
                 # make directory for run output
                 os.makedirs(os.path.join(outdir, run_lbl), exist_ok=True)
-                run_cmd = [executables["run_sampler"], "--output-h5", f"{run_lbl}/{run_lbl}.h5", "--mode", mode, "--Tcut-seconds", str(cut), run_options]
+                run_cmd = [executables["run_sampler"], "--output-h5", f"{run_lbl}/{run_lbl}.h5", "--mode", mode, 
+                           "--Tcut-seconds", str(cut), run_options, f"&>> {run_lbl}/{run_lbl}.log"]
                 tf_run.write(" ".join(run_cmd) + "\n")
                 # make_waveforms
                 if "waveform_h5s" in executables:
@@ -183,8 +185,9 @@ def main(args=None):
     if args.submit:
         subprocess.run([submit_sh])
     else:
-        print(f"Submit the workflow with: {submit_sh}")
-
+        print(f"\n**********************************************************************")
+        print(f"  Submit the workflow with: {submit_sh}")
+        print(f"**********************************************************************\n")
 
 if __name__ == "__main__":
     main()
