@@ -1,0 +1,50 @@
+[project]
+name = "time_domain_gw_inference"
+dynamic = ["version"]
+description = "working repository for time domain parameter estimation for gravitational-wave signals"
+readme = { file = "README.md", content-type = "text/markdown" }
+license = { text = "GPL" }
+# Specify the Python versions you support. Adjust as needed.
+requires-python = ">=3.11, <3.13"
+dependencies = [
+    "corner>=2.2.3",
+    "emcee",
+    "ezdag>=0.4.0",
+    "gwpy>=3.0.12",
+    "h5py>=3.14.0",
+    "imageio>=2.37.0",
+    "lalsuite==7.25.1",
+    "pandas>=2.3.0",
+    "seaborn>=0.13.2",
+    "tables>=3.10.2",
+]
+
+[project.scripts]
+run_sampler = "time_domain_gw_inference.run_sampler:main"
+time_domain_gw_inference_pipe = "time_domain_gw_inference.pipe.time_domain_gw_inference_pipe:main"
+time_domain_gw_inference_slurm_pipe = "time_domain_gw_inference.pipe.time_domain_gw_inference_slurm_pipe:main"
+waveform_h5s = "time_domain_gw_inference.waveform_h5s:main"
+
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+dev-dependencies = [
+    "time_domain_gw_inference",
+    "jupyter",
+    "pre-commit",
+    "pytest"
+]
+
+[tool.uv.sources]
+time_domain_gw_inference = { workspace = true }
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.ruff]
+line-length = 80
+
+[tool.ruff.lint]
+select = ["E", "W"] 
