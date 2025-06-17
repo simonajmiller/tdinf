@@ -1,5 +1,8 @@
 import numpy as np
-from scipy.signal import tukey
+try:
+    from scipy.signal import tukey
+except ImportError:
+    from scipy.signal.windows import tukey
 from scipy.linalg import solve_toeplitz
 import lal
 import lalsimulation as lalsim

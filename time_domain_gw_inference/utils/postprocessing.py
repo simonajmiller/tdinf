@@ -74,6 +74,7 @@ def postprocess_samples(sampler, likelihood_manager, getRidOfFixed=False, **kwar
     samples_dict['ln_likelihood'] = samples_lnp - samples_lnprior
     
     # Finally, generate SNRs and add them to the samples 
+    print('Calculating SNRs from posterior ...')
     SNRs_dict = likelihood_manager.get_SNRs(samples)
     for k in SNRs_dict: 
         samples_dict[k] = SNRs_dict[k]

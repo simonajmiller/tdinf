@@ -23,6 +23,7 @@ def get_parser():
     p.add_argument("--submit", action="store_true", help="Submit the workflow to Slurm")
     p.add_argument("--overwrite", action="store_true", help="Overwrite existing directory")
     p.add_argument("--ntasks", type=int, default=100, help="Maximum number of tasks to request through SLURM")
+    p.add_argument("--partition", type=str, default='cca', help="Partition to run")
     p.add_argument("--constraints", help="SLURM constraints")
     p.add_argument("--time", help="SLURM time directive")
     return p
@@ -166,7 +167,7 @@ def main(args=None):
         sf.write("        echo \"${BASH_REMATCH[1]}\"\n")
         sf.write("    else\n")
         sf.write("        echo \"sbatch failed\"\n")
-        sf.write("        exit 1\"\n")
+        sf.write("        exit 1\n")
         sf.write("    fi\n")
         sf.write("}\n\n")
         sf.write(f"cd {outdir}\n")
@@ -176,9 +177,9 @@ def main(args=None):
         if args.time:
             sb += f" -t {args.time}"
         # Stage 1: run_sampler
-        sf.write(f'runid=$(get_id "$({sb} -n {args.ntasks} -c {NCPU} disBatch {tasks_run})")\n')
+        sf.write(f'runid=$(get_id "$({sb} -p {args.partition} -n {args.ntasks} -c {NCPU} disBatch {tasks_run})")\n')
         # Stage 2: make_waveforms
-        sf.write(f'waveid=$(get_id "$({sb} --dependency=afterok:$runid -n {args.ntasks} -c {NCPU} disBatch {tasks_wave})")\n')
+        sf.write(f'waveid=$(get_id "$({sb} --dependency=afterok:$runid -p {args.partition} -n 8 -c {NCPU} disBatch {tasks_wave})")\n')
         sf.write("cd -\n")
 
     os.chmod(submit_sh, 0o755)

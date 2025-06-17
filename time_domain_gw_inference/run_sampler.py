@@ -6,7 +6,7 @@ import numpy as np
 import emcee
 import json
 import pandas as pd
-from multiprocessing import Pool
+from multiprocessing import Pool, cpu_count
 from contextlib import closing
 import os
 import time_domain_gw_inference.utils as utils
@@ -73,9 +73,6 @@ def create_run_sampler_arg_parser():
     # Do we want to sample in time and/or sky position?
     p.add_argument('--vary-time', action='store_true')
     p.add_argument('--vary-skypos', action='store_true')
-    p.add_argument('--vary-eccentricity', action='store_true')
-    p.add_argument('--eccentricity-prior-bounds', type=float, nargs=2, default=[0, 0.9],
-                   help="prior bounds for eccentricity parameter, only used if --vary-eccentricity given")
     p.add_argument('--total-mass-prior-bounds', type=float, nargs=2, default=[200, 350],
                    help="detector frame total mass bounds (in solar masses) for total_mass prior")
     p.add_argument('--mass-ratio-prior-bounds', type=float, nargs=2, default=[0.17, 1],
@@ -144,12 +141,6 @@ def modify_parameters(data, args):
 
     if 'mass_ratio' not in df.columns:
         df['mass_ratio'] = df['mass_2'] / df['mass_1']
-
-    # TODO not sure if these are the names all the time
-    if 'eccentricity' not in df.columns:
-        df['eccentricity'] = 0
-    if 'mean_anomaly' not in df.columns:
-        df['mean_anomaly'] = 0
 
     spin_component_keys = ['inclination', 'spin1_x', 'spin1_y', 'spin1_z', 'spin2_x', 'spin2_y', 'spin2_z']
     if not all(key in df.columns for key in spin_component_keys):
@@ -254,13 +245,11 @@ def initialize_kwargs(args, reference_parameters):
         'chi_lim': args.spin_magnitude_prior_bounds,
         'dist_lim': args.luminosity_distance_prior_bounds,
         'sigma_time': args.time_prior_sigma,
-        'eccentricity_lim': args.eccentricity_prior_bounds,
         'approx': args.approx,
         'f_ref': args.fref,
         'f_low': args.flow,
         'f22_start': args.f22_start,
         'delta_t': 1 / args.sampling_rate,
-
         'right_ascension': reference_parameters['right_ascension'],
         'declination': reference_parameters['declination'],
         'polarization': reference_parameters['polarization'],
@@ -268,27 +257,6 @@ def initialize_kwargs(args, reference_parameters):
         'verbose': args.verbose,
     }
     return kwargs
-
-
-def make_waveform_manager(args, **kwargs):
-    """
-    :param args: argument parser args
-    :param kwargs:
-    :return:
-    """
-    if args.approx == 'TEOBResumSDALI':
-        wf_manager = utils.NewWaveformManager(args.ifos,
-                                              use_higher_order_modes=args.use_higher_order_modes,
-                                              vary_time=args.vary_time,
-                                              vary_skypos=args.vary_skypos,
-                                              vary_eccentricity=args.vary_eccentricity, **kwargs)
-    else:
-        wf_manager = utils.WaveformManager(args.ifos,
-                                           vary_time=args.vary_time,
-                                           vary_skypos=args.vary_skypos,
-                                           vary_eccentricity=args.vary_eccentricity,
-                                           **kwargs)
-    return wf_manager
 
 
 def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initial_run_dir='', verbose=False):
@@ -419,15 +387,20 @@ def main():
 
     backend_path = args.output_h5  # where emcee spits its output
 
+    # get reference parameters
     reference_parameters, ref_pe_samples = get_injected_parameters(args, verbose=verbose)
+
+    # get kwards
     kwargs = initialize_kwargs(args, reference_parameters)
 
-    wf_manager = make_waveform_manager(args, **kwargs)
+    # make waveform manager
+    wf_manager = utils.WaveformManager(args.ifos,vary_time=args.vary_time,ary_skypos=args.vary_skypos,**kwargs)
 
-    time_dict, data_dict, psd_dict = get_conditioned_time_and_data(args,
-                                                                   wf_manager=wf_manager,
-                                                                   reference_parameters=reference_parameters,
-                                                                   verbose=verbose)
+    # get data
+    time_dict, data_dict, psd_dict = get_conditioned_time_and_data(
+        args, wf_manager=wf_manager, reference_parameters=reference_parameters, verbose=verbose
+    )
+    
     if verbose:
         print(f"kwargs are:")
         print(kwargs)
@@ -439,11 +412,11 @@ def main():
         psd_dict=psd_dict, time_dict=time_dict,
         data_dict=data_dict,
         vary_time=args.vary_time, vary_skypos=args.vary_skypos,
-        vary_eccentricity=args.vary_eccentricity,
         f_max=args.fmax,
         only_prior=args.only_prior,
         use_higher_order_modes=args.use_higher_order_modes,
-        **kwargs)
+        **kwargs
+    )
 
     """
     Set up sampler
@@ -452,8 +425,8 @@ def main():
     # Emcee args
     nsteps = args.nsteps
     nwalkers = args.nwalkers
-    # Default num dimensions (fixed time and sky position) = 14
     ndim = likelihood_manager.num_parameters
+    
     if verbose:
         print("Sampling %i parameters." % ndim)
 
@@ -487,7 +460,7 @@ def main():
             )
 
     else:
-        # Reset the backend
+        # Reset the backend or make new backend
         backend.reset(nwalkers, ndim)
         p0 = likelihood_manager.log_prior.initialize_walkers(
             nwalkers, reference_parameters, reference_posteriors=ref_pe_samples, verbose=verbose
@@ -507,7 +480,7 @@ def main():
     Run sampler
     """
 
-    print("Running with %i cores." % args.ncpu)
+    print("Running with %i cores." % cpu_count())
     with closing(Pool(processes=args.ncpu)) as pool:
 
         sampler = emcee.EnsembleSampler(nwalkers, ndim, likelihood_manager.get_lnprob,
