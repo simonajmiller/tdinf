@@ -258,6 +258,17 @@ def initialize_kwargs(args, reference_parameters):
     }
     return kwargs
 
+def make_waveform_manager(args, **kwargs):
+    """
+    :param args: argument parser args
+    :param kwargs:
+    :return:
+    """
+    wf_manager = utils.WaveformManager(
+        args.ifos,vary_time=args.vary_time,vary_skypos=args.vary_skypos,**kwargs
+    )
+    return wf_manager
+
 
 def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initial_run_dir='', verbose=False):
     # Check that a cutoff time is given
@@ -394,7 +405,7 @@ def main():
     kwargs = initialize_kwargs(args, reference_parameters)
 
     # make waveform manager
-    wf_manager = utils.WaveformManager(args.ifos,vary_time=args.vary_time,ary_skypos=args.vary_skypos,**kwargs)
+    wf_manager = make_waveform_manager(args, **kwargs)
 
     # get data
     time_dict, data_dict, psd_dict = get_conditioned_time_and_data(
@@ -480,7 +491,9 @@ def main():
     Run sampler
     """
 
-    print("Running with %i cores." % cpu_count())
+    print("Available cores: %i" % cpu_count())
+    print("Running with %i cores" % args.ncpu)
+    
     with closing(Pool(processes=args.ncpu)) as pool:
 
         sampler = emcee.EnsembleSampler(nwalkers, ndim, likelihood_manager.get_lnprob,

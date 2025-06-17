@@ -47,8 +47,12 @@ def load_run_settings_from_directory(directory, filename_dict=None, args_and_kwa
             if key == 'full':
                 _args_and_kwargs_only = False
             try:
+                if os.path.exists(os.path.join(directory, 'command_line.sh')): 
+                    commandline_file = os.path.join(directory, 'command_line.sh')
+                else: 
+                    commandline_file = os.path.join(directory, 'tasks_run.txt')
                 output = get_settings_from_command_line_file(
-                    os.path.join(directory, 'command_line.sh'),
+                    commandline_file,
                     filename_dict[key],
                     directory + '/',
                     parser, verbose=True, args_and_kwargs_only=_args_and_kwargs_only)
@@ -87,6 +91,10 @@ def load_dataframe(directory, run_directory_name):
 
 def get_settings_from_command_line_string(command_line_string, initial_run_dir, parser, args_and_kwargs_only=False,
                                           return_ref_pe=False, verbose=False):
+    # remove output part of the task file
+    if '&>>' in command_line_string:
+        command_line_string = command_line_string.split('  &>>')[0]
+    
     skip_initial_arg = command_line_string.split()[1:]
     args = parser.parse_args(skip_initial_arg)
     return get_settings_from_args(args, initial_run_dir, verbose=verbose, args_and_kwargs_only=args_and_kwargs_only,
@@ -141,7 +149,6 @@ def get_settings_from_args(args, initial_run_dir, return_ref_pe=False, args_and_
         data_dict=data_dict,
         vary_time=args.vary_time, vary_skypos=args.vary_skypos,
         f_max=args.fmax,
-        vary_eccentricity=args.vary_eccentricity,
         only_prior=args.only_prior,
         use_higher_order_modes=args.use_higher_order_modes,
         **kwargs)
