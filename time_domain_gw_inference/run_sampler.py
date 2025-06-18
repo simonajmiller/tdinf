@@ -514,8 +514,8 @@ def main():
             # Cycle through remaining iterations
             for sample in sampler.sample(p0, iterations=nsteps, progress=True):
 
-                # Only check convergence every 100 steps
-                if sampler.iteration % 100:
+                # Only check convergence every 500 steps
+                if sampler.iteration % 500:
                     continue
 
                 # Compute the autocorrelation time so far
