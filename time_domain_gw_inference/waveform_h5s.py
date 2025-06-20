@@ -84,10 +84,16 @@ if __name__ == "__main__":
     # load full run (for the waveform generator)
     filename_dict = group_postprocess.generate_filename_dict(directory)
     full_parser = run_sampler.create_run_sampler_arg_parser()
+
+    if os.path.exists(os.path.join(directory, 'command_line.sh')): 
+        commandline_file = os.path.join(directory, 'command_line.sh') # if run with condor
+    else: 
+        commandline_file = os.path.join(directory, 'tasks_run.txt')   # if run with slurm 
+
     full_args, \
     full_kwargs, \
     full_likelihood_manager = group_postprocess.get_settings_from_command_line_file(
-        os.path.join(directory, 'command_line.sh'),
+        commandline_file,
         filename_dict['full'],
         directory + '/',
         full_parser, verbose=True)

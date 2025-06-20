@@ -123,7 +123,10 @@ def get_pe_samples(path):
             try:
                 pe_samples = f['NRSur7dq4']['posterior_samples'][()]
             except: 
-                pe_samples = f['Exp0']['posterior_samples'][()]
+                try:
+                    pe_samples = f['C01:IMRPhenomXPHM']['posterior_samples'][()]
+                except: 
+                    pe_samples = f['Exp0']['posterior_samples'][()]
         except:
             # hdf5 --> dict
             pe_samples_dict = hdf5_to_dict(f)['posterior']

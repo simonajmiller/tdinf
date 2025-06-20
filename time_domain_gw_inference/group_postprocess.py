@@ -48,9 +48,9 @@ def load_run_settings_from_directory(directory, filename_dict=None, args_and_kwa
                 _args_and_kwargs_only = False
             try:
                 if os.path.exists(os.path.join(directory, 'command_line.sh')): 
-                    commandline_file = os.path.join(directory, 'command_line.sh')
+                    commandline_file = os.path.join(directory, 'command_line.sh') # if run with condor
                 else: 
-                    commandline_file = os.path.join(directory, 'tasks_run.txt')
+                    commandline_file = os.path.join(directory, 'tasks_run.txt')   # if run with slurm
                 output = get_settings_from_command_line_file(
                     commandline_file,
                     filename_dict[key],
