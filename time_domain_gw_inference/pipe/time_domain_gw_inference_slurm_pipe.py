@@ -139,7 +139,8 @@ def main(args=None):
                 tf_run.write(" ".join(run_cmd) + "\n")
                 # make_waveforms
                 if "waveform_h5s" in executables:
-                    wf_cmd = [executables["waveform_h5s"], "--directory", run_lbl, "--run_key", run_lbl, wf_options]
+                    wf_cmd = [executables["waveform_h5s"], "--directory", run_lbl, "--run_key", run_lbl, wf_options, 
+                             f"&>> {run_lbl}/waveforms.log"]
                     tf_wave.write(" ".join(wf_cmd) + "\n")
 
         # Build tasks for times
@@ -154,7 +155,8 @@ def main(args=None):
                 tf_run.write(" ".join(run_cmd) + "\n")
                 # make_waveforms
                 if "waveform_h5s" in executables:
-                    wf_cmd = [executables["waveform_h5s"], "--directory", run_lbl, "--run_key", run_lbl, wf_options]
+                    wf_cmd = [executables["waveform_h5s"], "--directory", run_lbl, "--run_key", run_lbl, wf_options,
+                             f"&>> {run_lbl}/waveforms.log"]
                     tf_wave.write(" ".join(wf_cmd) + "\n")
 
     # Create submission script with dependencies between stages
