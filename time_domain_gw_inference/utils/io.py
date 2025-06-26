@@ -104,9 +104,7 @@ def load_raw_data(path_dict, ifos=('H1', 'L1', 'V1'), verbose=True):
 
 def get_pe_samples(path):
     """
-    Load in parameter estimation (pe) samples from LVC GW190521 analysis, and calculate
-    the peak strain time at geocenter and each detector, the detector antenna patterns,
-    the psds, and the maximum posterior sky position
+    Load in reference posterior samples.
 
     Parameters
     ----------
@@ -118,26 +116,31 @@ def get_pe_samples(path):
         parameter estimation samples released by the LVC
     """
     # Load in posterior samples
-    with h5py.File(path, 'r') as f:
-        try:
+
+    if '.h5' in path or '.hdf5' in path:
+        with h5py.File(path, 'r') as f:
             try:
-                pe_samples = f['NRSur7dq4']['posterior_samples'][()]
-            except: 
                 try:
-                    pe_samples = f['C01:IMRPhenomXPHM']['posterior_samples'][()]
+                    pe_samples = f['NRSur7dq4']['posterior_samples'][()]
                 except: 
-                    pe_samples = f['Exp0']['posterior_samples'][()]
-        except:
-            # hdf5 --> dict
-            pe_samples_dict = hdf5_to_dict(f)['posterior']
+                    try:
+                        pe_samples = f['C01:IMRPhenomXPHM']['posterior_samples'][()]
+                    except: 
+                        pe_samples = f['Exp0']['posterior_samples'][()]
+            except:
+                # hdf5 --> dict
+                pe_samples_dict = hdf5_to_dict(f)['posterior']
+    
+                if isinstance(pe_samples_dict, np.ndarray):
+                    pe_samples = pe_samples_dict
+    
+                else:
+                    # dict --> a structured array with labels
+                    pe_samples = np.rec.fromarrays([pe_samples_dict[key] for key in pe_samples_dict],
+                                                   names=list(pe_samples_dict.keys()))
+    else: 
+        pe_samples = np.genfromtxt(path, names=True)
 
-            if isinstance(pe_samples_dict, np.ndarray):
-                pe_samples = pe_samples_dict
-
-            else:
-                # dict --> a structured array with labels
-                pe_samples = np.rec.fromarrays([pe_samples_dict[key] for key in pe_samples_dict],
-                                               names=list(pe_samples_dict.keys()))
     return pe_samples
 
 

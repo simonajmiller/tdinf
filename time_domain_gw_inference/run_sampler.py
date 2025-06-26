@@ -45,13 +45,13 @@ def create_run_sampler_arg_parser():
     p.add_argument('--reference-parameters', default=None, help='json of parameters that initialize '
                                                                 '1) how 0 is defined in the time cuts '
                                                                 '2) the initialization of prior draw points ')
+    p.add_argument('--reference-parameter-method', default='tightest_time_posterior', 
+                   help='how to get reference parameter from reference posterior; options = "tightest_time_posterior" or "maxL"')
 
     # Optional args for waveform/data settings
     p.add_argument('--approx', default='NRSur7dq4')
     p.add_argument('--use-higher-order-modes', action='store_true')
-
     p.add_argument('--sampling-rate', type=int, default=2048)
-
     p.add_argument('--flow', type=float, default=11,
                    help="lower frequency bound for data conditioning and likelihood function (ACF)")
     p.add_argument('--fmax', type=float, default=None,
@@ -73,6 +73,8 @@ def create_run_sampler_arg_parser():
     # Do we want to sample in time and/or sky position?
     p.add_argument('--vary-time', action='store_true')
     p.add_argument('--vary-skypos', action='store_true')
+
+    # Set up prior bounds
     p.add_argument('--total-mass-prior-bounds', type=float, nargs=2, default=[200, 350],
                    help="detector frame total mass bounds (in solar masses) for total_mass prior")
     p.add_argument('--mass-ratio-prior-bounds', type=float, nargs=2, default=[0.17, 1],
@@ -196,7 +198,7 @@ def get_injected_parameters(args, initial_run_dir='', verbose=False):
         if args.reference_parameters is None:
             pe_posterior_h5_file = os.path.join(initial_run_dir, args.pe_posterior_h5_file)
             ref_pe_samples = utils.get_pe_samples(pe_posterior_h5_file)
-            reference_parameters = utils.get_reference_parameters_from_posterior(ref_pe_samples)
+            reference_parameters = utils.get_reference_parameters_from_posterior(ref_pe_samples, args.reference_parameter_method)
             
         # Set reference parameters to the passed in reference_parameters
         else:

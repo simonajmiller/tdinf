@@ -1,0 +1,1 @@
+uv run time_domain_gw_inference_slurm_pipe --times_list 0 --modes full --output_directory output/250620_output --config_file GW200208_config.ini --overwrite --time 3-0 --ntasks 1 --submit

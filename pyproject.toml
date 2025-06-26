@@ -22,6 +22,7 @@ dependencies = [
     "pesummary>=1.0.0",
     "kdepy>=1.1.12",
     "arviz>=0.21.0",
+    "pyseobnr>=0.3.5",
 ]
 
 [project.scripts]

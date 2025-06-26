@@ -15,7 +15,7 @@ import scipy
 import copy
 from tqdm import tqdm
 
-def load_run_settings_from_directory(directory, filename_dict=None, args_and_kwargs_only=True):
+def load_run_settings_from_directory(directory, filename_dict=None, args_and_kwargs_only=True, verbose=False):
     """
     Given a directory with runs created via the pipeline, load in args, kwargs, likelihood_manager, and dataframe
     :param directory: directory containing runs
@@ -42,7 +42,8 @@ def load_run_settings_from_directory(directory, filename_dict=None, args_and_kwa
         td_samples = settings['dfs']
         directory = settings['dir']
         for key in td_settings.keys():
-            print(f'key: {key}')
+            if verbose:
+                print(f'key: {key}')
             _args_and_kwargs_only = args_and_kwargs_only
             if key == 'full':
                 _args_and_kwargs_only = False
@@ -51,11 +52,15 @@ def load_run_settings_from_directory(directory, filename_dict=None, args_and_kwa
                     commandline_file = os.path.join(directory, 'command_line.sh') # if run with condor
                 else: 
                     commandline_file = os.path.join(directory, 'tasks_run.txt')   # if run with slurm
+                # load output    
                 output = get_settings_from_command_line_file(
                     commandline_file,
                     filename_dict[key],
                     directory + '/',
-                    parser, verbose=True, args_and_kwargs_only=_args_and_kwargs_only)
+                    parser, 
+                    verbose=verbose, 
+                    args_and_kwargs_only=_args_and_kwargs_only
+                )
                 if _args_and_kwargs_only:
                     args, kwargs = output
                 else:
@@ -160,12 +165,13 @@ def get_settings_from_args(args, initial_run_dir, return_ref_pe=False, args_and_
 
 
 def get_settings_from_command_line_file(command_line_file, file_prefix, initial_run_dir, parser,
-                                        **kwargs):
+                                        verbose=False, **kwargs):
     with open(command_line_file, 'r') as f:
         lines = f.readlines()
         for line in lines:
             if file_prefix in line:
-                print("line is", line)
+                if verbose:
+                    print("line is", line)
                 return get_settings_from_command_line_string(line, initial_run_dir, parser, **kwargs)
 
 

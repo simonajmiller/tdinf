@@ -105,41 +105,52 @@ def condition(raw_time_dict, raw_data_dict, t_dict, desired_sample_rate, f_min=1
     return time_dict, data_dict, i_dict
 
 
-def get_reference_parameters_from_posterior(ref_pe_samples): 
+def get_reference_parameters_from_posterior(ref_pe_samples, method='tightest_time_posterior'): 
     
     """
     Find reference parameters from a set of samples (`ref_pe_samples`). This determines t0. 
-    
-    To do this:
-    1. Calculate standard deviation of the posterior for time in each detector
-    2. Find which time posterior is the narrowest
-    3. Take its median.
-    4. Whichever sample has the closest time to that median is the reference sample.
     """
-    
+    err_msg =  f'Unknown method {method} for calculating reference sample from reference posterior.'
+    assert method in ['maxL', 'tightest_time_posterior'], err_msg
+
     # get the parameter names from the posterior
     parameter_names = ref_pe_samples.dtype.names
-    
-    # find H1_time, L1_time, and/or V1_time
-    pattern = re.compile(r'.*1_time$')
-    ifo_time_posteriors = [s for s in parameter_names if pattern.match(s)]
-    
-    # get widths of time posteriors
-    ifo_time_posterior_widths = [np.std(ref_pe_samples[ifo]) for ifo in ifo_time_posteriors]
 
-    # find the narrowest one
-    narrowest = ifo_time_posteriors[np.argmin(ifo_time_posterior_widths)]
-    narrowest_posterior = ref_pe_samples[narrowest]
+    if method=='maxL':
+        '''
+        maximum likelihood sample
+        '''
+        # Use this to get the reference sample
+        ii = np.argmax(ref_pe_samples['log_likelihood'])
+
+    elif method=='tightest_time_posterior': 
+        '''
+        1. Calculate standard deviation of the posterior for time in each detector
+        2. Find which time posterior is the narrowest
+        3. Take its median.
+        4. Whichever sample has the closest time to that median is the reference sample.
+        '''
+        # find H1_time, L1_time, and/or V1_time
+        pattern = re.compile(r'.*1_time$')
+        ifo_time_posteriors = [s for s in parameter_names if pattern.match(s)]
+        
+        # get widths of time posteriors
+        ifo_time_posterior_widths = [np.std(ref_pe_samples[ifo]) for ifo in ifo_time_posteriors]
     
-    print(f"Using {narrowest} posterior to calculate t0.")
-    
-    # Calculate it's median
-    med = np.median(narrowest_posterior)
-    
-    # Use this to get the reference sample
-    ii = np.argmin(np.abs(narrowest_posterior - med))
+        # find the narrowest one
+        narrowest = ifo_time_posteriors[np.argmin(ifo_time_posterior_widths)]
+        narrowest_posterior = ref_pe_samples[narrowest]
+        
+        print(f"Using {narrowest} posterior to calculate t0.")
+        
+        # Calculate it's median
+        med = np.median(narrowest_posterior)
+        
+        # Use this to get the reference sample
+        ii = np.argmin(np.abs(narrowest_posterior - med))
+
+    # Get desired sample and return
     reference_parameters = {field:ref_pe_samples[field][ii] for field in parameter_names}
-    
     return reference_parameters
     
 
