@@ -1,8 +1,4 @@
 import numpy as np
-try:
-    from scipy.signal import tukey
-except ImportError:
-    from scipy.signal.windows import tukey
 from scipy.linalg import solve_toeplitz
 import lal
 import lalsimulation as lalsim
@@ -16,7 +12,6 @@ from .misc import *
 from .parameter import LogisticParameter, CartesianAngle, TrigLogisticParameter
 from .preprocessing import get_ACF
 from .whiten import whitenData
-
 import astropy.units as u
 
 def check_spin_settings_of_approx(approx_name):

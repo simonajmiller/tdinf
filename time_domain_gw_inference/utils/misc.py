@@ -4,6 +4,10 @@ from gwpy.timeseries import TimeSeries
 from gwpy.signal import filter_design
 import scipy.linalg as sl
 from scipy.interpolate import interp1d
+try:
+    from scipy.signal import tukey
+except ImportError:
+    from scipy.signal.windows import tukey
 
 """
 Logit transformations, used in likelihood
