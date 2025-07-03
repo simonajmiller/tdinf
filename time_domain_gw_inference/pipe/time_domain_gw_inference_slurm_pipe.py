@@ -139,9 +139,9 @@ def main(args=None):
                 tf_run.write(" ".join(run_cmd) + "\n")
                 # make_waveforms
                 if "waveform_h5s" in executables:
-                    wf_cmd = [executables["waveform_h5s"], "--directory", run_lbl, "--run_key", run_lbl, wf_options, 
+                    wf_cmd = [executables["waveform_h5s"], "--directory . --run_key", run_lbl, wf_options, 
                              f"&>> {run_lbl}/waveforms.log"]
-                    tf_wave.write(" ".join(wf_cmd) + "\n")
+                    tf_wave.write(" ".join(wf_cmd) + "\n")            
 
         # Build tasks for times
         for cut in times_list:
@@ -155,9 +155,13 @@ def main(args=None):
                 tf_run.write(" ".join(run_cmd) + "\n")
                 # make_waveforms
                 if "waveform_h5s" in executables:
-                    wf_cmd = [executables["waveform_h5s"], "--directory", run_lbl, "--run_key", run_lbl, wf_options,
+                    wf_cmd = [executables["waveform_h5s"], "--directory . --run_key", run_lbl, wf_options,
                              f"&>> {run_lbl}/waveforms.log"]
                     tf_wave.write(" ".join(wf_cmd) + "\n")
+
+    # delete the waveform generation file if not needed
+    if "waveform_h5s" not in executables:
+        os.remove(tasks_wave)
 
     # Create submission script with dependencies between stages
     NCPU = int(run_settings['ncpu'])
@@ -180,8 +184,9 @@ def main(args=None):
             sb += f" -t {args.time}"
         # Stage 1: run_sampler
         sf.write(f'runid=$(get_id "$({sb} -p {args.partition} -n {args.ntasks} -c {NCPU} disBatch {tasks_run})")\n')
-        # Stage 2: make_waveforms
-        sf.write(f'waveid=$(get_id "$({sb} --dependency=afterok:$runid -p {args.partition} -n 8 -c {NCPU} disBatch {tasks_wave})")\n')
+        # Stage 2 (optional): make_waveforms
+        if "waveform_h5s" in executables:
+            sf.write(f'waveid=$(get_id "$({sb} --dependency=afterok:$runid -p {args.partition} -n 1 -c {NCPU} disBatch {tasks_wave})")\n')
         sf.write("cd -\n")
 
     os.chmod(submit_sh, 0o755)

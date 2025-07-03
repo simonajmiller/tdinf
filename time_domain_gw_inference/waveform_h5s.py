@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import sys
 import os
 from time_domain_gw_inference import run_sampler, utils, group_postprocess
@@ -10,13 +13,17 @@ import h5py
 import argparse
 import tqdm
 
-
-def save_waveform_h5py(output_file, waveform_dict_list, maxL_waveform_dict):
+def save_waveform_h5py(output_file, waveform_dict_list, maxL_waveform_dict, time_dict):
     """
     save list of waveform dicts
     """
     # Save output to HDF5
     with h5py.File(output_file, 'w') as f:
+
+        # time stamps
+        group = f.create_group('times')
+        for key, value in time_dict.items():
+            group.create_dataset(key, data=value) 
         
         # maxL 
         group = f.create_group('maxL')
@@ -31,13 +38,21 @@ def save_waveform_h5py(output_file, waveform_dict_list, maxL_waveform_dict):
         
 def load_waveform_h5py(output_file):
     # Load HDF5 file if it exists and return output
+    
     with h5py.File(output_file, 'r') as f:
+        waveforms = {}
         waveform_dict_list = []
+        
         for key in f.keys():
             group = f[key]
             wf_dict = {k: group[k][()] for k in group.keys()}
-            waveform_dict_list.append(wf_dict)
-    return waveform_dict_list
+            if key=='maxL' or key=='times': 
+                waveforms[key] = wf_dict
+            else:
+                waveform_dict_list.append(wf_dict)
+    
+    waveforms['samples'] = waveform_dict_list    
+    return waveforms
 
 def compute_waveform(i, data_frame, likelihood_manager):
     params = data_frame.iloc[i]
@@ -114,7 +129,7 @@ if __name__ == "__main__":
     maxL_wf_dict = full_likelihood_manager.waveform_manager.get_projected_waveform(
         max_logL_params,
         full_likelihood_manager.ifos, 
-        time_dict = full_likelihood_manager.time_dict ,
+        time_dict = full_likelihood_manager.time_dict,
         f22_start = full_likelihood_manager.f22_start, 
         f_ref = full_likelihood_manager.f_ref
     )
@@ -133,5 +148,5 @@ if __name__ == "__main__":
         # Use pool.starmap to parallelize the computation
         results = list(pool.starmap(compute_waveform, tqdm.tqdm(parallel_args, total=N_waveforms)))
 
-    save_waveform_h5py(waveform_filename, results, maxL_wf_dict)
+    save_waveform_h5py(waveform_filename, results, maxL_wf_dict, full_likelihood_manager.time_dict)
     print("all done! waveforms saved to:", waveform_filename)
