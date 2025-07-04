@@ -163,7 +163,7 @@ class LogisticParameterManager:
 
 class LnPriorManager(LogisticParameterManager):
 
-    def initialize_walkers(self, nwalkers, injected_parameters, reference_posteriors=None, verbose=False):
+    def initialize_walkers(self, nwalkers, injected_parameters, reference_posterior=None, verbose=False):
             
         # get logistic vs cartesian parameters
         logistic_params = self.logistic_parameters
@@ -175,7 +175,7 @@ class LnPriorManager(LogisticParameterManager):
         # (code sees unit scale quantities; use logit transformations to take boundaries to +/- infinity)
         p0_arr = np.asarray([[np.random.normal() for j in range(self.num_parameters)] for i in range(nwalkers)])
         
-        if reference_posteriors is None:
+        if reference_posterior is None:
             # we want the initial walkers to be drawn from "balls" tightly around the injected parameters
             # in logistic space
             for param in logistic_params:
@@ -223,27 +223,13 @@ class LnPriorManager(LogisticParameterManager):
         else: 
             # if instead given a reference posterior, choose initial walkers from it for most parameters.
             # select random set of indices from the given reference posterior
-            idxs = np.random.choice(range(len(reference_posteriors['ra'])), size=nwalkers) 
-            
-            # translation between the bilby keys and the keys used here
-            reference_keys_dict = {
-                'total_mass':'total_mass',
-                'mass_ratio':'mass_ratio',
-                'luminosity_distance':'luminosity_distance',
-                'inclination':'iota',
-                'spin1_magnitude':'a_1',
-                'spin2_magnitude':'a_2',
-                'declination':'dec', 
-                'phase':'phase',
-                'right_ascension':'ra', 
-                'polarization':'psi'
-            }
+            idxs = np.random.choice(range(len(reference_posterior['total_mass'])), size=nwalkers) 
             
             # cycle through logistic params
             for param in logistic_params:
                                 
-                ref_kw = reference_keys_dict[param.physical_name]
-                walkers_phys = reference_posteriors[ref_kw][idxs]
+                # draw walkers
+                walkers_phys = np.asarray(reference_posterior[param.physical_name])[idxs]
                                  
                 # transform into logistic space
                 walkers_logit = param.physical_to_logistic(walkers_phys) 
@@ -253,10 +239,10 @@ class LnPriorManager(LogisticParameterManager):
            
             # cycle through cartesian params
             for param in cartesian_params:
-                
+
+                # draw walkers
                 param_kw = param.physical_name
-                ref_kw = reference_keys_dict[param_kw]
-                walkers_phys = reference_posteriors[ref_kw][idxs]
+                walkers_phys = np.asarray(reference_posterior[param_kw])[idxs]
                 
                 # get x and y components
                 initial_x, initial_y = param.radian_to_cartesian(walkers_phys) 
@@ -267,7 +253,7 @@ class LnPriorManager(LogisticParameterManager):
         
             # finally, if sampling time ... 
             if self.vary_time:
-                p0_arr[:, self.sampled_keys.index('geocenter_time')] = reference_posteriors['geocent_time'][idxs]
+                p0_arr[:, self.sampled_keys.index('geocenter_time')] = np.asarray(reference_posterior['geocenter_time'])[idxs]
         
         p0 = p0_arr.tolist()
         return p0

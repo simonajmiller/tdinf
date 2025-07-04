@@ -40,11 +40,16 @@ def create_run_sampler_arg_parser():
     p.add_argument('--psd', default=None, required=True,
                    help='path to data formatted as --psd {ifo}:path/To/psd', action='append')
 
+    # Option to pass a different set of samples from which to initialize walkers
+    p.add_argument('--initial-walkers', default=None,
+                   help='file with samples from which to draw initial walkers; if None, defaults'
+                         'to --pe-posterior-h5-file')
+
     # Option to do an injection instead of use real data;
     p.add_argument('--injected-parameters', default=None)
     p.add_argument('--reference-parameters', default=None, help='json of parameters that initialize '
                                                                 '1) how 0 is defined in the time cuts '
-                                                                '2) the initialization of prior draw points ')
+                                                                '2) the initialization of prior draw points')
     p.add_argument('--reference-parameter-method', default='tightest_time_posterior', 
                    help='how to get reference parameter from reference posterior; options = "tightest_time_posterior" or "maxL"')
 
@@ -104,8 +109,10 @@ def modify_parameters(data, args):
         df = data.copy()
     elif isinstance(data, dict):
         df = pd.DataFrame([data])  # Convert the dictionary to a one-row DataFrame
+    elif isinstance(data, np.ndarray): 
+        df = pd.DataFrame({k:data[k] for k in data.dtype.names})
     else:
-        raise ValueError("Input must be either a DataFrame or a dictionary.")
+        raise ValueError(f"Input to `modify_parameters` is {type(data)}: must be either a DataFrame or a dictionary.")
 
     def equivocate_columns(dataframe, wanted_key, maybe_key):
         """
@@ -173,6 +180,8 @@ def modify_parameters(data, args):
         return df
     elif isinstance(data, dict):
         return df.to_dict(orient='records')[0]  # Convert back to dictionary
+    elif isinstance(data, np.ndarray):
+        return df.to_dict(orient='list')
 
 
 def get_injected_parameters(args, initial_run_dir='', verbose=False):
@@ -391,6 +400,34 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
     return time_dict, data_dict, pe_psds
 
 
+def get_initial_walker_dist(args, ref_pe_samples,  initial_run_dir=''): 
+
+    '''
+    Function to get the correct posterior distribution (or None) for walker initialization
+    '''
+
+    print('initial walkers file:', args.initial_walkers)
+
+    # Case 1: no initial_walkers_distribution passed via args, then default to the reference PE samples
+    if args.initial_walkers is None: 
+
+        # Case 1A: reference PE samples is also none
+        if ref_pe_samples is None: 
+            return None
+
+        # Case 1B: reference PE samples a posterior
+        else:
+            initial_walker_dist = ref_pe_samples
+            
+    # Case 2: initial_walkers_distribution is passed, then we need to load in that file
+    else:
+        initial_walker_dist_path =  os.path.join(initial_run_dir, args.initial_walkers)
+        initial_walker_dist = utils.get_pe_samples(initial_walker_dist_path)
+
+    # Make sure all the parameter labels align with the TD code
+    return modify_parameters(initial_walker_dist, args)
+
+
 def main():
 
     verbose = True
@@ -446,6 +483,9 @@ def main():
     # Where to save samples while sampler running
     backend = emcee.backends.HDFBackend(backend_path)
 
+    # How to initialize walkers 
+    initial_walker_dist = get_initial_walker_dist(args, ref_pe_samples)
+
     # Resume if we want
     if args.resume and os.path.isfile(backend_path):
 
@@ -469,14 +509,14 @@ def main():
                 backend.reset(nwalkers, ndim)
 
             p0 = likelihood_manager.log_prior.initialize_walkers(
-                nwalkers, reference_parameters, reference_posteriors=ref_pe_samples, verbose=verbose
+                nwalkers, reference_parameters, reference_posterior=initial_walker_dist, verbose=verbose
             )
 
     else:
         # Reset the backend or make new backend
         backend.reset(nwalkers, ndim)
         p0 = likelihood_manager.log_prior.initialize_walkers(
-            nwalkers, reference_parameters, reference_posteriors=ref_pe_samples, verbose=verbose
+            nwalkers, reference_parameters, reference_posterior=initial_walker_dist, verbose=verbose
         )
 
     # Deactivate numpy default number of cores to avoid using too many
@@ -549,7 +589,7 @@ def main():
     sample_path = backend_path.replace('h5', 'dat')
     df.to_csv(sample_path, sep=' ', index=False)
     print("File saved: %r" % sample_path)
-
+    
 
 if __name__ == "__main__":
     main()

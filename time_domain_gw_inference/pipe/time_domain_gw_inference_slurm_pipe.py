@@ -81,7 +81,7 @@ def main(args=None):
     os.makedirs(data_directory, exist_ok=True)
 
     # Copy over the reference parameters and/or posterior into `data_directory` 
-    for f in ['injected-parameters', 'reference-parameters', 'pe-posterior-h5-file']: 
+    for f in ['injected-parameters', 'reference-parameters', 'pe-posterior-h5-file', 'initial-walkers']: 
         fpath = run_settings.pop(f, None)
         if fpath is not None: 
             run_settings[f] = copy_file_to_directory_and_return_new_name(
