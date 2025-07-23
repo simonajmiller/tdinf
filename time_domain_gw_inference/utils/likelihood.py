@@ -1,4 +1,5 @@
 import numpy as np
+import h5py
 from scipy.linalg import solve_toeplitz
 import lal
 import lalsimulation as lalsim
@@ -352,7 +353,7 @@ class WaveformManager(LogisticParameterManager):
         self.antenna_and_time_manager = AntennaAndTimeManager(ifos, *args, **kwargs)
 
     def generate_lal_hphc(self, m1_msun, m2_msun, chi1, chi2, delta_t, dist_mpc=1,
-                          f22_start=20, f_ref=11, inclination=0, phi_ref=0.):
+                          f22_start=20, f_ref=11, inclination=0, phi_ref=0.,NR_kws=None):
         """
         Generate the plus and cross polarizations for given waveform parameters and approximant
         """
@@ -364,12 +365,36 @@ class WaveformManager(LogisticParameterManager):
 
         param_dict = lal.CreateDict()
 
+        # if using an SXS waveform
+        if self.approximant==90:
+            assert NR_kws is not None, "If using NR_hdf5 approximate, must pass NR_kws"
+            nr_path = NR_kws['nr_path']
+            # get masses
+            mtot_msun = NR_kws["mtot"]
+            with h5py.File(nr_path, "r") as f:
+                m1 = f.attrs["mass1"]
+                m2 = f.attrs["mass2"]
+                m1_kg = m1 * mtot_msun * lal.MSUN_SI / (m1 + m2)
+                m2_kg = m2 * mtot_msun * lal.MSUN_SI / (m1 + m2)
+            # compute spin components in lalsim frame
+            s = lalsim.SimInspiralNRWaveformGetSpinsFromHDF5File(
+                NR_kws["f_ref"], mtot_msun, nr_path
+            )
+            chi1 = [s[0], s[1], s[2]]
+            chi2 = [s[3], s[4], s[5]]
+        
+            lalsim.SimInspiralWaveformParamsInsertNumRelData(param_dict, nr_path)
+            ascending_node = np.pi / 2
+        else: 
+            ascending_node = 0
+
+        # generate waveform
         try:
             hp, hc = lalsim.SimInspiralChooseTDWaveform(m1_kg, m2_kg,
                                                     chi1[0], chi1[1], chi1[2],
                                                     chi2[0], chi2[1], chi2[2],
                                                     distance, inclination,
-                                                    phi_ref, 0., 0, 0,
+                                                    phi_ref, ascending_node, 0, 0,
                                                     delta_t, f22_start, f_ref,
                                                     param_dict,
                                                     self.approximant)
@@ -384,6 +409,7 @@ class WaveformManager(LogisticParameterManager):
                 print("inclination =", inclination)
                 print("phi_ref =", phi_ref)
                 print("delta_t =", delta_t)
+                print("ascending node =", ascending_node)
                 print("f22_start =", f22_start)
                 print("f_ref =", f_ref)
                 print("Exception:", e)
@@ -393,7 +419,7 @@ class WaveformManager(LogisticParameterManager):
             
         return hp, hc
 
-    def get_hplus_hcross(self, x_phys, delta_t, f22_start=11, f_ref=11):
+    def get_hplus_hcross(self, x_phys, delta_t, f22_start=11, f_ref=11, NR_kws=None):
         """
         get complex waveform at geocenter
         """
@@ -405,7 +431,7 @@ class WaveformManager(LogisticParameterManager):
                                         dist_mpc=x_phys['luminosity_distance'],
                                         f22_start=f22_start, f_ref=f_ref,
                                         inclination=x_phys['inclination'],
-                                        phi_ref=x_phys['phase'])
+                                        phi_ref=x_phys['phase'],NR_kws=NR_kws)
         
         # for catching waveform errors
         if isinstance(hp, float) and hp!=hp:
@@ -413,11 +439,13 @@ class WaveformManager(LogisticParameterManager):
         
         return TimeSeries.from_lal(hp), TimeSeries.from_lal(hc)
 
-    def get_projected_waveform(self, x_phys, ifos, time_dict, f22_start=11, f_ref=11, window=False):
+    def get_projected_waveform(self, x_phys, ifos, time_dict, f22_start=11, f_ref=11, window=False, 
+                              NR_kws=None):
         delta_t = time_dict[ifos[0]][1] - time_dict[ifos[0]][0]
 
         # get hplus and hcross
-        hp, hc = self.get_hplus_hcross(x_phys, delta_t, f22_start=f22_start, f_ref=f_ref)
+        hp, hc = self.get_hplus_hcross(x_phys, delta_t, f22_start=f22_start, 
+                                       f_ref=f_ref,NR_kws=NR_kws)
         
         # for catching waveform errors
         if isinstance(hp, float) and hp!=hp:
