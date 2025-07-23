@@ -42,8 +42,9 @@ def create_run_sampler_arg_parser():
 
     # Option to pass a different set of samples from which to initialize walkers
     p.add_argument('--initial-walkers', default=None,
-                   help='file with samples from which to draw initial walkers; if None, defaults'
+                   help='folder with samples or backend from which to draw initial walkers; if None, defaults'
                          'to --pe-posterior-h5-file')
+    p.add_argument('--initial-walker-type', default='posterior', help='Options: "posterior" or "backend".')
 
     # Option to do an injection instead of use real data;
     p.add_argument('--injected-parameters', default=None)
@@ -400,32 +401,63 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
     return time_dict, data_dict, pe_psds
 
 
-def get_initial_walker_dist(args, ref_pe_samples,  initial_run_dir=''): 
-
+def get_initial_walkers(likelihood_manager, args, nwalkers, 
+                        reference_parameters, ref_pe_samples, verbose=True): 
     '''
     Function to get the correct posterior distribution (or None) for walker initialization
     '''
-
-    print('initial walkers file:', args.initial_walkers)
+    print('initial walkers folder:', args.initial_walkers)
 
     # Case 1: no initial_walkers_distribution passed via args, then default to the reference PE samples
     if args.initial_walkers is None: 
 
         # Case 1A: reference PE samples is also none
         if ref_pe_samples is None: 
-            return None
+            print('Initializing walkers based on an injection or reference point.')
+            initial_walker_dist = None
 
-        # Case 1B: reference PE samples a posterior
+        # Case 1B: reference PE samples used to initialize
         else:
-            initial_walker_dist = ref_pe_samples
+            print('Initializing walkers based on a reference posterior.')
+            initial_walker_dist = modify_parameters(ref_pe_samples, args)
             
     # Case 2: initial_walkers_distribution is passed, then we need to load in that file
     else:
-        initial_walker_dist_path =  os.path.join(initial_run_dir, args.initial_walkers)
-        initial_walker_dist = utils.get_pe_samples(initial_walker_dist_path)
+        initial_walker_dist_folder =  args.initial_walkers
+        which_run = args.output_h5.split('/')[0]
+        
+        # Case 2A: the initial walkers dist is a posterior 
+        if args.initial_walker_type == "posterior":
 
-    # Make sure all the parameter labels align with the TD code
-    return modify_parameters(initial_walker_dist, args)
+            if '.dat' in initial_walker_dist_folder:  # if passed a posterior file
+                draw_from = os.path.join(initial_walker_dist_folder)
+            else:
+                draw_from = os.path.join(initial_walker_dist_folder, which_run, which_run+'.dat')  # if passsed a folder
+            print('Drawing initial walkers from reference posterior:', draw_from)
+            
+            initial_walker_dist = utils.get_pe_samples(draw_from)
+            
+            # Make sure all the parameter labels align with the TD code
+            initial_walker_dist = modify_parameters(initial_walker_dist, args)
+            
+        # Case 2B: initial walkers drawn from a reference backend (different from the one
+        # saved for this round of inference). This is useful for picking up an old run without
+        # the backend getting unfeasible big.
+        elif args.initial_walker_type == "backend": 
+
+            draw_from = os.path.join(initial_walker_dist_folder, which_run, which_run+'.h5')
+            print('Drawing initial walkers from a reference backend:', draw_from)
+            
+            ref_backend = emcee.backends.HDFBackend(draw_from, read_only=True)
+            p0 = ref_backend.get_last_sample()
+            return p0
+
+    # If not Case 2b, initialize walkers using the function in the likelihood_manager, and return those
+    p0 = likelihood_manager.log_prior.initialize_walkers(
+        nwalkers, reference_parameters, reference_posterior=initial_walker_dist, verbose=verbose
+    )
+    return p0
+            
 
 
 def main():
@@ -483,9 +515,6 @@ def main():
     # Where to save samples while sampler running
     backend = emcee.backends.HDFBackend(backend_path)
 
-    # How to initialize walkers 
-    initial_walker_dist = get_initial_walker_dist(args, ref_pe_samples)
-
     # Resume if we want
     if args.resume and os.path.isfile(backend_path):
 
@@ -507,17 +536,12 @@ def main():
                 os.remove(backend_path)
                 backend = emcee.backends.HDFBackend(backend_path)
                 backend.reset(nwalkers, ndim)
-
-            p0 = likelihood_manager.log_prior.initialize_walkers(
-                nwalkers, reference_parameters, reference_posterior=initial_walker_dist, verbose=verbose
-            )
+            p0 = get_initial_walkers(likelihood_manager, args, nwalkers, reference_parameters, ref_pe_samples)
 
     else:
         # Reset the backend or make new backend
         backend.reset(nwalkers, ndim)
-        p0 = likelihood_manager.log_prior.initialize_walkers(
-            nwalkers, reference_parameters, reference_posterior=initial_walker_dist, verbose=verbose
-        )
+        p0 = get_initial_walkers(likelihood_manager, args, nwalkers, reference_parameters, ref_pe_samples)
 
     # Deactivate numpy default number of cores to avoid using too many
     if args.ncpu > 1:
