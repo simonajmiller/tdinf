@@ -4,6 +4,9 @@ from gwpy.timeseries import TimeSeries
 from gwpy.signal import filter_design
 import scipy.linalg as sl
 from scipy.interpolate import interp1d
+from scipy.spatial.distance import jensenshannon
+from scipy.stats import gaussian_kde
+from collections import namedtuple
 try:
     from scipy.signal import tukey
 except ImportError:
@@ -72,3 +75,32 @@ def apply_window(timeseries):
     window = tukey(nsamps)
     window[int(0.5*nsamps):] = 1.
     return timeseries*window
+
+# I've copied the code used to calculate JS divergences in bilby review from 
+# https://git.ligo.org/gregory.ashton/bilby_mcmc_validation/-/blob/master/bilby_test/bilby_test/utils.py
+
+def calc_median_error(jsvalues, quantiles=(0.16, 0.84)):
+    quants_to_compute = np.array([quantiles[0], 0.5, quantiles[1]])
+    quants = np.percentile(jsvalues, quants_to_compute * 100)
+    summary = namedtuple("summary", ["median", "lower", "upper"])
+    summary.median = quants[1]
+    summary.plus = quants[2] - summary.median
+    summary.minus = summary.median - quants[0]
+    return summary
+
+def calculate_js(samplesA, samplesB, weightsA=None, weightsB=None, ntests=100, xsteps=100, nsamples=None):
+    js_array = np.zeros(ntests)
+    for j in range(ntests):
+        if nsamples is None:
+            nsamples = min([len(samplesA), len(samplesB)])
+        A = np.random.choice(samplesA, size=nsamples, replace=False, p=weightsA)
+        B = np.random.choice(samplesB, size=nsamples, replace=False, p=weightsB)
+        xmin = np.min([np.min(A), np.min(B)])
+        xmax = np.max([np.max(A), np.max(B)])
+        x = np.linspace(xmin, xmax, xsteps)
+        A_pdf = gaussian_kde(A)(x)
+        B_pdf = gaussian_kde(B)(x)
+
+        js_array[j] = np.nan_to_num(np.power(jensenshannon(A_pdf, B_pdf), 2))
+
+    return calc_median_error(js_array)

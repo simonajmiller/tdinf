@@ -29,6 +29,9 @@ def m1m2_from_mtotq(mtot, q):
     m2 = mtot - m1
     return m1, m2
 
+def get_chirpmass(m1, m2):
+    return np.power(m1*m2,3./5)*np.power(m1+m2,-1./5)
+
 
 """
 Functions to calculate various spin quantities
