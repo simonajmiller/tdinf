@@ -1,1 +1,0 @@
-/mnt/home/smiller/src/time-domain-gw-inference/.venv/bin/time_domain_gw_inference_slurm_pipe --times_list 0 --modes full --output_directory output/250617_output --config_file fiducial_bbh_xphm_config.ini --overwrite --time 3-0 --ntasks 1 --submit
