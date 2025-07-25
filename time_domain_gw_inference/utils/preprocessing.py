@@ -240,18 +240,27 @@ def get_ACF(pe_psds, time_dict, f_low=11, f_max=None, nan_inf_replacement=1e10, 
         freq = freq[m_ny]
         psd = psd[m_ny]
 
-        # set values below f_low to be equal to 100*max(psd)
+        # set values below f_low and greater than f_max to be equal to 100*max(psd)
         m_lower = freq >= f_low
         m_upper = freq <= fmax
         mask = m_lower & m_upper
         patch = 100 * max(psd[mask])
         psd[~mask] = 100 * patch
+
+        # check dynamic range -- aka look for giant spikes or blocks
+        dynamic_range = max(np.log10(psd)) - min(np.log10(psd))
+        if dynamic_range > 25: 
+            print(f'alert! dynamic range of PSD is {int(dynamic_range)} orders of magnitude!')
+            mask2 = np.log10(psd) > min(np.log10(psd)) + 25
+            patch2 = 100*max(psd[~mask2])
+            psd[mask2] = patch2
+
+        # Store in dict
+        cond_psds[ifo] = np.transpose([freq, psd])
         
         # Compute ACF from PSD
         rho = 0.5 * np.fft.irfft(psd) / dt  # dt comes from numpy fft conventions
         rho_dict[ifo] = rho[:Nanalyze]
-
-        cond_psds[ifo] = np.transpose([freq, psd])
         
     if return_psds: 
         return rho_dict, cond_psds
