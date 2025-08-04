@@ -23,6 +23,7 @@ dependencies = [
     "kdepy>=1.1.12",
     "arviz>=0.21.0",
     "pyseobnr>=0.3.5",
+    "scikit-learn>=1.7.1",
 ]
 
 [project.scripts]

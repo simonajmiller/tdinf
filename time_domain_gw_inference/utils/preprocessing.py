@@ -203,7 +203,7 @@ def get_Tcut_from_Ncycles(waveform_dict, time_dict, ifo, Ncycles, ra, dec):
     return tcut_geo
 
 
-def get_ACF(pe_psds, time_dict, f_low=11, f_max=None, nan_inf_replacement=1e10, return_psds=False): 
+def get_ACF(pe_psds, time_dict, f_low=11, f_max=None, nan_inf_replacement=1e10, patch=None, return_psds=False): 
     
     """
     Get ACF from PSDs and the times
@@ -244,8 +244,8 @@ def get_ACF(pe_psds, time_dict, f_low=11, f_max=None, nan_inf_replacement=1e10, 
         m_lower = freq >= f_low
         m_upper = freq <= fmax
         mask = m_lower & m_upper
-        patch = 100 * max(psd[mask])
-        psd[~mask] = 100 * patch
+        patch_ifo = 10000 * max(psd[mask]) if patch is None else patch
+        psd[~mask] = patch_ifo
 
         # check dynamic range -- aka look for giant spikes or blocks
         dynamic_range = max(np.log10(psd)) - min(np.log10(psd))
