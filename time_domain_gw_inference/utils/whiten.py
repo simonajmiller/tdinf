@@ -1,4 +1,10 @@
 import numpy as np
+import scipy.linalg as sl
+from tqdm import tqdm
+
+'''
+Functions for whitening in the frequency domain
+'''
 
 def whitenData(h_td, times, psd, psd_freqs, verbose=False):
     """
@@ -55,4 +61,25 @@ def whiten_wfs(wf_dict_list, lm):
         ) for ifo, h_ifo in d.items()}
         wf_dict_list_wh.append(d_wh)
     
+    return wf_dict_list_wh
+
+
+'''
+Functions for whitening in the time domain
+'''
+
+def whitenData_TD(data, ACF):
+    C = sl.toeplitz(ACF)
+    L = sl.cholesky(C,lower=True)
+    data_wh = sl.solve_triangular(L,data, lower=True)
+    return data_wh
+
+def whitenData_dict_TD(data_dict, lm):         
+    return {ifo:whitenData_TD(data_dict[ifo], lm.rho_dict[ifo]) for ifo in lm.ifos}
+
+def whiten_wfs_TD(wf_dict_list, L_dict): 
+    wf_dict_list_wh = []
+    for d in tqdm(wf_dict_list): 
+        d_wh = {ifo:sl.solve_triangular(L_dict[ifo], d[ifo], lower=True) for ifo in d.keys()}
+        wf_dict_list_wh.append(d_wh)
     return wf_dict_list_wh

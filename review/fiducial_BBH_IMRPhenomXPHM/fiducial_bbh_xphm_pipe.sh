@@ -1,1 +1,1 @@
-uv run time_domain_gw_inference_slurm_pipe --times_list 0 --modes full --output_directory output/250805_output --config_file fiducial_bbh_xphm_config.ini --overwrite --time 3-0 --ntasks 1 --submit
+uv run time_domain_gw_inference_slurm_pipe --times_list 0 --modes full --output_directory output/250806_output_custom_init --config_file fiducial_bbh_xphm_config.ini --overwrite --time 3-0 --ntasks 1 --submit

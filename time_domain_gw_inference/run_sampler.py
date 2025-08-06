@@ -401,7 +401,7 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
     return time_dict, data_dict, pe_psds
 
 
-def get_initial_walkers(likelihood_manager, args, nwalkers, 
+def get_initial_walkers(likelihood_manager, args, nwalkers, ndim,
                         reference_parameters, ref_pe_samples, verbose=True): 
     '''
     Function to get the correct posterior distribution (or None) for walker initialization
@@ -423,18 +423,21 @@ def get_initial_walkers(likelihood_manager, args, nwalkers,
             
     # Case 2: initial_walkers_distribution is passed, then we need to load in that file
     else:
-        initial_walker_dist_folder =  args.initial_walkers
-        which_run = args.output_h5.split('/')[0]
+        assert args.initial_walker_type is not None, 'if passed args.initial_walkers, must also pass args.initial_walker_type!'
+
+        # path to file or folder for initial walkers
+        initial_walker_path =  args.initial_walkers
         
         # Case 2A: the initial walkers dist is a posterior 
         if args.initial_walker_type == "posterior":
 
-            if '.dat' in initial_walker_dist_folder:  # if passed a posterior file
-                draw_from = os.path.join(initial_walker_dist_folder)
-            else:
-                draw_from = os.path.join(initial_walker_dist_folder, which_run, which_run+'.dat')  # if passsed a folder
+            if '.dat' in initial_walker_path:  # if passed a posterior file
+                draw_from = initial_walker_path
+            else:  # if passsed a folder
+                which_run = args.output_h5.split('/')[0]
+                draw_from = os.path.join(initial_walker_path, which_run, which_run+'.dat') 
+                
             print('Drawing initial walkers from reference posterior:', draw_from)
-            
             initial_walker_dist = utils.get_pe_samples(draw_from)
             
             # Make sure all the parameter labels align with the TD code
@@ -445,14 +448,32 @@ def get_initial_walkers(likelihood_manager, args, nwalkers,
         # the backend getting unfeasible big.
         elif args.initial_walker_type == "backend": 
 
-            draw_from = os.path.join(initial_walker_dist_folder, which_run, which_run+'.h5')
-            print('Drawing initial walkers from a reference backend:', draw_from)
+            if '.h5' in initial_walker_path: # if passed a backend file 
+                draw_from = initial_walker_path
+            else: # if passed a folder:
+                which_run = args.output_h5.split('/')[0]
+                draw_from = os.path.join(initial_walker_path, which_run, which_run+'.h5')
             
+            print('Drawing initial walkers from a reference backend:', draw_from)
             ref_backend = emcee.backends.HDFBackend(draw_from, read_only=True)
             p0 = ref_backend.get_last_sample()
             return p0
 
-    # If not Case 2b, initialize walkers using the function in the likelihood_manager, and return those
+        # Case 2C: directly pass the distribution of initial walkers
+        elif args.initial_walker_type == "walkers": 
+
+            assert '.npy' in initial_walker_path, "Must load in a .npy file for custom intial walkers."
+
+            print('Initial walkers positions given directly in the file', initial_walker_path)
+            p0 = np.load(initial_walker_path)
+
+            # check that the shape is correct
+            err_msg =  f"shape of initial walkers must be (nwalkers, ndim) = {(nwalkers, ndim)}, but instead was {p0.shape}"
+            assert p0.shape==(nwalkers, ndim), err_msg
+            
+            return p0
+
+    # If not Case 2B or 2C, initialize walkers using the function in the likelihood_manager, and return those
     p0 = likelihood_manager.log_prior.initialize_walkers(
         nwalkers, reference_parameters, reference_posterior=initial_walker_dist, verbose=verbose
     )
@@ -472,7 +493,7 @@ def main():
     # get reference parameters
     reference_parameters, ref_pe_samples = get_injected_parameters(args, verbose=verbose)
 
-    # get kwards
+    # get kwargs
     kwargs = initialize_kwargs(args, reference_parameters)
 
     # make waveform manager
@@ -517,7 +538,6 @@ def main():
 
     # Resume if we want
     if args.resume and os.path.isfile(backend_path):
-
         # Load in last sample to use as the new starting walkers
         try:
             p0 = backend.get_last_sample()
@@ -536,12 +556,11 @@ def main():
                 os.remove(backend_path)
                 backend = emcee.backends.HDFBackend(backend_path)
                 backend.reset(nwalkers, ndim)
-            p0 = get_initial_walkers(likelihood_manager, args, nwalkers, reference_parameters, ref_pe_samples)
-
+            p0 = get_initial_walkers(likelihood_manager, args, nwalkers, ndim, reference_parameters, ref_pe_samples)
     else:
         # Reset the backend or make new backend
         backend.reset(nwalkers, ndim)
-        p0 = get_initial_walkers(likelihood_manager, args, nwalkers, reference_parameters, ref_pe_samples)
+        p0 = get_initial_walkers(likelihood_manager, args, nwalkers, ndim, reference_parameters, ref_pe_samples)
 
     # Deactivate numpy default number of cores to avoid using too many
     if args.ncpu > 1:
