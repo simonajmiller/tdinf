@@ -13,22 +13,24 @@ import h5py
 import argparse
 import tqdm
 
-def save_waveform_h5py(output_file, waveform_dict_list, maxL_waveform_dict, time_dict):
+def save_waveform_h5py(output_file, waveform_dict_list, maxL_waveform_dict=None, time_dict=None):
     """
     save list of waveform dicts
     """
     # Save output to HDF5
     with h5py.File(output_file, 'w') as f:
 
-        # time stamps
-        group = f.create_group('times')
-        for key, value in time_dict.items():
-            group.create_dataset(key, data=value) 
-        
-        # maxL 
-        group = f.create_group('maxL')
-        for key, value in maxL_waveform_dict.items():
-            group.create_dataset(key, data=value) 
+        if time_dict is not None:
+            # time stamps
+            group = f.create_group('times')
+            for key, value in time_dict.items():
+                group.create_dataset(key, data=value) 
+
+        if maxL_waveform_dict is not None:
+            # maxL 
+            group = f.create_group('maxL')
+            for key, value in maxL_waveform_dict.items():
+                group.create_dataset(key, data=value) 
         
         # random draws
         for i, wf_dict in enumerate(waveform_dict_list):
