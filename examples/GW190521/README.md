@@ -11,7 +11,7 @@ chmod +x get_data.sh
 
 ### Step 2: Run `TDinf` using `condor` or `slurm`
 
-We pass the [`GW190521.ini`](https://github.com/simonajmiller/time-domain-gw-inference/blob/main/examples/GW190521/GW190521.ini) file to one of scripts in the `pipe` folder to run `TDinf` on a computing cluster. The `.ini` file provides paths to the input data, and sampler + waveform settings. The `pipe` scripts create an output directory for the run results, which include copies of the input data, config file, and all necessary commands needed to reproduce results. 
+We pass the [`GW190521.ini`](https://github.com/simonajmiller/time-domain-gw-inference/blob/main/examples/GW190521/GW190521.ini) file to one of scripts in the `pipe` folder to run `TDinf` on a computing cluster. The `.ini` file provides paths to the input data, and sampler + waveform settings. We additionally tell the `pipe` script which cutoff times and/or cycles to run on. The `pipe` scripts then create an output directory for the run results, which include copies of the input data, config file, and all necessary commands needed to reproduce results. 
 
 If you are using `condor` for cluster management, run:
 ```
