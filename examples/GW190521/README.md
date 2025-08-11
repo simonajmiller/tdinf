@@ -29,7 +29,8 @@ tail -f output/full_0.0seconds/full_0.0seconds.log
 ```
 (or replace with any of the run names, e.g, `post_-0.05seconds/post_-0.05seconds.log`)
 
-To generate waveform reconstructions from the various posteriors after the run has finished, run
+If you use the `GW190521.ini` config file, waveform reconstructions from the posteriors for each run will be automatically generated after inference finishes. 
+This can also be done manually via:
 ```
 chmod +x generate_waveforms.sh
 ./generate_waveforms.sh
