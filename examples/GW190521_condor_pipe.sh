@@ -1,1 +1,0 @@
-# example of condor pipe

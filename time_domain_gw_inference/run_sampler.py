@@ -63,8 +63,7 @@ def create_run_sampler_arg_parser():
     p.add_argument('--fmax', type=float, default=None,
                    help="Upper frequency bound for data conditioning and likelihood function (ACF) default: None")
     p.add_argument('--f22-start', type=float, default=11,
-                   help="frequency at which to start generating 22 mode for waveforms, "
-                        "NOTE! f22-start _is_ the reference frequency for eccentric waveforms ")
+                   help="frequency at which to start generating 22 mode for waveforms")
     p.add_argument('--fref', type=float, default=11)
     p.add_argument('--ifos', nargs='+', default=['H1', 'L1', 'V1'])
 
