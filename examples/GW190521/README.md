@@ -2,6 +2,7 @@
 
 
 ### Step 1: Download the data
+To run this example, the necessary strain data, PSDs, and reference posteriors must be downloaded. Do this with:
 ```
 cd GW190521_input_data
 chmod +x get_data.sh
@@ -10,15 +11,15 @@ chmod +x get_data.sh
 
 ### Step 2: Run `TDinf` using `condor` or `slurm`
 
-The `.ini` file contains all the info needed for a given run, *except* for the specific cutoff times desired and the path to the output. 
+We pass the [`GW190521.ini`](https://github.com/simonajmiller/time-domain-gw-inference/blob/main/examples/GW190521/GW190521.ini) file to one of scripts in the `pipe` folder to run `TDinf` on a computing cluster. The `.ini` file provides paths to the input data, and sampler + waveform settings. The `pipe` scripts create an output directory for the run results, which include copies of the input data, config file, and all necessary commands needed to reproduce results. 
 
-If using `condor` for cluster management, run:
+If you are using `condor` for cluster management, run:
 ```
 chmod +x GW190521_pipe_condor.sh
 ./GW190521_pipe_condor.sh
 ```
 
-If using with `slurm` for cluster management, run:
+If you are using with `slurm` for cluster management, run:
 ```
 chmod +x GW190521_pipe_slurm.sh
 ./GW190521_pipe_slurm.sh
