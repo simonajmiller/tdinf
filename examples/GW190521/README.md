@@ -14,7 +14,7 @@ chmod +x get_data.sh
 ### Option 1: Run `TDinf` using `condor` or `slurm` (Preferred)
 We pass the [`GW190521.ini`](https://github.com/simonajmiller/time-domain-gw-inference/blob/main/examples/GW190521/GW190521.ini) config file to one of scripts in the [`pipe`](https://github.com/simonajmiller/time-domain-gw-inference/tree/main/pipe) folder to run `TDinf` on a computing cluster. The `.ini` file provides paths to the input data, plus sampler and waveform settings. We additionally tell the `pipe` script which cutoff times and/or cycles to run on. The `pipe` script then creates an output directory for the run results, which includes sub-folders for all cutoff times, plus copies of the input data, config file, and all necessary commands needed to reproduce results. 
 
-| Cluster manager | Python script |  How to call in this example | 
+| Cluster manager | Python script |  How to run in this example | 
 | :---- | :---------------- | :------ | 
 | condor | [`time_domain_inference_condor_pipe.py`](https://github.com/simonajmiller/time-domain-gw-inference/blob/main/pipe/time_domain_gw_inference_condor_pipe.py)|  [`./GW190521_pipe_condor.sh`](https://github.com/simonajmiller/time-domain-gw-inference/blob/main/examples/GW190521/GW190521_pipe_condor.sh) |
 | slurm | [`time_domain_inference_slurm_pipe.py`](https://github.com/simonajmiller/time-domain-gw-inference/blob/main/pipe/time_domain_gw_inference_slurm_pipe.py)    |  [`./GW190521_pipe_slurm.sh`](https://github.com/simonajmiller/time-domain-gw-inference/blob/main/examples/GW190521/GW190521_pipe_slurm.sh) |
