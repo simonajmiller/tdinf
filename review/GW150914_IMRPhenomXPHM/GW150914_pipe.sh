@@ -1,2 +1,0 @@
-uv run time_domain_gw_inference_slurm_pipe --times_list 0 --modes full --output_directory output/250722_output --config_file GW150914_config.ini --overwrite --time 3-0 --ntasks 1 --submit
-uv run time_domain_gw_inference_slurm_pipe --times_list 0 --modes full --output_directory output/250722_output_longer_seg --config_file GW150914_config_longer_seg.ini --overwrite --time 3-0 --ntasks 1 --submit
