@@ -2,6 +2,16 @@
 
 # Example for running TDinf code using the slurm pipeline. 
 
+uv run time_domain_gw_inference_slurm_pipe \
+    --modes full pre post \
+    --times_list -0.05 0 0.05 \
+    --output_directory output \
+    --config_file GW190521.ini \
+    --overwrite \
+    --time 3-0 \
+    --ntasks 7 \
+    --submit
+
 # -------------------------------
 # Explanation of arguments 
 # --------------------------------
@@ -13,13 +23,3 @@
 # --time 3-0    | Request three days for running.
 # --ntasks 7    | Full + pre three times + post three times = 7 tasks for slurm to run.
 # --submit      | Submit job to slurm automatically. If excluded, then must manually run: ./output/submit.sh
-
-uv run time_domain_gw_inference_slurm_pipe \
-    --modes full pre post \
-    --times_list -0.05 0 0.05 \
-    --output_directory output \
-    --config_file GW190521.ini \
-    --overwrite \
-    --time 3-0 \
-    --ntasks 7 \
-    --submit
