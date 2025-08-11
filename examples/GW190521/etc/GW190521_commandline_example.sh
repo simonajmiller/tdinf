@@ -6,19 +6,18 @@
 # See GW190521.ini for documentation about arguments to `run_sampler.py` 
 
 mkdir output
-mkdir output/full_0.0seconds
 
-../../time_domain_gw_inference/run_sampler.py \
-    --output-h5 output/full_0.0seconds/full_0.0seconds.h5 \
+../../../time_domain_gw_inference/run_sampler.py \
+    --output-h5 output/full_0.0seconds.h5 \
     --mode full \
     --Tcut-seconds 0.0 \
     --ifos H1 L1 V1 \
-    --data H1:GW190521_input_data/H-H1_GWOSC_16KHZ_R2-1242442952-32.hdf5 \
-    --data L1:GW190521_input_data/L-L1_GWOSC_16KHZ_R2-1242442952-32.hdf5 \
-    --data V1:GW190521_input_data/V-V1_GWOSC_16KHZ_R2-1242442952-32.hdf5 \
-    --psd H1:GW190521_input_data/glitch_median_PSD_H1.dat \
-    --psd L1:GW190521_input_data/glitch_median_PSD_L1.dat \
-    --psd V1:GW190521_input_data/glitch_median_PSD_V1.dat \
+    --data H1:../GW190521_input_data/H-H1_GWOSC_16KHZ_R2-1242442952-32.hdf5 \
+    --data L1:../GW190521_input_data/L-L1_GWOSC_16KHZ_R2-1242442952-32.hdf5 \
+    --data V1:../GW190521_input_data/V-V1_GWOSC_16KHZ_R2-1242442952-32.hdf5 \
+    --psd H1:../GW190521_input_data/glitch_median_PSD_H1.dat \
+    --psd L1:../GW190521_input_data/glitch_median_PSD_L1.dat \
+    --psd V1:../GW190521_input_data/glitch_median_PSD_V1.dat \
     --reference-posterior-file GW190521_input_data/GW190521_posterior_samples.h5 \
     --reference-parameter-method maxL \
     --total-mass-prior-bounds 200 400 \
