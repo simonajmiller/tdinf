@@ -229,24 +229,24 @@ class RunSamplerDag(AbstractPipelineDAG):
 
         injected_parameters = self.time_domain_gw_inference_settings.get('injected-parameters', None)
         if injected_parameters is None:
-            pe_posterior_h5_file = self.time_domain_gw_inference_settings.get('pe-posterior-h5-file', None)
+            reference_posterior_file = self.time_domain_gw_inference_settings.get('reference-posterior-file', None)
             reference_parameters = self.time_domain_gw_inference_settings.get('reference-parameters', None)
-            if (pe_posterior_h5_file is None) and (reference_parameters is None):
+            if (reference_posterior_file is None) and (reference_parameters is None):
                 raise AssertionError(
-                    'Neither injected-parameters nor pe-posterior-h5-file supplied nor reference-parameters is supplied, please include one')
-            if pe_posterior_h5_file is not None:
-                self.time_domain_gw_inference_settings['pe-posterior-h5-file'] = \
+                    'Neither injected-parameters nor reference-posterior-file supplied nor reference-parameters is supplied, please include one')
+            if reference_posterior_file is not None:
+                self.time_domain_gw_inference_settings['reference-posterior-file'] = \
                     self._copy_file_to_directory_and_return_new_name_(
-                        pe_posterior_h5_file, data_directory, self.output_directory)
+                        reference_posterior_file, data_directory, self.output_directory)
             if reference_parameters is not None:
                 self.time_domain_gw_inference_settings['reference-parameters'] = \
                     self._copy_file_to_directory_and_return_new_name_(
                         reference_parameters, data_directory, self.output_directory)
         else:
-            pe_posterior_h5_file = self.time_domain_gw_inference_settings.get('pe-posterior-h5-file', None)
-            if pe_posterior_h5_file is not None:
+            reference_posterior_file = self.time_domain_gw_inference_settings.get('reference-posterior-file', None)
+            if reference_posterior_file is not None:
                 raise AssertionError(
-                    'both injected-parameters and pe-posterior-h5-file have been supplied, please only include one')
+                    'both injected-parameters and reference-posterior-file have been supplied, please only include one')
             self.time_domain_gw_inference_settings['injected-parameters'] = \
                 self._copy_file_to_directory_and_return_new_name_(
                     injected_parameters, data_directory, self.output_directory)

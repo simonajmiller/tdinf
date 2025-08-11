@@ -29,34 +29,41 @@ def create_run_sampler_arg_parser():
     p.add_argument('-ts', '--Tcut-seconds', type=float, default=None)
 
     # Start & end times for segment of data to analyze
-    p.add_argument('--Tstart', type=float, default=1242442966.9077148) # the defaults are for gw190521
-    p.add_argument('--Tend', type=float, default=1242442967.607715)
+    p.add_argument('--Tstart', type=float, required=True)
+    p.add_argument('--Tend', type=float, required=True)
+
+    # Inferometers 
+    p.add_argument('--ifos', nargs='+', default=['H1', 'L1', 'V1'])
 
     # Place where input data is stored
-    p.add_argument('--pe-posterior-h5-file', default=None,
-                   help='posterior file containing pe samples, used only if injected-parameters==None')
     p.add_argument('--data', default=None, required=True,
-                   help='path to data formatted as --data {ifo}:path/To/psd', action='append')
+                   help='path to data formatted as --data {ifo}:path/To/psd. !! must include one per ifo.', 
+                   action='append')
     p.add_argument('--psd', default=None, required=True,
-                   help='path to data formatted as --psd {ifo}:path/To/psd', action='append')
+                   help='path to data formatted as --psd {ifo}:path/To/psd. !! must include one per ifo.', 
+                   action='append')
+    
+    # Option to do an injection instead of use real data;
+    p.add_argument('--injected-parameters', default=None)
+
+    # How to generate reference parameters? Can either be from a reference posterior, or reference
+    # point. If injected-parameters is passed, those are used as the ference
+    p.add_argument('--reference-parameters', default=None, help='json of parameters that initialize '
+                                                                '1) how 0 is defined in the time cuts '
+                                                                '2) the initialization of prior draw points')
+    p.add_argument('--reference-posterior-file', default=None,
+                   help='posterior file containing pe samples, used only if injected-parameters==None and reference-parameters=None')
+    p.add_argument('--reference-parameter-method', default='tightest_time_posterior', 
+                   help='how to get reference parameter from reference posterior; options = "tightest_time_posterior" or "maxL"')
 
     # Option to pass a different set of samples from which to initialize walkers
     p.add_argument('--initial-walkers', default=None,
                    help='folder with samples or backend from which to draw initial walkers; if None, defaults'
-                         'to --pe-posterior-h5-file')
-    p.add_argument('--initial-walker-type', default='posterior', help='Options: "posterior" or "backend".')
-
-    # Option to do an injection instead of use real data;
-    p.add_argument('--injected-parameters', default=None)
-    p.add_argument('--reference-parameters', default=None, help='json of parameters that initialize '
-                                                                '1) how 0 is defined in the time cuts '
-                                                                '2) the initialization of prior draw points')
-    p.add_argument('--reference-parameter-method', default='tightest_time_posterior', 
-                   help='how to get reference parameter from reference posterior; options = "tightest_time_posterior" or "maxL"')
+                         'to --reference-posterior-file')
+    p.add_argument('--initial-walker-type', default='walkers', help='Options: "posterior", "backend", or "walkers"')
 
     # Optional args for waveform/data settings
     p.add_argument('--approx', default='NRSur7dq4')
-    p.add_argument('--use-higher-order-modes', action='store_true')
     p.add_argument('--sampling-rate', type=int, default=2048)
     p.add_argument('--flow', type=float, default=11,
                    help="lower frequency bound for data conditioning and likelihood function (ACF)")
@@ -65,7 +72,6 @@ def create_run_sampler_arg_parser():
     p.add_argument('--f22-start', type=float, default=11,
                    help="frequency at which to start generating 22 mode for waveforms")
     p.add_argument('--fref', type=float, default=11)
-    p.add_argument('--ifos', nargs='+', default=['H1', 'L1', 'V1'])
 
     # Optional args sampler settings
     p.add_argument('--nwalkers', type=int, default=512)
@@ -187,16 +193,16 @@ def modify_parameters(data, args):
 def get_injected_parameters(args, initial_run_dir='', verbose=False):
     """
     Loads in injection parameters from args.injected_paramters or, if there was no injection,
-    loads in max likelihood samples from args.pe_posterior_h5_file
+    loads in max likelihood samples from args.reference_posterior_file
     :param args: argparser
     :param initial_run_dir:
     :param verbose: Level of detail printing output
     :return:
     """
 
-    if (args.injected_parameters is None) and (args.reference_parameters is None) and (args.pe_posterior_h5_file is None):
+    if (args.injected_parameters is None) and (args.reference_parameters is None) and (args.reference_posterior_file is None):
         raise ValueError("WARNING: none of --injected-parameters, "
-                         "--reference_parameters, or --pe-posterior-h5-file were given. "
+                         "--reference_parameters, or --reference-posterior-file were given. "
                          " These parameters are needed in order to set up time cuts and initialize the sampler."
                          " Please provide one!")
 
@@ -205,8 +211,8 @@ def get_injected_parameters(args, initial_run_dir='', verbose=False):
         
         # Use reference parameter from a full PE file...
         if args.reference_parameters is None:
-            pe_posterior_h5_file = os.path.join(initial_run_dir, args.pe_posterior_h5_file)
-            ref_pe_samples = utils.get_pe_samples(pe_posterior_h5_file)
+            reference_posterior_file = os.path.join(initial_run_dir, args.reference_posterior_file)
+            ref_pe_samples = utils.get_pe_samples(reference_posterior_file)
             reference_parameters = utils.get_reference_parameters_from_posterior(ref_pe_samples, args.reference_parameter_method)
             
         # Set reference parameters to the passed in reference_parameters
@@ -516,7 +522,6 @@ def main():
         vary_time=args.vary_time, vary_skypos=args.vary_skypos,
         f_max=args.fmax,
         only_prior=args.only_prior,
-        use_higher_order_modes=args.use_higher_order_modes,
         **kwargs
     )
 

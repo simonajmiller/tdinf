@@ -5,8 +5,8 @@
 # -------------------------------
 # Explanation of arguments 
 # --------------------------------
-# --modes full pre post      | This runs on full signal, and pre/post 
-# --times_list -0.05 0 0.05  | t = {-0.05, 0, 0.05} seconds from merger.
+# --modes full pre post      | This runs on full signal, and pre/post t = {-0.05, 0, 0.05} seconds from merger. 
+# --times_list -0.05 0 0.05  | NOTE: Could alternatively pass --cycles_list to cut in # of cycles rather than seconds.
 # --output_directory output  | The output is put in a folder called `output` inside the current directory. 
 # --config_file GW190521.ini | Path to the config file.
 # --overwrite   | If `output` directory already exists, overwrite it.

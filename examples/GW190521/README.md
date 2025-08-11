@@ -29,5 +29,10 @@ tail -f output/full_0.0seconds/full_0.0seconds.log
 ```
 (or replace with any of the run names, e.g, `post_-0.05seconds/post_-0.05seconds.log`)
 
+To generate waveform reconstructions from the various posteriors after the run has finished, run
+```
+chmod +x generate_waveforms.sh
+./generate_waveforms.sh
+```
 
 ### See `GW190521_plot_results.ipynb` for how to plot load and plot the data and results.

@@ -79,7 +79,7 @@ def make_waveform_h5_arg_parser():
     return parser
 
 
-if __name__ == "__main__":
+def main():
     # Initialize ArgumentParser
     parser = make_waveform_h5_arg_parser()
 
@@ -152,3 +152,6 @@ if __name__ == "__main__":
 
     save_waveform_h5py(waveform_filename, results, maxL_wf_dict, full_likelihood_manager.time_dict)
     print("all done! waveforms saved to:", waveform_filename)
+
+if __name__ == "__main__":
+    main()
