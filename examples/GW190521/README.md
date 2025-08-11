@@ -30,7 +30,7 @@ tail -f output/full_0.0seconds/full_0.0seconds.log
 
 ### Option 2: Run `TDinf` in the commandline
 
-If you do not have access to a computing cluster, `TDinf` can also be in the commandline, although it is not recommended due to computational expense. The script [`./commandline_example.sh`](https://github.com/simonajmiller/time-domain-gw-inference/blob/main/examples/GW190521/commandline_example.sh) shows an example for running in the commandline. 
+If you do not have access to a computing cluster, `TDinf` can also be in the commandline, although it is not recommended due to computational expense and because it is not compatible with `group_postprocess.py` or `waveform_h5s.py` which aid in easily loading and plotting results. The script [`./commandline_example.sh`](https://github.com/simonajmiller/time-domain-gw-inference/blob/main/examples/GW190521/commandline_example.sh) shows an example for running in the commandline. 
 
 ## Step 2.5: Generate waveform reconstructions from posteriors
 
