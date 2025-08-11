@@ -38,6 +38,7 @@ If you use the provided `GW190521.ini` config file, waveform reconstructions fro
 This can also be done manually with [`./generate_waveforms.sh`](https://github.com/simonajmiller/time-domain-gw-inference/blob/main/examples/GW190521/generate_waveforms.sh).
 
 ## 🔹 Step 3: View results
-### See [`GW190521_plot_results.ipynb`](https://github.com/simonajmiller/time-domain-gw-inference/blob/main/examples/GW190521/GW190521_plot_results.ipynb) for how to plot load and plot the data and results using the `group_postprocess` module.
+
+See [`GW190521_plot_results.ipynb`](https://github.com/simonajmiller/time-domain-gw-inference/blob/main/examples/GW190521/GW190521_plot_results.ipynb) for how to load and plot the data and results using the `group_postprocess` and `waveform_h5s` modules.
 
 If you have any questions or concerns about running this example, or about `TDinf` in general, please email `simona.miller@ligo.org`. 📩
