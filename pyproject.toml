@@ -4,6 +4,7 @@ dynamic = ["version"]
 description = "working repository for time domain parameter estimation for gravitational-wave signals"
 readme = { file = "README.md", content-type = "text/markdown" }
 license = { text = "GPL" }
+
 # Specify the Python versions you support. Adjust as needed.
 requires-python = ">=3.11, <3.13"
 dependencies = [
@@ -28,9 +29,9 @@ dependencies = [
 
 [project.scripts]
 run_sampler = "time_domain_gw_inference.run_sampler:main"
-time_domain_gw_inference_pipe = "time_domain_gw_inference.pipe.time_domain_gw_inference_pipe:main"
-time_domain_gw_inference_slurm_pipe = "time_domain_gw_inference.pipe.time_domain_gw_inference_slurm_pipe:main"
 waveform_h5s = "time_domain_gw_inference.waveform_h5s:main"
+time_domain_gw_inference_pipe = "pipe.time_domain_gw_inference_pipe:main"
+time_domain_gw_inference_slurm_pipe = "pipe.time_domain_gw_inference_slurm_pipe:main"
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
