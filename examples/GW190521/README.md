@@ -27,12 +27,12 @@ tail -f output/full_0.0seconds/full_0.0seconds.log
 > [!WARNING]
 > Time-domain inference is computationally intensive. One `TDinf` run typically takes 8-12 hours to finish on 128 CPUs. 
 
-**Option 2: Run `TDinf` in the commandline** -- If you do not have access to a computing cluster, `TDinf` can also be in the commandline, although it is ***not recommended*** due to computational expense and because it is not compatible with `group_postprocess.py` or `waveform_h5s.py` which aid in easily loading and plotting results. The script [`./commandline_example.sh`](https://github.com/simonajmiller/time-domain-gw-inference/blob/main/examples/GW190521/commandline_example.sh) shows an example for running in the commandline. 
+**Option 2: Run `TDinf` in the commandline** -- If you do not have access to a computing cluster, `TDinf` can also be in the commandline, although it is ***not recommended*** due to computational expense and because it is not compatible with `group_postprocess.py` or `waveform_h5s.py` which aid in easily loading and plotting results. The script [`./etc/commandline_example.sh`](https://github.com/simonajmiller/time-domain-gw-inference/blob/main/examples/GW190521/etc/commandline_example.sh) shows an example for running in the commandline. 
 
 ### 🔹 Step 2.5: Generate waveform reconstructions from posteriors
 
 If you use the provided `GW190521.ini` config file, waveform reconstructions from the posteriors for each run (full, pre- and post-cutoff) will be automatically generated after inference finishes. 
-This can also be done manually with [`./generate_waveforms.sh`](https://github.com/simonajmiller/time-domain-gw-inference/blob/main/examples/GW190521/generate_waveforms.sh).
+This can also be done manually with [`./etc/generate_waveforms.sh`](https://github.com/simonajmiller/time-domain-gw-inference/blob/main/examples/GW190521/etc/generate_waveforms.sh).
 
 ### 🔹 Step 3: View results
 
