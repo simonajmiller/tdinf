@@ -92,12 +92,6 @@ class LogisticParameterManager:
                 LogisticParameter('spin1_magnitude', kwargs['chi_lim'], None),
                 LogisticParameter('spin2_magnitude', kwargs['chi_lim'], None)
             ])
-            # if aligned spins, only sample z-component
-            if self.aligned_spins:
-                self.sampled_keys.extend(['c1_z', 'c2_z'])
-            # else, sample over all components (x,y,z)
-            else:
-                self.sampled_keys.extend(['c1_x', 'c1_y', 'c1_z','c2_x', 'c2_y', 'c2_z'])
 
         # add sky position, if we want to sample it
         if self.vary_skypos:
@@ -125,6 +119,13 @@ class LogisticParameterManager:
         self.sampled_keys = [p.logistic_name for p in self.logistic_parameters]
         for cartesian_angle in self.cartesian_angles:
             self.sampled_keys.extend([cartesian_angle.x_name, cartesian_angle.y_name])
+        if not self.no_spins:
+            # if aligned spins, only sample z-component
+            if self.aligned_spins:
+                self.sampled_keys.extend(['c1_z', 'c2_z'])
+            # else, sample over all components (x,y,z)
+            else:
+                self.sampled_keys.extend(['c1_x', 'c1_y', 'c1_z','c2_x', 'c2_y', 'c2_z'])
         if self.vary_time:
             self.sampled_keys.append('geocenter_time')  
 

@@ -107,7 +107,7 @@ def load_run_settings_from_directory(directory, filename_dict=None, load_all_lm=
                 )
 
                 # formatting info for the run
-                if do_not_load_lm:
+                if args_kwargs_only:
                     args, kwargs = output
                 else:
                     args, kwargs, lm = output

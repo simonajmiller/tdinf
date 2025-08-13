@@ -137,6 +137,21 @@ def get_waveform_filename(directory, run_key):
     return os.path.join(waveform_dir, f'{run_key}_waveforms.h5')
 
 
+def get_waveform_CI(wf_dict_list, lm): 
+    '''
+    Get the 90% credible region of strain from a list of waveforms
+    `wf_dict_list` and a likelihood manager `lm`
+    '''
+    CIs_dict = {}
+    for ifo in lm.ifos: 
+        d_list = []
+        for d in wf_dict_list: 
+            d_list.append(d[ifo])
+        d_arr = np.asarray(d_list)
+        CIs = np.quantile(d_arr, (0.05, 0.5, 0.95), axis=0)
+        CIs_dict[ifo]  = {'5th':CIs[0],'median':CIs[1],'95th':CIs[2]}
+    return(CIs_dict)
+
 def make_waveform_h5_arg_parser():
     
     parser = argparse.ArgumentParser(description="Script to save waveforms to file")

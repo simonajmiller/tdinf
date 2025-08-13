@@ -83,7 +83,7 @@ def create_run_sampler_arg_parser():
                         "Default: 11 Hz")
     p.add_argument('--fmax', type=float, default=None,
                    help="Upper frequency bound for data conditioning and likelihood function (ACF). "
-                        'Default: None")
+                        "Default: None")
     p.add_argument('--f22-start', type=float, default=11,
                    help="frequency at which to start generating 22 mode for waveforms. "
                         "Default: 11 Hz")
@@ -93,7 +93,7 @@ def create_run_sampler_arg_parser():
     # Optional args sampler settings
     p.add_argument('--nwalkers', type=int, default=512,
                   help='Number of walkers for emcee to run with. Default: 512')
-    p.add_argument('--nsteps', type=int, default=50000
+    p.add_argument('--nsteps', type=int, default=50000,
                    help='Number of steps for emcee to run. Default: 50000')
     p.add_argument('--ncpu', type=int, default=4,
                    help='Number of CPUs for emcee to run on. Default: 4')
@@ -300,7 +300,10 @@ def initialize_kwargs(args, reference_parameters):
     return kwargs
 
 def make_waveform_manager(args, **kwargs):
-    return = utils.WaveformManager(
+    '''
+    Generate waveform manager (see utils.likelihood.WaveformManger) from args and kwargs
+    '''
+    return utils.WaveformManager(
         args.ifos,vary_time=args.vary_time,vary_skypos=args.vary_skypos,**kwargs
     )
 

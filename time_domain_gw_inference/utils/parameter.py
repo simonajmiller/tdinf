@@ -154,7 +154,7 @@ class CartesianAngle:
         return np.cos(value), np.sin(value)
 
     def ln_prior_weight(self, value_x, value_y):
-         """
+        """
         Compute the log of prior weight in Cartesian space.
         """
         return -0.5 * (value_x ** 2 + value_y ** 2)

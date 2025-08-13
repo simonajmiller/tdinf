@@ -117,7 +117,7 @@ def postprocessing_get_complete_samples_dict(samples, samples_lnp, likelihood_ma
 
 
 def postprocess_samples(sampler, likelihood_manager, getRidOfFixed=False, **kwargs):
-   """
+    """
     Post-process MCMC samples from an `emcee` sampler object.
 
     This function:

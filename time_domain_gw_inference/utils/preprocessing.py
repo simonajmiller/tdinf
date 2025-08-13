@@ -58,7 +58,7 @@ def condition(raw_time_dict, raw_data_dict, t_dict, desired_sample_rate, f_min=1
 
     # Get downsample factor
     _downsample_factor = raw_data_sample_rate / desired_sample_rate
-    assert _downsample_factor.isinteger(), f'Downsample factor must be a interger, but is instead {_downsample_factor}'
+    assert _downsample_factor.is_integer(), f'Downsample factor must be a interger, but is instead {_downsample_factor}'
     downsample_factor = int(np.floor(_downsample_factor))
     if verbose:
         print('downsample factor is', downsample_factor)
@@ -236,7 +236,7 @@ def get_Tcut_from_Ncycles(waveform_dict, time_dict, ifo, Ncycles, ra, dec):
 
 
 def get_ACF(psd_dict, time_dict, f_low=11, f_max=None, nan_inf_replacement=1e10, patch=None, return_psds=False): 
-   """
+    """
     Compute the autocorrelation function (ACF) from a PSD
 
     The PSDs are preprocessed by removing NaN/Inf values, clipping to Nyquist, patching values
