@@ -16,6 +16,17 @@ from .whiten import whitenData
 import astropy.units as u
 
 def check_spin_settings_of_approx(approx_name):
+    """
+    Check the spin configuration supported by a given waveform approximant.
+
+    Parameters:
+    - approx_name (str): Name of the waveform approximant.
+
+    Returns:
+    - aligned_spins (bool): True if the approximant supports only aligned spins.
+    - no_spins (bool): True if the approximant supports no spins.
+    """
+    
     aligned_spins = False
     no_spins = False
 
@@ -34,83 +45,123 @@ def check_spin_settings_of_approx(approx_name):
         no_spins = True
     else:
         print("WARNING, UNSURE IF WAVEFORM HAS SPINS")
+        
     return aligned_spins, no_spins
 
+
 class LogisticParameterManager:
+    """
+    Manager for logistic and Cartesian parameter transformations.
+
+    Handles:
+    - Spin, mass, distance, inclination, phase, and sky location parameters
+    - Conversion between logistic space and physical space
+    - Cartesian angle transformations
+    - Spin normalization
+    - Fixed and sampled parameters
+    """
+    
     def __init__(self, vary_time=False, vary_skypos=False, **kwargs):
 
+        # vary time and sky pos?
         self.vary_time = vary_time
         self.vary_skypos = vary_skypos
+
+        #  where we will put parameters which are NOT sampled over
+        self.fixed = {}
+        
+        # reference time
+        self.reference_time = kwargs['geocenter_time']
 
         # get allowed spin settings of waveform model
         self.aligned_spins, self.no_spins = check_spin_settings_of_approx(kwargs['approx'])
 
-        # TODO put in injected values
-        self.logistic_parameters = [LogisticParameter('total_mass', kwargs['mtot_lim'], None),
-                                    LogisticParameter('mass_ratio', kwargs['q_lim'], None),
-                                    LogisticParameter('luminosity_distance', kwargs['dist_lim'], None),
-                                    TrigLogisticParameter('inclination', 'cos', [-1, 1], None)
-                                    ]
+        # get up the logistic parameters which are always sampled over
+        self.logistic_parameters = [
+            LogisticParameter('total_mass', kwargs['mtot_lim'], None),
+            LogisticParameter('mass_ratio', kwargs['q_lim'], None),
+            LogisticParameter('luminosity_distance', kwargs['dist_lim'], None),
+            TrigLogisticParameter('inclination', 'cos', [-1, 1], None)                            
+        ]
+        # set up the cartesian parameters which are always sampled over
+        self.cartesian_angles = [CartesianAngle('phase')]
+        
+        # add spin magnitudes, if supported by waveform model
         if not self.no_spins:
             self.logistic_parameters.extend([
                 LogisticParameter('spin1_magnitude', kwargs['chi_lim'], None),
-                LogisticParameter('spin2_magnitude', kwargs['chi_lim'], None)])
-
-        if self.vary_skypos:
-            self.logistic_parameters.append(TrigLogisticParameter('declination', 'sin', [-1, 1], None))
-
-        self.sampled_keys = [p.logistic_name for p in self.logistic_parameters]
-
-        if not self.no_spins:
+                LogisticParameter('spin2_magnitude', kwargs['chi_lim'], None)
+            ])
+            # if aligned spins, only sample z-component
             if self.aligned_spins:
                 self.sampled_keys.extend(['c1_z', 'c2_z'])
+            # else, sample over all components (x,y,z)
             else:
-                self.sampled_keys.extend(
-                    ['c1_x', 'c1_y', 'c1_z',
-                     'c2_x', 'c2_y', 'c2_z'])
+                self.sampled_keys.extend(['c1_x', 'c1_y', 'c1_z','c2_x', 'c2_y', 'c2_z'])
 
-        self.cartesian_angles = [CartesianAngle('phase')]
-
-        if self.vary_time:
-            # this is set for the prior manager
-            self.sigma_time = kwargs['sigma_time']
-            self.sampled_keys.append('geocenter_time')
-
+        # add sky position, if we want to sample it
         if self.vary_skypos:
+            # right ascension
+            self.logistic_parameters.append(TrigLogisticParameter('declination', 'sin', [-1, 1], None))
+            # declination
             self.cartesian_angles.extend([
                 CartesianAngle('right_ascension', phase_offset=np.pi),
                 CartesianAngle('polarization')
             ])
-
-        for cartesian_angle in self.cartesian_angles:
-            self.sampled_keys.extend([cartesian_angle.x_name, cartesian_angle.y_name])
-
-        self.num_parameters = len(self.sampled_keys)
-
-        self.fixed = {}
-        if not self.vary_skypos:
+        # otherwise, add to fixed parameters
+        else:
             self.fixed['right_ascension'] = kwargs['right_ascension']
             self.fixed['declination'] = kwargs['declination']
             self.fixed['polarization'] = kwargs['polarization']
 
-        if not self.vary_time:
-            self.fixed['geocenter_time'] = kwargs['geocenter_time']
-        self.reference_time = kwargs['geocenter_time']
+        # add time, if we want to sample it
+        if self.vary_time:
+            self.sigma_time = kwargs['sigma_time']
+        # otherwise, add to fixed parameters 
+        else:
+            self.fixed['geocenter_time'] = self.reference_time
+        
+        # generate list of ALL parameters we are sampling over
+        self.sampled_keys = [p.logistic_name for p in self.logistic_parameters]
+        for cartesian_angle in self.cartesian_angles:
+            self.sampled_keys.extend([cartesian_angle.x_name, cartesian_angle.y_name])
+        if self.vary_time:
+            self.sampled_keys.append('geocenter_time')  
+
+        # NUMBER of sampled parameters
+        self.num_parameters = len(self.sampled_keys)
 
     def get_logistic_dict(self, x):
+        """
+        Convert array `x` of sampled values into a dictionary keyed by sampled 
+        parameter names.
+        """
         return {self.sampled_keys[i]: x[i] for i in range(self.num_parameters)}
 
     def get_physical_dict_from_logistic_dict(self, x_dict):
+        """
+        Convert a dictionary of logistic parameters into their physical values.
+        """
         physicalDict = self.fixed.copy()
 
-        physicalDict.update({transform.physical_name: transform.logistic_to_physical(x_dict[transform.logistic_name])
-                             for transform in self.logistic_parameters})
-        physicalDict.update({transform.physical_name: transform.cartesian_to_radian(x_dict[transform.x_name],
-                                                                                    x_dict[transform.y_name])
-                             for transform in self.cartesian_angles})
+        physicalDict.update({
+            transform.physical_name: transform.logistic_to_physical(
+                x_dict[transform.logistic_name]
+            )
+            for transform in self.logistic_parameters
+        })
+        physicalDict.update({
+            transform.physical_name: transform.cartesian_to_radian(
+                x_dict[transform.x_name],x_dict[transform.y_name]
+            ) 
+            for transform in self.cartesian_angles
+        })
         return physicalDict
 
     def get_physical_spins(self, spin_magnitude, c_x, c_y, c_z):
+        """
+        Normalize Cartesian spin components to the correct spin magnitude.
+        """
         if self.no_spins:
             return 0, 0, 0
 
@@ -119,21 +170,27 @@ class LogisticParameterManager:
         spin_x = c_x * chi_norm
         spin_y = c_y * chi_norm
         spin_z = c_z * chi_norm
+        
         return spin_x, spin_y, spin_z
 
     def samp_to_phys(self, x):
-        # Implementation of samp_to_phys
-        # logistic dict
+        """
+        Convert a sampled array `x` into a physical dictionary with spins normalized.
+        """
+        # Convert `x` from an array into a dict
         x_dict = self.get_logistic_dict(x)
         physical_dict = self.get_physical_dict_from_logistic_dict(x_dict)
 
-        # normalize spins
+        # Normalize spins
         for i in ['1', '2']:
             physical_dict[f'spin{i}_x'], physical_dict[f'spin{i}_y'], physical_dict[f'spin{i}_z'] = \
-                self.get_physical_spins(physical_dict.get(f'spin{i}_magnitude', 0),
-                                        x_dict.get(f'c{i}_x', 0),
-                                        x_dict.get(f'c{i}_y', 0),
-                                        x_dict.get(f'c{i}_z', 0))
+                self.get_physical_spins(
+                    physical_dict.get(f'spin{i}_magnitude', 0),
+                    x_dict.get(f'c{i}_x', 0),
+                    x_dict.get(f'c{i}_y', 0),
+                    x_dict.get(f'c{i}_z', 0)
+                )
+            
         if self.vary_time:
             physical_dict['geocenter_time'] = x_dict['geocenter_time']
 
@@ -143,9 +200,11 @@ class LogisticParameterManager:
     def physical_dict_to_waveform_dict(physical_dict):
         """
         Take in the physical dictionary and return one that has units for astropy
-        :return:
         """
+        # Get component masses from total mass and mass ratio
         m1, m2 = m1m2_from_mtotq(physical_dict['total_mass'], physical_dict['mass_ratio'])
+        
+        # Add units to all parameters
         param_dict = {
             'mass1': m1 * u.Msun,
             'mass2': m2 * u.Msun,
@@ -159,12 +218,17 @@ class LogisticParameterManager:
             'distance': physical_dict['luminosity_distance'] * u.Mpc,
             'inclination': physical_dict['inclination'] * u.rad,
         }
+        
         return param_dict
 
 
 class LnPriorManager(LogisticParameterManager):
 
     def initialize_walkers(self, nwalkers, injected_parameters, reference_posterior=None, verbose=False):
+        '''
+        Function to get initial walkers for an emcee run depending on 
+        settings provided by the user.
+        '''
             
         # get logistic vs cartesian parameters
         logistic_params = self.logistic_parameters
@@ -260,7 +324,21 @@ class LnPriorManager(LogisticParameterManager):
         return p0
 
     def get_lnprior(self, x, phys_dict=None):
+        '''
+        Get the Bayesian log prior for a parameter vector `x`. 
+        
+        The priors used in the TDinf code are as follows: 
+        - Uniform in total mass, mass ratio, luminosity distance, and 
+          spin magnitudes with bounds provided by the user.
+        - Uniform in phi_12, theta_jn, phase, polarization, and 
+          right_ascension over their allowed angular ranges [radians].
+        - Uniform in the cosine of the spin tilt angles and theta_jn.
+        - Uniform in the sine of the declination.
+        - Gaussian distributed around the geocenter reference time with a
+          standard deviation provided by the user. 
+        '''
 
+        # Convert `x` from an array to a dictionary
         x_dict = self.get_logistic_dict(x)
 
         # If phys_dict passed in kws, return it, if not, calculate it with samp_to_phys
@@ -276,8 +354,8 @@ class LnPriorManager(LogisticParameterManager):
         for cartesian_param in self.cartesian_angles:
             lnprior += cartesian_param.ln_prior_weight(x_dict[cartesian_param.x_name], x_dict[cartesian_param.y_name])
 
+        # Gaussian
         if self.vary_time:
-            # gaussian
             lnprior -= 0.5 * ((phys_dict['geocenter_time'] - self.reference_time) ** 2) / (self.sigma_time ** 2)
 
         # Spins
@@ -293,57 +371,104 @@ class LnPriorManager(LogisticParameterManager):
 
 
 class AntennaAndTimeManager(LogisticParameterManager):
+    """
+    Manager for antenna patterns and time delays for a set of interferometers (IFOs).
+
+    Inherits from LogisticParameterManager and adds methods to handle:
+    - fixed or varying sky position
+    - fixed or varying geocenter times
+    - precomputing antenna patterns and time delays
+    """
+
     def __init__(self, ifos, *args, **kwargs):
         super(AntennaAndTimeManager, self).__init__(*args, **kwargs)
-        # If we are sampling over sky position and/or time ...
+
+        # Initialize storage for peak times, antenna patterns, and time delays
         self.peak_time_dict = None
         self.antenna_pattern_dict = None
         self.time_delay_dict = None
+
         if not self.vary_skypos:
-            # antenna pattern is fixed if sky location is fixed
-            # (it will vary a tiny amount over different geocenter times)
-            self.antenna_pattern_dict = t_and_AP.get_antenna_pattern_dict(self.reference_time, ifos,
-                                                                     self.fixed['right_ascension'],
-                                                                     self.fixed['declination'],
-                                                                     self.fixed['polarization'])
+            # Antenna pattern is fixed if sky location is fixed
+            # (it will vary slightly over different geocenter times)
+            self.antenna_pattern_dict = t_and_AP.get_antenna_pattern_dict(
+                self.reference_time, ifos,
+                self.fixed['right_ascension'],
+                self.fixed['declination'],
+                self.fixed['polarization']
+            )
 
             if not self.vary_time:
-                # tpeak dict is only fixed if both sky location and time are fixed
+                # Peak time dict is only fixed if both sky location and time are fixed
                 self.peak_time_dict = t_and_AP.get_tgps_dict(
                     self.reference_time, ifos,
-                    self.fixed['right_ascension'], self.fixed['declination'])
+                    self.fixed['right_ascension'],
+                    self.fixed['declination']
+                )
 
-                self.time_delay_dict = self.compute_time_delay_dict(self.fixed['right_ascension'],
-                                                                    self.fixed['declination'],
-                                                                    self.reference_time, ifos)
+                self.time_delay_dict = self.compute_time_delay_dict(
+                    self.fixed['right_ascension'],
+                    self.fixed['declination'],
+                    self.reference_time, ifos
+                )
         return
 
     def get_time_delay_dict(self, x_phys, ifos):
+        """
+        Return time delay dictionary for each interferometer.
+        """
         if self.time_delay_dict is not None:
             return self.time_delay_dict
-        return self.compute_time_delay_dict(x_phys['right_ascension'],
-                                            x_phys['declination'], x_phys['geocenter_time'], ifos)
+
+        return self.compute_time_delay_dict(
+            x_phys['right_ascension'],
+            x_phys['declination'],
+            x_phys['geocenter_time'],
+            ifos
+        )
 
     @staticmethod
     def compute_time_delay_dict(right_ascension, declination, geocenter_time, ifos):
-
-        time_delay_dict = {ifo: lal.TimeDelayFromEarthCenter(lal.cached_detector_by_prefix[ifo].location,
-                                                             right_ascension,
-                                                             declination,
-                                                             geocenter_time) for ifo in ifos}
+        """
+        Compute the time delay from geocenter to each interferometer.
+        """
+        time_delay_dict = {
+            ifo: lal.TimeDelayFromEarthCenter(
+                lal.cached_detector_by_prefix[ifo].location,
+                right_ascension,
+                declination,
+                geocenter_time
+            ) for ifo in ifos
+        }
         return time_delay_dict
 
     def get_tpeak_dict(self, x_phys, ifos):
+        """
+        Return the peak times for each interferometer.
+        """
         if self.peak_time_dict is not None:
             return self.peak_time_dict
-        return t_and_AP.get_tgps_dict(x_phys['geocenter_time'], ifos, x_phys['right_ascension'], x_phys['declination'])
+
+        return t_and_AP.get_tgps_dict(
+            x_phys['geocenter_time'],
+            ifos,
+            x_phys['right_ascension'],
+            x_phys['declination']
+        )
 
     def get_antenna_pattern_dict(self, x_phys, ifos):
+        """
+        Return the antenna pattern (Fp, Fc) for each interferometer.
+        """
         if self.antenna_pattern_dict is not None:
             return self.antenna_pattern_dict
-        return t_and_AP.get_antenna_pattern_dict(x_phys['geocenter_time'], ifos,
-                                            x_phys['right_ascension'], x_phys['declination'], x_phys['polarization'])
 
+        return t_and_AP.get_antenna_pattern_dict(
+            x_phys['geocenter_time'], ifos,
+            x_phys['right_ascension'],
+            x_phys['declination'],
+            x_phys['polarization']
+        )
 
 class WaveformManager(LogisticParameterManager):
     def __init__(self, ifos, *args, **kwargs):
@@ -357,17 +482,18 @@ class WaveformManager(LogisticParameterManager):
         """
         Generate the plus and cross polarizations for given waveform parameters and approximant
         """
-
+        # Convert masses from solar masses --> kilograms
         m1_kg = m1_msun * lal.MSUN_SI
         m2_kg = m2_msun * lal.MSUN_SI
 
+        # Convert distance from MPc --> meters
         distance = dist_mpc * 1e6 * lal.PC_SI
 
         param_dict = lal.CreateDict()
 
         # if using an SXS waveform
         if self.approximant==90:
-            assert NR_kws is not None, "If using NR_hdf5 approximate, must pass NR_kws"
+            assert NR_kws is not None, "If using NR_hdf5 approximate, must pass NR_kws !!"
             nr_path = NR_kws['nr_path']
             # get masses
             mtot_msun = NR_kws["mtot"]
@@ -398,6 +524,8 @@ class WaveformManager(LogisticParameterManager):
                                                     delta_t, f22_start, f_ref,
                                                     param_dict,
                                                     self.approximant)
+            
+        # catch input domain errors (these show up for NRSur waveforms)
         except Exception as e:
             if "Input domain error" in str(e):
                 print("Caught Input domain error")
@@ -421,8 +549,10 @@ class WaveformManager(LogisticParameterManager):
 
     def get_hplus_hcross(self, x_phys, delta_t, f22_start=11, f_ref=11, NR_kws=None):
         """
-        get complex waveform at geocenter
+        Get plus and cross polarizations of waveform at geocenter
         """
+
+        # get parameters needed for LAL waveform generation
         m1, m2 = m1m2_from_mtotq(x_phys['total_mass'], x_phys['mass_ratio'])
         chi1 = [x_phys['spin1_x'], x_phys['spin1_y'], x_phys['spin1_z']]
         chi2 = [x_phys['spin2_x'], x_phys['spin2_y'], x_phys['spin2_z']]
@@ -436,11 +566,19 @@ class WaveformManager(LogisticParameterManager):
         # for catching waveform errors
         if isinstance(hp, float) and hp!=hp:
             return np.nan, np.nan
-        
+
+        # wrap as gwpy TimeSeries
         return TimeSeries.from_lal(hp), TimeSeries.from_lal(hc)
 
-    def get_projected_waveform(self, x_phys, ifos, time_dict, f22_start=11, f_ref=11, window=False, 
-                              NR_kws=None):
+    
+    def get_projected_waveform(self, x_phys, ifos, time_dict, f22_start=11, f_ref=11, 
+                               window=False, NR_kws=None):
+        """
+        Generate plus and cross polarizations for a waveform and project them 
+        onto the detectors.
+        """
+        
+        # get time spacing of data
         delta_t = time_dict[ifos[0]][1] - time_dict[ifos[0]][0]
 
         # get hplus and hcross
@@ -461,16 +599,23 @@ class WaveformManager(LogisticParameterManager):
         hp.t0 = x_phys['geocenter_time'] + hp.t0.value
         hc.t0 = x_phys['geocenter_time'] + hc.t0.value
 
+        # get antenna pattern
         AP_dict = self.antenna_and_time_manager.get_antenna_pattern_dict(x_phys, ifos)
+
+        # get delay times
         time_delay_dict = self.antenna_and_time_manager.get_time_delay_dict(x_phys, ifos)
 
-        # Cycle through ifos
+        # cycle through ifos
         projected_waveform_dict = {}
         for ifo in ifos:
+
+            # generate complex timeseries
             h_td = hp.value - 1j * hc.value
 
+            # get antenna patterns for this ifo
             Fp, Fc = AP_dict[ifo]
 
+            # project waveform using antenna patterns
             h_ifo = Fp * h_td.real - Fc * h_td.imag
 
             # convert h_ifo to detector_time
@@ -494,12 +639,11 @@ class LnLikelihoodManager(LogisticParameterManager):
         self.f22_start = f22_start
         self.f_max = f_max
         self.psd_dict = psd_dict
-        self.rho_dict = self._make_autocorrolation_dict()
+        self.rho_dict, self.conditioned_psd_dict = self._make_autocorrolation_dict()
         self.ifos = list(self.data_dict.keys())
         for ifo, rho in self.rho_dict.items():
             assert len(rho) == len(self.data_dict[ifo]), 'Length for ACF is not the same as for the data'
         self.only_prior = only_prior
-        self.conditioned_psd_dict = self._make_conditioned_psd_dict()
         self.whitened_data_dict = self._make_whitened_data_dict()
         self.waveform_manager = WaveformManager(self.ifos, *args, **kwargs)
         self.log_prior = LnPriorManager(*args, **kwargs)
@@ -507,12 +651,16 @@ class LnLikelihoodManager(LogisticParameterManager):
         super().__init__(*args, **kwargs)
 
     def _make_autocorrolation_dict(self):
-        return get_ACF(self.psd_dict, self.time_dict, f_low=self.f_low, f_max=self.f_max)
-
-    def _make_conditioned_psd_dict(self):
-        return get_ACF(self.psd_dict, self.time_dict, f_low=self.f_low, f_max=self.f_max, return_psds=True)[1]
+        '''
+        Auto-generate ACF and additionally return the PSDs used to calculate them
+        '''
+        acf_dict, cond_psds_dict = get_ACF(self.psd_dict, self.time_dict, f_low=self.f_low, f_max=self.f_max, return_psds=True)
+        return acf_dict, cond_psds_dict 
 
     def _make_whitened_data_dict(self): 
+        '''
+        Auto-generate whitened data with FREQUENCY DOMAIN whitening
+        '''
         return {
             ifo : whitenData(
                 self.data_dict[ifo], self.time_dict[ifo], 
@@ -521,28 +669,61 @@ class LnLikelihoodManager(LogisticParameterManager):
         }
 
     def waveform_has_error(self, phys_dict, waveform_ifo, residual):
-        # check for various errors before continuing
+        '''
+        Function to check for various waveform generation errors
+        '''
+        # Make sure waveform falls in desired time window
         if np.all(waveform_ifo == 0):
             print('waveform falls outside allowed window for:')
             print(phys_dict)
+            # This is actually fine when calculating the likelihood, but 
+            # we want to print out that it is happening to the log file
             return False
-
+        # Check for NaNs in the residual
         if sum(np.isnan(residual)) > 0:
             print('NaNs in residuals for:')
             print(phys_dict)
             return True
-
+        # Check for infinities in the residual
         if sum(np.isinf(residual)) > 0:
             print('infinities in residuals for:')
             print(phys_dict)
             return True
-
         return False
 
-    def get_log_posterior(self, x_phys, verbose=False, **kwargs): # log likelihood
+    def get_log_likelihood(self, x_phys, verbose=False, **kwargs):
+        """
+        Compute the Bayesian log-likelihood for a given set of physical parameters.
+    
+        The log-likelihood is computed by generating the model waveform for the 
+        specified parameters, subtracting it from the observed data, over-whitening the 
+        residuals using the autocorrelation function, and computing the Gaussian 
+        likelihood under the assumption of stationary Gaussian noise.
+    
+        Parameters
+        ----------
+        x_phys : dict or array-like
+            The set of physical waveform parameters (e.g., masses, spins, etc.) 
+            in physical units.
+        verbose : bool, optional
+            If True, prints additional information during computation, e.g., for debugging.
+        **kwargs : dict, optional
+            Additional keyword arguments passed to `waveform_manager.get_projected_waveform`.
+            Supported keys:
+            - `f22_start` : float, start frequency for the (2,2) mode. Defaults to `self.f22_start`.
+            - `f_ref` : float, reference frequency for spin definitions. Defaults to `self.f_ref`.
+            - `window` : bool, whether to apply a window function to the waveform. Defaults to False.
+    
+        Returns
+        -------
+        float
+            The computed log-likelihood value. Returns `-np.inf` if waveform generation 
+            fails or if there are waveform errors.
+        """
+
+        # Generate waveform for parameters `x_phys`
         if verbose:
             print('getting wf')
-        
         projected_wf_dict = self.waveform_manager.get_projected_waveform(
             x_phys, self.ifos, self.time_dict,
             f22_start=kwargs.get('f22_start', self.f22_start),
@@ -576,8 +757,33 @@ class LnLikelihoodManager(LogisticParameterManager):
             
         return ln_posterior
 
-    def get_lnprob(self, x, verbose=False,
-                   **kwargs):
+    def get_log_posterior(self, x, verbose=False, **kwargs):
+        """
+        Compute the Bayesian log-posterior probability for a given parameter
+        vector `x`.
+    
+        The posterior is computed as: log_posterior = log_likelihood + log_prior
+    
+        If `self.only_prior` is True, the likelihood is skipped and only the prior 
+        is evaluated.
+    
+        Parameters
+        ----------
+        x : array-like
+            Parameter vector in sampling coordinates.
+        verbose : bool, optional
+            If True, prints additional information during computation, e.g., for debugging.
+        **kwargs : dict, optional
+            Optional arguments:
+            - `x_phys` : dict or array-like, precomputed physical parameters. 
+              If not provided, computed via `self.samp_to_phys(x)`.
+    
+        Returns
+        -------
+        float
+            The log-posterior value. Returns `-np.inf` if the posterior evaluates to NaN.
+        """
+        
         # get physical parameters
         x_phys = kwargs.pop('x_phys', None)
         if x_phys is None:
@@ -590,7 +796,7 @@ class LnLikelihoodManager(LogisticParameterManager):
 
         # Calculate posterior
         if not self.only_prior:
-            lnprob += self.get_log_posterior(x_phys, verbose=verbose)
+            lnprob += self.get_log_likelihood(x_phys, verbose=verbose)
 
         # Calculate prior
         lnprob += self.log_prior.get_lnprior(x, phys_dict=x_phys)
@@ -605,9 +811,9 @@ class LnLikelihoodManager(LogisticParameterManager):
         return lnprob
             
     def get_SNRs(self, samples): 
-        
         '''
-        Get SNRs for a list of samples
+        Get SNRs (optimal and matched filter, for all ifos and network)
+        for a list of samples. 
         '''
                 
         # set up arrays

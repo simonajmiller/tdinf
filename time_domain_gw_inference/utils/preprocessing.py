@@ -52,16 +52,19 @@ def condition(raw_time_dict, raw_data_dict, t_dict, desired_sample_rate, f_min=1
     time_dict = {}
     i_dict = {}
 
+    # Get sampling rate
     ifo = list(raw_time_dict.keys())[0]
     raw_data_sample_rate = 1 / (raw_time_dict[ifo][1] - raw_time_dict[ifo][0])
-    # TODO how do i check that this is an integer?
-    downsample_factor = int(np.floor(raw_data_sample_rate / desired_sample_rate))
+
+    # Get downsample factor
+    _downsample_factor = raw_data_sample_rate / desired_sample_rate
+    assert _downsample_factor.isinteger(), f'Downsample factor must be a interger, but is instead {_downsample_factor}'
+    downsample_factor = int(np.floor(_downsample_factor))
     if verbose:
         print('downsample factor is', downsample_factor)
     if downsample_factor == 0:
         raise ValueError(f"Desired sampling rate must be less than or equal to given sample rate! "
                          f"raw:{raw_data_sample_rate}, desired:{desired_sample_rate}")
-
     
     # Cycle through interferometers
     for ifo in ifos:
@@ -106,9 +109,9 @@ def condition(raw_time_dict, raw_data_dict, t_dict, desired_sample_rate, f_min=1
 
 
 def get_reference_parameters_from_posterior(ref_pe_samples, method='tightest_time_posterior'): 
-    
     """
     Find reference parameters from a set of samples (`ref_pe_samples`). This determines t0. 
+    Options for `method` include 'tightest_time_posterior' or 'maxL'.
     """
     err_msg =  f'Unknown method {method} for calculating reference sample from reference posterior.'
     assert method in ['maxL', 'tightest_time_posterior'], err_msg
@@ -118,13 +121,14 @@ def get_reference_parameters_from_posterior(ref_pe_samples, method='tightest_tim
 
     if method=='maxL':
         '''
-        maximum likelihood sample
+        Reference sample = maximum likelihood sample
         '''
         # Use this to get the reference sample
         ii = np.argmax(ref_pe_samples['log_likelihood'])
 
     elif method=='tightest_time_posterior': 
         '''
+        Reference sample calculated as follows:
         1. Calculate standard deviation of the posterior for time in each detector
         2. Find which time posterior is the narrowest
         3. Take its median.
@@ -157,8 +161,36 @@ def get_reference_parameters_from_posterior(ref_pe_samples, method='tightest_tim
 def get_Tcut_from_Ncycles(waveform_dict, time_dict, ifo, Ncycles, ra, dec):
     
     """
-    Calculate the cutoff time given the cutoff cycle and the parameters of the 
-    waveform to base the cutoff time from
+    Compute the geocenter cutoff time corresponding to a given number of waveform cycles 
+    after the peak amplitude.
+
+    The function identifies extrema (peaks/troughs) in the detector strain data, locates 
+    the absolute peak, and determines the time corresponding to the specified number of 
+    half-cycles from the peak. If the target cycle lies between extrema, the function 
+    linearly interpolates between them. The time is then shifted from the detector 
+    reference frame to the geocenter frame using the given sky location.
+
+    Parameters
+    ----------
+    waveform_dict : dict
+        Dictionary mapping interferometer names (e.g., 'H1') to their strain time series (array-like).
+    time_dict : dict
+        Dictionary mapping interferometer names to their corresponding time arrays (same length as waveform).
+    ifo : str
+        Interferometer name for the detector in which we want to calculate the mapping from cycles to time. (
+        Must be a key in waveform_dict and time_dict.
+    Ncycles : float
+        Number of full waveform cycles from the peak strain at which to compute the cutoff time.
+        Negative Ncycles means before the peak, positive Ncycles means after the peak. 
+    ra : float
+        Right ascension used to transform from time in `ifo` to geocenter time
+    dec : float
+        Declination used to transform from time in `ifo` to geocenter time
+
+    Returns
+    -------
+    tcut_geo : float
+        Geocenter GPS time corresponding to the desired cutoff cycle.
     """
 
     # Get waveform in H1
@@ -203,17 +235,47 @@ def get_Tcut_from_Ncycles(waveform_dict, time_dict, ifo, Ncycles, ra, dec):
     return tcut_geo
 
 
-def get_ACF(pe_psds, time_dict, f_low=11, f_max=None, nan_inf_replacement=1e10, patch=None, return_psds=False): 
-    
-    """
-    Get ACF from PSDs and the times
+def get_ACF(psd_dict, time_dict, f_low=11, f_max=None, nan_inf_replacement=1e10, patch=None, return_psds=False): 
+   """
+    Compute the autocorrelation function (ACF) from a PSD
+
+    The PSDs are preprocessed by removing NaN/Inf values, clipping to Nyquist, patching values
+    outside the frequency range of interest, and limiting the dynamic range. The ACF is computed 
+    using the inverse real FFT of the PSD.
+
+    Parameters
+    ----------
+    psd_dict : dict
+        Dictionary mapping ifo names to their PSD arrays of shape (N, 2) 
+        where the first column is frequency and the second is PSD value.
+    time_dict : dict
+        Dictionary mapping ifo names to their corresponding time arrays 
+        (used to determine sampling rate and analysis length).
+    f_low : float, optional
+        Minimum frequency (Hz) to keep in the PSD before patching. Default is 11 Hz.
+    f_max : float or None, optional
+        Maximum frequency (Hz) to keep before patching. Defaults to Nyquist if None.
+    nan_inf_replacement : float, optional
+        Value to replace NaN or ±Inf entries in the PSD. Default is 1e10.
+    patch : float or None, optional
+        Value to patch PSD bins outside [f_low, f_max]. Default is None. 
+        If None, uses 100 × max(PSD in range).
+    return_psds : bool, optional
+        If True, return the conditioned PSDs in addition to the ACF.
+
+    Returns
+    -------
+    rho_dict : dict
+        Dictionary mapping ifo names to their ACF arrays.
+    cond_psds : dict, optional
+        Dictionary mapping ifo names to their conditioned PSDs (only returned if return_psds=True).
     """
     
     rho_dict = OrderedDict()  # stores acf
     cond_psds = OrderedDict() # stores conditioned psds
     
     # Cycle through ifos
-    for ifo, freq_psd in pe_psds.items():
+    for ifo, freq_psd in psd_dict.items():
                 
         # unpack psd
         freq, psd = freq_psd.copy().T

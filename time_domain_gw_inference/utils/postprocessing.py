@@ -12,15 +12,39 @@ except:
     
     
 def get_dict_from_samples(samples, parameter_manager, **kwargs):
-    
     """
     Transform samples from their logistic space values to their physical values, 
     convert into the quantities we want (spin magnitudes and tilts, etc.), and
-    wrap it all up in a dictionary 
+    wraps it all up in a dictionary.
+
+    Specifically, this function:
+      1. Transforms each sample from logistic space to physical space using
+         the provided `parameter_manager`.
+      2. Computes derived astrophysical quantities (e.g., spin magnitudes,
+         spin tilts, orientation angles) via
+         `lalsim.SimInspiralTransformPrecessingWvf2PE`.
+      3. Returns all results as a pandas DataFrame.
+
+    Parameters
+    ----------
+    samples : array_like
+        List or array of parameter samples in logistic space.
+    parameter_manager : object
+        Object with a `.samp_to_phys()` method to convert a sample from logistic
+        to physical space.
+    **kwargs :
+        Additional keyword arguments. Must include `f_ref` 
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame where each row corresponds to a physical parameter sample
+        with derived quantities added.
     """
     # get physical parameters (list of dictionary)
     samps_phys = [parameter_manager.samp_to_phys(samp) for samp in samples]
 
+    # parameter conversion
     for sample in samps_phys:
         m1, m2 = m1m2_from_mtotq(sample['total_mass'], sample['mass_ratio'])
         sample['theta_jn'], sample['phi_jl'], \
@@ -32,12 +56,39 @@ def get_dict_from_samples(samples, parameter_manager, **kwargs):
                 m1, m2,
                 kwargs['f_ref'], sample['phase']
             )
+    # return as dataframe
     return pandas.DataFrame(samps_phys)
 
 
 def postprocessing_get_complete_samples_dict(samples, samples_lnp, likelihood_manager, getRidOfFixed=False, **kwargs): 
+    """
+    Create a complete postprocessed dictionary of samples including posterior,
+    prior, likelihood, and SNR values.
 
-    # convert samples into their physical quantities
+    Parameters
+    ----------
+    samples : array_like
+        Samples in logistic space.
+    samples_lnp : array_like
+        Log posterior values for each sample.
+    likelihood_manager : LnLikelihoodManager object
+        Likelihood manager for the TDinf run (see likelihood.LnLikelihoodManager)
+    getRidOfFixed : bool, optional
+        If True, remove parameters that are fixed (min == max across samples).
+        Default is False.
+    **kwargs :
+        Additional keyword arguments passed to `get_dict_from_samples`.
+        Must include `f_ref`. 
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame containing:
+            - Physical parameters
+            - ln_posterior, ln_prior, ln_likelihood
+            - SNR values (per-detector and network)
+    """
+    # Convert samples into their physical quantities
     samples_dict = get_dict_from_samples(samples, likelihood_manager.log_prior, **kwargs)
 
     # Add posterior values the sample_dict
@@ -64,11 +115,34 @@ def postprocessing_get_complete_samples_dict(samples, samples_lnp, likelihood_ma
 
     return samples_dict
 
+
 def postprocess_samples(sampler, likelihood_manager, getRidOfFixed=False, **kwargs):
-    """
-    Post-process emcee sample chains
-    
-    input: sampler = emcee sampler object
+   """
+    Post-process MCMC samples from an `emcee` sampler object.
+
+    This function:
+      1. Estimates the burn-in and thinning based on the autocorrelation time.
+      2. Extracts thinned and burned-in samples and their log posterior values.
+      3. Converts samples into a dictionary with the physical parameters,
+         posterior values, prior values, likelihood values, and SNRs.
+
+    Parameters
+    ----------
+    sampler : emcee.EnsembleSampler
+        MCMC sampler object from which to extract samples.
+    likelihood_manager : LnLikelihoodManager object
+        Likelihood manager for the TDinf run (see likelihood.LnLikelihoodManager)
+    getRidOfFixed : bool, optional
+        If True, remove parameters that are fixed (min == max across samples).
+        Default is False.
+    **kwargs :
+        Additional keyword arguments passed to`postprocessing_get_complete_samples_dict`.
+        Must include `f_ref`. 
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame containing fully postprocessed samples.
     """
     
     print('\nPOSTPROCESSING:')

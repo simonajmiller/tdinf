@@ -586,7 +586,7 @@ def main():
     
     with closing(Pool(processes=args.ncpu)) as pool:
 
-        sampler = emcee.EnsembleSampler(nwalkers, ndim, likelihood_manager.get_lnprob,
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, likelihood_manager.get_log_posterior,
                                         backend=backend, pool=pool,
                                         runtime_sortingfn=sort_on_runtime,
                                         kwargs=kwargs)

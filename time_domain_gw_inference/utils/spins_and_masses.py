@@ -44,19 +44,27 @@ def transformPrecessingWvf2PE( incl, S1x, S1y, S1z, S2x, S2y, S2z,  m1, m2, fRef
     Parameters
     ----------
     iota : `numpy.array` or float
-        inclination angle of the binary at f_ref
+        inclination angle of the binary at fRef
     s1x : `numpy.array`  or float
-        x-component spin of primary mass at f_ref
+        x-component spin of primary spin at fRef
     s1y : `numpy.array` or float
-        y-component spin of primary mass at f_ref
+        y-component spin of primary spin at fRef
     s1z : `numpy.array` or float
-        z-component spin of primary mass at f_ref
+        z-component spin of primary spin at fRef
     s2x : `numpy.array` or float
-        x-component spin of secondary mass at f_ref
+        x-component spin of secondary spin at fRef
     s2y : `numpy.array` or float
-        y-component spin of secondary mass at f_ref
+        y-component spin of secondary spin at fRef
     s2z : `numpy.array` or float
-        z-component spin of secondary mass at f_ref
+        z-component spin of secondary spin at fRef
+    m1 : `numpy.array` or float
+        primary mass [solar masses]
+    m2 : `numpy.array` or float
+        secondary mass [solar masses]
+    fRef : `numpy.array` or float
+        reference frequency [Hz]
+    phiRef : `numpy.array` or float
+        reference phase at fRef
 
     Returns
     ----------
