@@ -6,7 +6,6 @@ from lalsimulation import SimInspiralTransformPrecessingNewInitialConditions, Si
 Functions to calculate various mass quantities
 """
 
-
 def m1m2_from_mtotq(mtot, q):
     """
     Calculate component masses from total mass and mass ratio
@@ -30,6 +29,21 @@ def m1m2_from_mtotq(mtot, q):
     return m1, m2
 
 def get_chirpmass(m1, m2):
+    """
+    Calculate chirp mass
+    
+    Parameters
+    ----------
+    m1 : float or `numpy.array`
+        primary mass
+    m2 : float or `numpy.array`
+        secondary mass (m2 <= m1)
+    
+    Returns
+    -------
+    float or `numpy.array
+         chirp mass
+    """
     return np.power(m1*m2,3./5)*np.power(m1+m2,-1./5)
 
 

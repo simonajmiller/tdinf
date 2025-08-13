@@ -11,7 +11,6 @@ from contextlib import closing
 import os
 import time_domain_gw_inference.utils as utils
 
-
 def create_run_sampler_arg_parser():
     """
     Parse arguments
@@ -19,98 +18,132 @@ def create_run_sampler_arg_parser():
     p = argparse.ArgumentParser()
 
     # Path to where to save data 
-    p.add_argument('-o', '--output-h5', help='h5 filename for emcee', required=True)
+    p.add_argument('-o', '--output-h5',  required=True, 
+                   help='h5 filename for emcee backend')
 
     # Whether to run pre-Tcut, post-Tcut, or full (Tstart to Tend)?
-    p.add_argument('-m', '--mode', required=True)
+    p.add_argument('-m', '--mode', required=True, 
+                   help='Options: "pre", "post", or "full"')
 
     # Args for cutoff (defined in # of cycles OR seconds from merger; up to user)
-    p.add_argument('-t', '--Tcut-cycles', type=float, default=None)
-    p.add_argument('-ts', '--Tcut-seconds', type=float, default=None)
+    p.add_argument('-t', '--Tcut-cycles', type=float, default=None, 
+                  help='Cutoff time in cycles from peak.')
+    p.add_argument('-ts', '--Tcut-seconds', type=float, default=None, 
+                  help='Cutoff time in seconds from peak.')
 
     # Start & end times for segment of data to analyze
-    p.add_argument('--Tstart', type=float, required=True)
-    p.add_argument('--Tend', type=float, required=True)
+    p.add_argument('--Tstart', type=float, required=True, 
+                  help='Start time for full and pre runs.')
+    p.add_argument('--Tend', type=float, required=True, 
+                  help='End tiem for full and post runs.')
 
     # Inferometers 
-    p.add_argument('--ifos', nargs='+', default=['H1', 'L1', 'V1'])
+    p.add_argument('--ifos', nargs='+', default=['H1', 'L1', 'V1'], 
+                  help='Interferometers; some combination of H1, L1, and/or V1.')
 
     # Place where input data is stored
-    p.add_argument('--data', default=None, required=True,
-                   help='path to data formatted as --data {ifo}:path/To/psd. !! must include one per ifo.', 
-                   action='append')
-    p.add_argument('--psd', default=None, required=True,
-                   help='path to data formatted as --psd {ifo}:path/To/psd. !! must include one per ifo.', 
-                   action='append')
+    p.add_argument('--data', default=None, required=True, action='append',
+                   help='path to data formatted as --data {ifo}:path/To/psd. '
+                   '!! must include one per ifo.')
+    p.add_argument('--psd', default=None, required=True,action='append',
+                   help='path to data formatted as --psd {ifo}:path/To/psd. '
+                   '!! must include one per ifo.')
     
     # Option to do an injection instead of use real data;
-    p.add_argument('--injected-parameters', default=None)
+    p.add_argument('--injected-parameters', default=None, 
+                  help = '...')
 
     # How to generate reference parameters? Can either be from a reference posterior, or reference
     # point. If injected-parameters is passed, those are used as the ference
-    p.add_argument('--reference-parameters', default=None, help='json of parameters that initialize '
-                                                                '1) how 0 is defined in the time cuts '
-                                                                '2) the initialization of prior draw points')
+    p.add_argument('--reference-parameters', default=None, 
+                   help='json of parameters that initialize '
+                        '1) how 0 is defined in the time cuts '
+                        '2) the initialization of prior draw points')
     p.add_argument('--reference-posterior-file', default=None,
-                   help='posterior file containing pe samples, used only if injected-parameters==None and reference-parameters=None')
+                   help='posterior file containing pe samples, '
+                        ' used only if injected-parameters==None and reference-parameters=None')
     p.add_argument('--reference-parameter-method', default='tightest_time_posterior', 
-                   help='how to get reference parameter from reference posterior; options = "tightest_time_posterior" or "maxL"')
+                   help='how to get reference parameter from reference posterior; '
+                        'options = "tightest_time_posterior" or "maxL"')
 
     # Option to pass a different set of samples from which to initialize walkers
     p.add_argument('--initial-walkers', default=None,
-                   help='folder with samples or backend from which to draw initial walkers; if None, defaults'
-                         'to --reference-posterior-file')
-    p.add_argument('--initial-walker-type', default='walkers', help='Options: "posterior", "backend", or "walkers"')
+                   help='folder with samples or backend from which to draw initial walkers; '
+                         'if None, defaults to --reference-posterior-file')
+    p.add_argument('--initial-walker-type', default='walkers', 
+                   help='Options: "posterior", "backend", or "walkers" '
+                        'Only used if --initial-walkers is not None.')
 
     # Optional args for waveform/data settings
-    p.add_argument('--approx', default='NRSur7dq4')
+    p.add_argument('--approx', default='NRSur7dq4', 
+                  help='Waveform approximate string. Default: NRSur7dq4')
     p.add_argument('--sampling-rate', type=int, default=2048)
     p.add_argument('--flow', type=float, default=11,
-                   help="lower frequency bound for data conditioning and likelihood function (ACF)")
+                   help="Lower frequency bound for data conditioning and likelihood function (ACF). "
+                        "Default: 11 Hz")
     p.add_argument('--fmax', type=float, default=None,
-                   help="Upper frequency bound for data conditioning and likelihood function (ACF) default: None")
+                   help="Upper frequency bound for data conditioning and likelihood function (ACF). "
+                        'Default: None")
     p.add_argument('--f22-start', type=float, default=11,
-                   help="frequency at which to start generating 22 mode for waveforms")
-    p.add_argument('--fref', type=float, default=11)
+                   help="frequency at which to start generating 22 mode for waveforms. "
+                        "Default: 11 Hz")
+    p.add_argument('--fref', type=float, default=11, 
+                   help='Reference frequency. Default: 11 Hz')
 
     # Optional args sampler settings
-    p.add_argument('--nwalkers', type=int, default=512)
-    p.add_argument('--nsteps', type=int, default=50000)
-    p.add_argument('--ncpu', type=int, default=4)
+    p.add_argument('--nwalkers', type=int, default=512,
+                  help='Number of walkers for emcee to run with. Default: 512')
+    p.add_argument('--nsteps', type=int, default=50000
+                   help='Number of steps for emcee to run. Default: 50000')
+    p.add_argument('--ncpu', type=int, default=4,
+                   help='Number of CPUs for emcee to run on. Default: 4')
 
     # Do we want to run with only the prior?
-    p.add_argument('--only-prior', action='store_true')
+    p.add_argument('--only-prior', action='store_true', 
+                   help = 'Include flag if you want to run with only the prior.')
 
     # Do we want to sample in time and/or sky position?
-    p.add_argument('--vary-time', action='store_true')
-    p.add_argument('--vary-skypos', action='store_true')
+    p.add_argument('--vary-time', action='store_true',
+                   help = 'Include flag if you want to sample over time parameter.')
+    p.add_argument('--vary-skypos', action='store_true',
+                   help = 'Include flag if you want to sample over sky position parameters '
+                           '(right ascension, declination, and polarization).')
 
     # Set up prior bounds
     p.add_argument('--total-mass-prior-bounds', type=float, nargs=2, default=[200, 350],
-                   help="detector frame total mass bounds (in solar masses) for total_mass prior")
+                   help="detector frame total mass bounds (in solar masses) for total_mass prior."
+                        "Default: [200,350]")
     p.add_argument('--mass-ratio-prior-bounds', type=float, nargs=2, default=[0.17, 1],
-                   help="mass ratio bounds for mass ratio prior")
+                   help="mass ratio bounds for mass ratio prior."
+                        "Default: [0.17, 1]")
     p.add_argument('--luminosity-distance-prior-bounds', type=float, nargs=2, default=[100, 10000],
-                   help="luminosity_distance bounds for luminosity_distance prior")
+                   help="luminosity_distance bounds for luminosity_distance prior."
+                        "Default: [100, 10000]")
     p.add_argument('--spin-magnitude-prior-bounds', type=float, nargs=2, default=[0, 0.99],
-                   help="Spin magnitude bounds for spin magnitude prior")
-    p.add_argument('--time-prior-sigma', type=float, default=0.01, help="Standard deviation of time prior [s]")
+                   help="Spin magnitude bounds for spin magnitude prior."
+                        "Default: [0,0.99]")
+    p.add_argument('--time-prior-sigma', type=float, default=0.01, 
+                   help="Standard deviation of time prior [s.]"
+                        "Default: 0.01 s")
 
     # Do we want to resume an old run?
-    p.add_argument('--resume', action='store_true')
+    p.add_argument('--resume', action='store_true',
+                   help = 'Include flag if you want the run to pick up from a previous un-finished run, '
+                           'or continue running if the code freezes on a computing cluster. '
+                           '!! Recommended to include !!')
 
     # Debugging
-    p.add_argument('--verbose', action='store_true')
+    p.add_argument('--verbose', action='store_true', 
+                  help = 'Include flag if you want code to print out additional information as it '
+                         'runs. Helpful for debugging.')
 
     return p
 
 
 def modify_parameters(data, args):
-    """
-    :param data:
-    :param args:
-    :return:
-    """
+
+    # Figure out which format `data` has, and convert it to a pandas DataFrame
+    # if it is not already one.
     if isinstance(data, pd.DataFrame):
         df = data.copy()
     elif isinstance(data, dict):
@@ -118,16 +151,14 @@ def modify_parameters(data, args):
     elif isinstance(data, np.ndarray): 
         df = pd.DataFrame({k:data[k] for k in data.dtype.names})
     else:
-        raise ValueError(f"Input to `modify_parameters` is {type(data)}: must be either a DataFrame or a dictionary.")
+        raise ValueError(f"Input to `modify_parameters` is {type(data)}: must be either "\
+                           "a DataFrame, dictionary, or array with names.")
 
     def equivocate_columns(dataframe, wanted_key, maybe_key, verbose=False):
         """
-        Often parameters will have the same names,
-        this function checks for and sets both names
-        :param dataframe:
-        :param wanted_key:
-        :param maybe_key:
-        :return:
+        Often the same parameters will have the different names for different codes. 
+        This function checks for and sets both names (`wanted key` and `maybe_key`)
+        and equivocates them. This is needed for, e.g., comparing to a `bilby` result.
         """
         if wanted_key not in dataframe.columns:
             if maybe_key in dataframe.columns:
@@ -136,7 +167,6 @@ def modify_parameters(data, args):
                 if verbose:
                     print(f'warning! neither {wanted_key} nor {maybe_key} in df.columns!')
 
-    # Common operations for both DataFrames and dictionaries
     equivocate_columns(df, 'geocenter_time', 'geocent_time')
     equivocate_columns(df, 'right_ascension', 'ra')
     equivocate_columns(df, 'declination', 'dec')
@@ -148,9 +178,7 @@ def modify_parameters(data, args):
         df['f_ref'] = args.fref
 
     if 'mass_1' not in df.columns and all(col in df.columns for col in ['total_mass', 'mass_ratio']):
-        m1s, m2s = utils.m1m2_from_mtotq(df['total_mass'], df['mass_ratio'])
-        df['mass_1'] = m1s
-        df['mass_2'] = m2s
+        df['mass_1'], df['mass_2'] = utils.m1m2_from_mtotq(df['total_mass'], df['mass_ratio'])
 
     if 'total_mass' not in df.columns:
         df['total_mass'] = df['mass_1'] + df['mass_2']
@@ -160,7 +188,6 @@ def modify_parameters(data, args):
 
     spin_component_keys = ['inclination', 'spin1_x', 'spin1_y', 'spin1_z', 'spin2_x', 'spin2_y', 'spin2_z']
     if not all(key in df.columns for key in spin_component_keys):
-        # TODO do not overwrite existing parameters
         df[['inclination', 'spin1_x', 'spin1_y', 'spin1_z', 'spin2_x', 'spin2_y', 'spin2_z']] = df.apply(
             lambda row: pd.Series(utils.transform_spins(
                 row['theta_jn'], row['phi_jl'],
@@ -170,7 +197,6 @@ def modify_parameters(data, args):
                 row['f_ref'], row['phase'])
             ), axis=1)
     else:
-        # TODO do not overwrite existing parameters
         df[['theta_jn', 'phi_jl', 'tilt_1', 'tilt_2', 'phi_12', 'a_1', 'a_2']] = df.apply(
             lambda row: pd.Series(utils.transformPrecessingWvf2PE(
                 row['inclination'],
@@ -183,6 +209,7 @@ def modify_parameters(data, args):
     equivocate_columns(df, 'spin1_magnitude', 'a_1')
     equivocate_columns(df, 'spin2_magnitude', 'a_2')
 
+    # return in original format
     if isinstance(data, pd.DataFrame):
         return df
     elif isinstance(data, dict):
@@ -194,11 +221,7 @@ def modify_parameters(data, args):
 def get_injected_parameters(args, initial_run_dir='', verbose=False):
     """
     Loads in injection parameters from args.injected_paramters or, if there was no injection,
-    loads in max likelihood samples from args.reference_posterior_file
-    :param args: argparser
-    :param initial_run_dir:
-    :param verbose: Level of detail printing output
-    :return:
+    loads in a reference sample from args.reference_posterior_file
     """
 
     if (args.injected_parameters is None) and (args.reference_parameters is None) and (args.reference_posterior_file is None):
@@ -277,16 +300,9 @@ def initialize_kwargs(args, reference_parameters):
     return kwargs
 
 def make_waveform_manager(args, **kwargs):
-    """
-    :param args: argument parser args
-    :param kwargs:
-    :return:
-    """
-    wf_manager = utils.WaveformManager(
+    return = utils.WaveformManager(
         args.ifos,vary_time=args.vary_time,vary_skypos=args.vary_skypos,**kwargs
     )
-    return wf_manager
-
 
 def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initial_run_dir='', verbose=False):
     # Check that a cutoff time is given
@@ -301,7 +317,7 @@ def get_conditioned_time_and_data(args, wf_manager, reference_parameters, initia
     data_path_dict, psd_path_dict = utils.parse_data_and_psds(args, initial_run_dir)
 
     """
-    Load or generate data
+    Load or generate strain data
     """
 
     # Either reads injection file or finds maxL parameters from
@@ -484,15 +500,14 @@ def get_initial_walkers(likelihood_manager, args, nwalkers, ndim,
         nwalkers, reference_parameters, reference_posterior=initial_walker_dist, verbose=verbose
     )
     return p0
-            
 
 
 def main():
-
-    verbose = True
+    
     # Parse the commandline arguments
     p = create_run_sampler_arg_parser()
     args = p.parse_args()
+    verbose = args.verbose
 
     backend_path = args.output_h5  # where emcee spits its output
 
@@ -514,9 +529,7 @@ def main():
         print(f"kwargs are:")
         print(kwargs)
         
-    """
-    Set up likelihood 
-    """
+    # set up likelihood
     likelihood_manager = utils.LnLikelihoodManager(
         psd_dict=psd_dict, time_dict=time_dict,
         data_dict=data_dict,
@@ -586,6 +599,7 @@ def main():
     
     with closing(Pool(processes=args.ncpu)) as pool:
 
+        # Set up sampler
         sampler = emcee.EnsembleSampler(nwalkers, ndim, likelihood_manager.get_log_posterior,
                                         backend=backend, pool=pool,
                                         runtime_sortingfn=sort_on_runtime,
@@ -627,6 +641,7 @@ def main():
     """
     Post processing and saving data
     """
+    
     # Print dimensions of chain
     print(sampler.get_chain().shape)
 
@@ -637,7 +652,7 @@ def main():
     sample_path = backend_path.replace('h5', 'dat')
     df.to_csv(sample_path, sep=' ', index=False)
     print("File saved: %r" % sample_path)
-    
 
 if __name__ == "__main__":
     main()
+    
