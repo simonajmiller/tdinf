@@ -9,7 +9,7 @@ from typing import Dict, List, Tuple, Union
 from htcondor.dags import SimpleFormatter
 import argparse
 import subprocess
-from time_domain_gw_inference.run_sampler import create_run_sampler_arg_parser
+from tdinf.run_sampler import create_run_sampler_arg_parser
 
 def get_option_from_list(option_name: str, option_list: list[Option]):
     return next((opt for opt in option_list if opt.name == option_name), None)
@@ -55,7 +55,7 @@ class AbstractPipelineDAG(abc.ABC):
     transfer_files: bool
 
     def __post_init__(self):
-        self.executables, self.condor_settings, self.time_domain_gw_inference_settings = self.parse_config(self.config_file)
+        self.executables, self.condor_settings, self.tdinf_settings = self.parse_config(self.config_file)
 
     def default_condor_settings(self):
         condor_settings = {
@@ -120,16 +120,16 @@ class AbstractPipelineDAG(abc.ABC):
     def parse_config(self, config_file: str) \
             -> Tuple[Dict[str, str], Dict[str, str], Dict[str, str], Dict[str, str], Dict[str, str]]:
         """
-        Read the configuration file and extract values from the [data], [time_domain_gw_inference],
+        Read the configuration file and extract values from the [data], [tdinf],
          and [executables] sections.
 
         Args:
             :param config_file: (str) The path to the configuration file.
             :param output_directory: (str) The path to the output directory that contains the dag files,
-                config file, and submit script, and time_domain_gw_inference output directories.
+                config file, and submit script, and tdinf output directories.
         Returns:
             tuple[dict[str, str], dict[str, str], dict[str, str]]: A tuple containing 5 dictionaries,
-            the first one for [data] section values, the second one for [time_domain_gw_inference] section values,
+            the first one for [data] section values, the second one for [tdinf] section values,
             and the third one for [executables] section values.
 
         """
@@ -143,7 +143,7 @@ class AbstractPipelineDAG(abc.ABC):
         condor_settings = self.default_condor_settings()
         condor_settings.update(dict(config.items("condor")))
 
-        run_settings = dict(config.items("time_domain_gw_inference"))
+        run_settings = dict(config.items("tdinf"))
 
         self.validate_executables(executables)
         self.validate_condor_settings(condor_settings)
@@ -215,8 +215,8 @@ class RunSamplerDag(AbstractPipelineDAG):
         data_directory = os.path.join(self.output_directory, 'data_directory')
         os.makedirs(data_directory, exist_ok=True)
 
-        data_dict = eval(self.time_domain_gw_inference_settings.pop('data-path-dict'))
-        psd_dict = eval(self.time_domain_gw_inference_settings.pop('psd-path-dict'))
+        data_dict = eval(self.tdinf_settings.pop('data-path-dict'))
+        psd_dict = eval(self.tdinf_settings.pop('psd-path-dict'))
         new_data_dict = {}
         new_psd_dict = {}
 
@@ -227,27 +227,27 @@ class RunSamplerDag(AbstractPipelineDAG):
             new_psd_dict[ifo] = self._copy_file_to_directory_and_return_new_name_(
                 psd_dict[ifo], data_directory, self.output_directory)
 
-        injected_parameters = self.time_domain_gw_inference_settings.get('injected-parameters', None)
+        injected_parameters = self.tdinf_settings.get('injected-parameters', None)
         if injected_parameters is None:
-            reference_posterior_file = self.time_domain_gw_inference_settings.get('reference-posterior-file', None)
-            reference_parameters = self.time_domain_gw_inference_settings.get('reference-parameters', None)
+            reference_posterior_file = self.tdinf_settings.get('reference-posterior-file', None)
+            reference_parameters = self.tdinf_settings.get('reference-parameters', None)
             if (reference_posterior_file is None) and (reference_parameters is None):
                 raise AssertionError(
                     'Neither injected-parameters nor reference-posterior-file supplied nor reference-parameters is supplied, please include one')
             if reference_posterior_file is not None:
-                self.time_domain_gw_inference_settings['reference-posterior-file'] = \
+                self.tdinf_settings['reference-posterior-file'] = \
                     self._copy_file_to_directory_and_return_new_name_(
                         reference_posterior_file, data_directory, self.output_directory)
             if reference_parameters is not None:
-                self.time_domain_gw_inference_settings['reference-parameters'] = \
+                self.tdinf_settings['reference-parameters'] = \
                     self._copy_file_to_directory_and_return_new_name_(
                         reference_parameters, data_directory, self.output_directory)
         else:
-            reference_posterior_file = self.time_domain_gw_inference_settings.get('reference-posterior-file', None)
+            reference_posterior_file = self.tdinf_settings.get('reference-posterior-file', None)
             if reference_posterior_file is not None:
                 raise AssertionError(
                     'both injected-parameters and reference-posterior-file have been supplied, please only include one')
-            self.time_domain_gw_inference_settings['injected-parameters'] = \
+            self.tdinf_settings['injected-parameters'] = \
                 self._copy_file_to_directory_and_return_new_name_(
                     injected_parameters, data_directory, self.output_directory)
 
@@ -259,7 +259,7 @@ class RunSamplerDag(AbstractPipelineDAG):
     def attach_layers_to_dag(self, dag):
         data_option, psd_option = self.move_input_files()
         data_options = [data_option, psd_option]
-        runSamplerLayerManager = RunSamplerLayerManager(self.time_domain_gw_inference_settings,
+        runSamplerLayerManager = RunSamplerLayerManager(self.tdinf_settings,
                                                         self.executables['run_sampler'],
                                                         self.condor_settings,
                                                         transfer_files=self.transfer_files,
@@ -464,7 +464,7 @@ if __name__ == "__main__":
     
     # Set up arg parser
     parser = argparse.ArgumentParser(description="Generate and optionally submit a Condor DAG for the "
-                                                 "time_domain_gw_inference pipeline "
+                                                 "tdinf pipeline "
                                                  "pipeline.")
     parser.add_argument("--config_file", required=True, help="Path to the configuration file")
     parser.add_argument("--output_directory", required=True,

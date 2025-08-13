@@ -3,7 +3,7 @@
 
 import sys
 import os
-from time_domain_gw_inference import run_sampler, utils, group_postprocess
+from tdinf import run_sampler, utils, group_postprocess
 import re
 import numpy as np
 import scipy

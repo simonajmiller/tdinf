@@ -1,18 +1,18 @@
 from setuptools import setup
 
 setup(
-    name='time_domain_gw_inference',
+    name='tdinf',
     version='0.0dev',
-    packages=['time_domain_gw_inference',
-              'time_domain_gw_inference.utils',
-              'time_domain_gw_inference.pipe'
+    packages=['tdinf',
+              'tdinf.utils',
+              'tdinf.pipe'
               ],
     install_requires=[],
-    scripts=['time_domain_gw_inference/run_sampler.py',
-             'time_domain_gw_inference/waveform_h5s.py', 
-             'time_domain_gw_inference/group_postprocess.py',
-             'pipe/time_domain_gw_inference_condor_pipe.py',
-             'pipe/time_domain_gw_inference_slurm_pipe.py',
+    scripts=['tdinf/run_sampler.py',
+             'tdinf/waveform_h5s.py', 
+             'tdinf/group_postprocess.py',
+             'pipe/tdinf_condor_pipe.py',
+             'pipe/tdinf_slurm_pipe.py',
              ],
     license='GPL',
     long_description=open('README.md').read(),

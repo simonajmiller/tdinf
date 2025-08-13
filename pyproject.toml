@@ -1,7 +1,7 @@
 [project]
-name = "time_domain_gw_inference"
+name = "tdinf"
 dynamic = ["version"]
-description = "working repository for time domain parameter estimation for gravitational-wave signals"
+description = "time domain parameter estimation for gravitational-wave signals"
 readme = { file = "README.md", content-type = "text/markdown" }
 license = { text = "GPL" }
 
@@ -28,10 +28,10 @@ dependencies = [
 ]
 
 [project.scripts]
-run_sampler = "time_domain_gw_inference.run_sampler:main"
-waveform_h5s = "time_domain_gw_inference.waveform_h5s:main"
-time_domain_gw_inference_pipe = "pipe.time_domain_gw_inference_pipe:main"
-time_domain_gw_inference_slurm_pipe = "pipe.time_domain_gw_inference_slurm_pipe:main"
+run_sampler = "tdinf.run_sampler:main"
+waveform_h5s = "tdinf.waveform_h5s:main"
+tdinf_condor_pipe = "pipe.tdinf_condor_pipe:main"
+tdinf_slurm_pipe = "pipe.tdinf_slurm_pipe:main"
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
@@ -39,14 +39,14 @@ build-backend = "hatchling.build"
 
 [tool.uv]
 dev-dependencies = [
-    "time_domain_gw_inference",
+    "tdinf",
     "jupyter",
     "pre-commit",
     "pytest"
 ]
 
 [tool.uv.sources]
-time_domain_gw_inference = { workspace = true }
+tdinf = { workspace = true }
 
 [tool.hatch.version]
 source = "vcs"

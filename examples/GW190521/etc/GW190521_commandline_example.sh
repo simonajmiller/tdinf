@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 
-# Example for running TDinf in the commandline. NOT recommended due to computational expense, and NOT compatible with the `group_postprocess` or
+# Example for running tdinf in the commandline. NOT recommended due to computational expense, and NOT compatible with the `group_postprocess` or
 # 'waveform_h5s' modules which easily load and plot results. 
 
 # See GW190521.ini for documentation about arguments to `run_sampler.py` 

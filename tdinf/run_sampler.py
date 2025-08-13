@@ -9,7 +9,7 @@ import pandas as pd
 from multiprocessing import Pool, cpu_count
 from contextlib import closing
 import os
-import time_domain_gw_inference.utils as utils
+import tdinf.utils as utils
 
 def create_run_sampler_arg_parser():
     """

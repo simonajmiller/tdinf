@@ -1,1 +1,1 @@
-# time-domain-gw-inference
+# tdinf

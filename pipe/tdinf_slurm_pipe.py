@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # coding: utf-8
 """
-Generate and optionally submit a Slurm + disBatch workflow for the time_domain_gw_inference pipeline.
+Generate and optionally submit a Slurm + disBatch workflow for the tdinf pipeline.
 """
 
 import sys
@@ -14,7 +14,7 @@ import shutil
 import ast
 
 def get_parser():
-    p = argparse.ArgumentParser(description="time_domain_gw_inference Slurm + disBatch pipeline")
+    p = argparse.ArgumentParser(description="tdinf Slurm + disBatch pipeline")
     p.add_argument("--config_file", required=True, help="Path to the configuration file")
     p.add_argument("--output_directory", required=True, help="Output directory for workflow")
     p.add_argument("--cycle_list", nargs='+', type=float, help="Cycles before merger to cut data at")
@@ -51,7 +51,7 @@ def main(args=None):
     config.optionxform = str
     config.read(args.config_file)
     executables = dict(config.items("executables"))
-    run_settings = dict(config.items("time_domain_gw_inference"))
+    run_settings = dict(config.items("tdinf"))
     if 'waveform_h5s' in config.sections(): 
         wf_settings = dict(config.items("waveform_h5s"))
     else: 
