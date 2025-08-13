@@ -155,7 +155,6 @@ def get_settings_from_args(args, initial_run_dir, return_ref_pe=False, args_and_
         vary_time=args.vary_time, vary_skypos=args.vary_skypos,
         f_max=args.fmax,
         only_prior=args.only_prior,
-        use_higher_order_modes=args.use_higher_order_modes,
         **kwargs)
 
     if return_ref_pe:

@@ -120,7 +120,7 @@ def modify_parameters(data, args):
     else:
         raise ValueError(f"Input to `modify_parameters` is {type(data)}: must be either a DataFrame or a dictionary.")
 
-    def equivocate_columns(dataframe, wanted_key, maybe_key):
+    def equivocate_columns(dataframe, wanted_key, maybe_key, verbose=False):
         """
         Often parameters will have the same names,
         this function checks for and sets both names
@@ -133,7 +133,8 @@ def modify_parameters(data, args):
             if maybe_key in dataframe.columns:
                 dataframe[wanted_key] = dataframe[maybe_key]
             else:
-                print(f'warning! neither {wanted_key} nor {maybe_key} in df.columns!')
+                if verbose:
+                    print(f'warning! neither {wanted_key} nor {maybe_key} in df.columns!')
 
     # Common operations for both DataFrames and dictionaries
     equivocate_columns(df, 'geocenter_time', 'geocent_time')
