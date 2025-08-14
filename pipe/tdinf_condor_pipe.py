@@ -11,16 +11,30 @@ import argparse
 import subprocess
 from tdinf.run_sampler import create_run_sampler_arg_parser
 
+def get_parser():
+    # Set up arg parser
+    p = argparse.ArgumentParser(description="Generate and optionally submit a Condor DAG for the "
+                                                 "tdinf pipeline.")
+    p.add_argument("--config_file", required=True, help="Path to the configuration file")
+    p.add_argument("--output_directory", required=True,
+                        help="The path to the output directory that contains the dag files, config file, submit "
+                             "script, and run_sampler output files")
+    p.add_argument("--cycle_list", required=False, nargs='+', type=float,
+                        help="Cycles before merger to cut data at, e.g. --cycle_list -3 0 1") 
+    p.add_argument("--times_list", required=False, nargs='+', type=float,
+                        help="Times in seconds before merger to cut data at, e.g. --times_list -0.001 0 0.2")
+    p.add_argument("--modes", nargs='+', type=str, default=("full","pre","post"), help="Run full, pre, and/or post?")
+    p.add_argument("--submit", action="store_true", help="Submit the DAG to Condor")
+    p.add_argument("--run_in_place", action="store_true",
+                        help="Skip condor file transfer and bank on a shared file system")
+    return p
+
 def get_option_from_list(option_name: str, option_list: list[Option]):
     return next((opt for opt in option_list if opt.name == option_name), None)
-
 
 def set_option_in_list(option_list: list[Option], new_option: Option) -> None:
     """
     If the option already exists in the list, update the argument, otherwise append it to the list
-    :param option_list:
-    :param new_option:
-    :return:
     """
     old_option = get_option_from_list(new_option.name, option_list)
     if old_option is None:
@@ -32,16 +46,14 @@ def set_option_in_list(option_list: list[Option], new_option: Option) -> None:
 
 def check_and_create_directory(directory_path):
     """
-    Check if directory exists. If no, create it, if yes, ask if should continue
-    :param directory_path:
-    :return:
+    Check if directory exists. If no, create it, if yes, ask if should continue.
     """
     if not os.path.exists(directory_path):
         os.makedirs(directory_path)
     else:
         continue_existing = input(
             f"The directory {directory_path} already exists."
-            "This may overwrite a previous run and is not guaranteed to work"
+            "This may overwrite a previous run and is not guaranteed to work."
             f" Do you want to continue? (yes/no): ").lower()
         if continue_existing not in {'yes', 'y'}:
             print("You chose wisely, exiting program.")
@@ -131,7 +143,6 @@ class AbstractPipelineDAG(abc.ABC):
             tuple[dict[str, str], dict[str, str], dict[str, str]]: A tuple containing 5 dictionaries,
             the first one for [data] section values, the second one for [tdinf] section values,
             and the third one for [executables] section values.
-
         """
         config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
         config.optionxform = str  # Preserve case
@@ -152,18 +163,28 @@ class AbstractPipelineDAG(abc.ABC):
         return executables, condor_settings, run_settings
 
     def submit_dag_or_print_instructions(self, dag_file):
+        # commandline needed to submit to condor
+        submit_dag = f'condor_submit_dag -import_env -usedagdir {dag_file}'
+
+        # put it in an .sh file for reproducability
+        submit_sh = os.path.join(self.output_directory, "submit.sh")
+        with open(submit_sh, "w") as sf:
+            sf.write("#!/usr/bin/env bash\n")
+            sf.write(submit_dag)
+        os.chmod(submit_sh, 0o755)
+
+        # either submit automatically, or print instructions for how to submit 
+        # manually
         if self.submit:
-            print("TODO submit has not been implemented yet :-( ")
-            # dag_submit = htcondor.Submit.from_dag(dag_file, {'force': 1})
+            subprocess.run([submit_sh])
+            print("Submitted to condor with:")
+            print(submit_dag)
         else:
             print(f"******************************************************")
             print(f"To submit the DAG, run the following command:")
-            print(f"\tcondor_submit_dag -import_env -usedagdir {dag_file} ")
+            print(f"\t{submit_dag}")
+            print(f" or alternatively:\n\t./{submit_sh}")
             print(f"******************************************************")
-
-    @abc.abstractmethod
-    def attach_layers_to_dag(self, dag):
-        raise NotImplementedError("add_jobs_to_layers has not been implemented yet")
 
     def create_pipeline_dag(self):
         # Create the output directory if it doesn't exist
@@ -188,12 +209,11 @@ class AbstractPipelineDAG(abc.ABC):
 
         self.submit_dag_or_print_instructions(dag_file)
 
-
 @dataclass
 class RunSamplerDag(AbstractPipelineDAG):
     cycle_list: List[float]
     times_list: List[float]
-    full_only: bool = False
+    modes : List[str]
 
     @staticmethod
     def _copy_file_to_directory_and_return_new_name_(file, target_directory, relative_path=None):
@@ -264,36 +284,23 @@ class RunSamplerDag(AbstractPipelineDAG):
                                                         self.condor_settings,
                                                         transfer_files=self.transfer_files,
                                                         additional_options=data_options)
-
+        def get_modes(val):
+            if 'full' in self.modes and val==0: 
+                return self.modes
+            else: 
+                return [k for k in self.modes if k!='full']
+        
+        # Cycle through cutoff cycles
         if len(self.cycle_list) > 0:
             for cycle in self.cycle_list:
-                if cycle == 0:
-                    run_modes = ['full', 'pre', 'post']
-                else:
-                    run_modes = ['pre', 'post']
-
-                if self.full_only:
-                    run_modes = ['full']
-                    if len(self.cycle_list) > 1:
-                        print("WARNING: Changing number of cycles doesn't make different runs when mode is full")
-                        print("\t Consider having only cycle == 0 in cycle_list")
-
+                run_modes = get_modes(cycle)
                 for run_mode in run_modes:
                     runSamplerLayerManager.add_job(self.output_directory, run_mode, cycle, 'cycles')
 
+        # Cycle through cutoff times
         if len(self.times_list) > 0:
             for time in self.times_list:
-                if time == 0:
-                    run_modes = ['full', 'pre', 'post']
-                else:
-                    run_modes = ['pre', 'post']
-
-                if self.full_only:
-                    run_modes = ['full']
-                    if len(self.times_list) > 1:
-                        print("WARNING: Changing cut time doesn't make different runs when mode is full")
-                        print("\t Consider having only time == 0 in times_list")
-
+                run_modes = get_modes(time)
                 for run_mode in run_modes:
                     runSamplerLayerManager.add_job(self.output_directory, run_mode, time, 'times')
                     
@@ -459,30 +466,13 @@ class RunSamplerLayerManager(AbstractLayerManager):
             outputs=outputs,
             variables={'run_prefix': self.get_output_filename_prefix(run_mode, cutoff, unit)}
         )
-
-if __name__ == "__main__":
     
-    # Set up arg parser
-    parser = argparse.ArgumentParser(description="Generate and optionally submit a Condor DAG for the "
-                                                 "tdinf pipeline "
-                                                 "pipeline.")
-    parser.add_argument("--config_file", required=True, help="Path to the configuration file")
-    parser.add_argument("--output_directory", required=True,
-                        help="The path to the output directory that contains the dag files, config file, submit "
-                             "script, and run_sampler output files")
-    parser.add_argument("--cycle_list", required=False, nargs='+', type=float,
-                        help="Cycles before merger to cut data at, e.g. --cycle_list -3 0 1") 
-    parser.add_argument("--times_list", required=False, nargs='+', type=float,
-                        help="Times in seconds before merger to cut data at, e.g. --times_list -0.001 0 0.2")
-    parser.add_argument("--full_only", action='store_true', help="Do not run pre or post, only run full")
-
-    parser.add_argument("--submit", action="store_true", help="Submit the DAG to Condor (NOT IMPLEMENTED YET))")
-    parser.add_argument("--run_in_place", action="store_true",
-                        help="Skip condor file transfer and bank on a shared file system")
-
+def main(args=None):
+    
+    parser = get_parser()
     args = parser.parse_args()
     
-    # Check that inputs are right
+    # Check that cutoff times or cycles are given
     assert args.cycle_list is not None or args.times_list is not None, "must give a list of cutoffs"
 
     if not os.path.isfile(args.config_file):
@@ -496,6 +486,9 @@ if __name__ == "__main__":
     pipeline_dag = RunSamplerDag(args.output_directory, args.config_file, args.submit,
                                  transfer_files=not args.run_in_place,
                                  cycle_list=cutoff_cycles, times_list=cutoff_times,
-                                 full_only=args.full_only)
+                                 modes=args.modes)
 
     pipeline_dag.create_pipeline_dag()
+
+if __name__ == "__main__":
+    main()
