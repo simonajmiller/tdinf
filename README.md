@@ -31,4 +31,4 @@ We ask that scientific users of this code cite the Zenodo entry corresponding to
 
 ### Contact
 
-Please contact `simona.miller@ligo.org` with any questions of concerns about running `tdinf` or plotting results.
+Please contact `simona.miller@ligo.org` with any questions, comments, or concerns about running `tdinf`.
