@@ -25,7 +25,8 @@ We ask that scientific users of this code cite the Zenodo entry corresponding to
 	url = {https://doi.org/10.5281/zenodo.16865525},
 	version = {v1.0.0},
 	year = 2025,
-	bdsk-url-1 = {https://doi.org/10.5281/zenodo.16865525}}
+	bdsk-url-1 = {https://doi.org/10.5281/zenodo.16865525}
+}
 ```
 
 ### Contact
