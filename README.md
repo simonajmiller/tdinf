@@ -11,10 +11,7 @@ There is a full tutorial for running `tdinf` on gravitational-wave signal GW1905
 
 ### Citations
 
-We ask that scientific users of this code cite the Zenodo entry corresponding to our `git` release. This can be done by accessing the blue DOI badge above, or by simply using the following:
-```
-xxx
-```
+We ask that scientific users of this code cite the Zenodo entry corresponding to our `git` release.
 
 ### Contact
 
