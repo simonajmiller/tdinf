@@ -1,3 +1,6 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.16865525.svg)](https://doi.org/10.5281/zenodo.16865525)
+
+
 # `tdinf`: time domain parameter estimation for gravitational-wave signals 🌀
 
 ### Installation
@@ -11,7 +14,19 @@ There is a full tutorial for running `tdinf` on gravitational-wave signal GW1905
 
 ### Citations
 
-We ask that scientific users of this code cite the Zenodo entry corresponding to our `git` release.
+We ask that scientific users of this code cite the Zenodo entry corresponding to our `git` release: 
+```bibtex
+@software{miller_2025_16865525,
+	author = {Miller, Simona and Hourihane, Sophie and Isi, Maximiliano},
+	doi = {10.5281/zenodo.16865525},
+	month = aug,
+	publisher = {Zenodo},
+	title = {tdinf},
+	url = {https://doi.org/10.5281/zenodo.16865525},
+	version = {v1.0.0},
+	year = 2025,
+	bdsk-url-1 = {https://doi.org/10.5281/zenodo.16865525}}
+```
 
 ### Contact
 
