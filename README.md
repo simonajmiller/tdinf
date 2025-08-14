@@ -16,8 +16,8 @@ There is a full tutorial for running `tdinf` on gravitational-wave signal GW1905
 
 We ask that scientific users of this code cite the Zenodo entry corresponding to our `git` release: 
 ```bibtex
-@software{TDInf,
-    author = {Miller, Simona J. and Hourihane, Sophie and Isi, Maximiliano},
+@software{tdinf,
+    author = {Miller, Simona J. and Hourihane, Sophie and Isi, Maximiliano and Chatziioannou, Katerina, and Farr, Will M.},
     doi = {10.5281/zenodo.16865525},
     month = aug,
     year = 2025,
