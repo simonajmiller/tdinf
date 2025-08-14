@@ -746,6 +746,33 @@ wheels = [
 ]
 
 [[package]]
+name = "igwn-ligolw"
+version = "2.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "igwn-segments" },
+    { name = "numpy" },
+    { name = "python-dateutil" },
+    { name = "pyyaml" },
+    { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/87/db/4c9420b13b1fd874b4cbc3beb74c96c2d4e17a5fb9c2ead91cdca7b2cfc9/igwn_ligolw-2.1.0.tar.gz", hash = "sha256:02a7201445d5dba8179a28f097b1ca9839a6564a5503201ee922dcbc9aa31c9d", size = 2337001, upload-time = "2025-05-02T12:50:34.755Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a1/22/b385020647b1f863a5596c920442b29207a05a8159c81ca886ce943e5cc2/igwn_ligolw-2.1.0-cp311-cp311-macosx_12_0_arm64.whl", hash = "sha256:0666e7f2073a8dc3b67fc0e5875def0a354d2ed069eea9a4e12fffad3469536c", size = 154007, upload-time = "2025-05-02T12:50:03.998Z" },
+    { url = "https://files.pythonhosted.org/packages/68/35/a2f6a8ff17d376edce34fcbc554aaec00ca4885958080101e8414ca90208/igwn_ligolw-2.1.0-cp311-cp311-macosx_13_0_x86_64.whl", hash = "sha256:10864654ff3a520bc5e583cbdec03653a10239beb0c91e800167d0384d43585f", size = 153965, upload-time = "2025-05-02T12:50:05.433Z" },
+    { url = "https://files.pythonhosted.org/packages/3e/98/cb1c56b1aed546cd47b70c441e9920ec1d20f25dab99ae4579e030026eec/igwn_ligolw-2.1.0-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:edd0275d45e1feaf5f1a4cdf53c7db70f79d79e4f21ae06ea3ccc6419d1ddff5", size = 181218, upload-time = "2025-05-02T12:50:06.536Z" },
+    { url = "https://files.pythonhosted.org/packages/b2/fa/e96611d376990da4c84539874e1607dd38da880e9b12df8714dd02736dee/igwn_ligolw-2.1.0-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:f2cfaae08451a3c8768b46673696f5a5316bf2bf586beff87ac04b26aa23ce57", size = 179917, upload-time = "2025-05-02T12:50:07.553Z" },
+    { url = "https://files.pythonhosted.org/packages/a8/3f/fea574695acc80522d603718c270ffadd52d625c8827795febdf9b6c83ab/igwn_ligolw-2.1.0-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:134b107839d059f73d4b36d931b50f61c1a88c4dc940166b143b9f5a14e1e36a", size = 180164, upload-time = "2025-05-02T12:50:08.833Z" },
+    { url = "https://files.pythonhosted.org/packages/70/f1/ba36d403a30e3a8d8b6981e1309d1f49e1cd5cb0683134a50576a0c706aa/igwn_ligolw-2.1.0-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:f3b4f4811129a08fe1291fadacf5f19a64b8fdfe27e1c0be4fd3c886e0216b17", size = 179721, upload-time = "2025-05-02T12:50:10.05Z" },
+    { url = "https://files.pythonhosted.org/packages/d5/9f/4c6c9669e5112cb4e254dbb98e5bed51a3b89c999d3e040c4800ee9c473d/igwn_ligolw-2.1.0-cp312-cp312-macosx_12_0_arm64.whl", hash = "sha256:9e1500284b48b58a6ae11b073875493ac4dfe3db2c56ff1dee153f559ecead88", size = 154088, upload-time = "2025-05-02T12:50:11.162Z" },
+    { url = "https://files.pythonhosted.org/packages/f7/6e/1225a52b65e9195418f3d427bde2eaaf6d8c6240da4cb8b52a4469399b12/igwn_ligolw-2.1.0-cp312-cp312-macosx_13_0_x86_64.whl", hash = "sha256:873d9d70d8dc873b77440c5014d1c11212367aa297d8d0fe7e6bc36e0e5c9cae", size = 154125, upload-time = "2025-05-02T12:50:12.866Z" },
+    { url = "https://files.pythonhosted.org/packages/10/46/13cbdf0d2c86260d6ce632b6c760798a9978d4561395bb88bed5f59d9930/igwn_ligolw-2.1.0-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:ce64911f7a36e9851ee4b2106582b26204bcf44e43fca492608fdaedcf6bbafb", size = 183564, upload-time = "2025-05-02T12:50:13.97Z" },
+    { url = "https://files.pythonhosted.org/packages/e2/19/9403e2c218f0b414503f3b0542e5762befb466ea2dc7cb74d4c846a40e74/igwn_ligolw-2.1.0-cp312-cp312-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:818f148f176d3c974e333d28703d75b282be3f96bccd768090e3ba191f146b9d", size = 182726, upload-time = "2025-05-02T12:50:14.993Z" },
+    { url = "https://files.pythonhosted.org/packages/6a/f7/583a24baf1aca96a5bf774207158c0605c57595017a888452cb8afb4b192/igwn_ligolw-2.1.0-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:20f9a64d31b8c81d4de924ba5e53cbad6d3dbd21acd98018f0f184d589f4a238", size = 182128, upload-time = "2025-05-02T12:50:16.065Z" },
+    { url = "https://files.pythonhosted.org/packages/69/19/791e43cadb690b132dfe34f0435fd1de9c8333d3c3172124045864aef2e4/igwn_ligolw-2.1.0-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:8bd2924d05d0d7a084075526ce85cbab617453e2688ae460a7328251a6cb1369", size = 181989, upload-time = "2025-05-02T12:50:17.146Z" },
+]
+
+[[package]]
 name = "igwn-segments"
 version = "2.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1193,12 +1220,49 @@ wheels = [
 ]
 
 [[package]]
+name = "lalsuite"
+version = "7.26.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "astropy" },
+    { name = "igwn-ligolw" },
+    { name = "igwn-segments" },
+    { name = "lscsoft-glue" },
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "python-dateutil" },
+    { name = "scipy" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/53/f0/68f2b0f79fd7552b481e8370a2c7406e37aa304b8f05257f7be17a2e5901/lalsuite-7.26.1-cp311-cp311-macosx_12_0_arm64.whl", hash = "sha256:e10dcbaabeb47f42ac351b4bf79c5027d51b5feeab3e2293b517881acf2e30b3", size = 38824418, upload-time = "2025-05-23T20:19:21.505Z" },
+    { url = "https://files.pythonhosted.org/packages/b2/36/1e08b8e2a2e02a5b3cb2ccbdc40bb4dd64b653e1ceab595a77735fcf757e/lalsuite-7.26.1-cp311-cp311-macosx_13_0_x86_64.whl", hash = "sha256:1511100c209508b2a2d8de6d676bb9b2f96caa5963c9b1a887565af201d4e5dc", size = 40143345, upload-time = "2025-05-23T20:19:24.78Z" },
+    { url = "https://files.pythonhosted.org/packages/5f/a2/dfb58c44a8ac29b9e218cdad68a189be7aec67d4b4066ac97bbb65362adb/lalsuite-7.26.1-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:85cef6a51313b77eaeb77591ec86ca3182636e2709ef984a8a7eedbf2e0ab954", size = 38149128, upload-time = "2025-05-23T20:19:27.705Z" },
+    { url = "https://files.pythonhosted.org/packages/ed/0d/c1ab1dca659d2ba46efa44e134c13eaebdd7f774a2f1e66dbde9d7e797ce/lalsuite-7.26.1-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:0e15daf5666a20f59a35ba02861fa3d99ac28995e2c592ff0cda627c141aed8f", size = 40268736, upload-time = "2025-05-23T20:19:31.509Z" },
+    { url = "https://files.pythonhosted.org/packages/19/51/f7068daa9e817a9e20409d80329a47e8334373a1e38f82ec4f80aa800e8a/lalsuite-7.26.1-cp312-cp312-macosx_12_0_arm64.whl", hash = "sha256:96b30f4c630a66201ff71573ea1a13c88ba0f920dbc90f056fe3ef387f66f020", size = 39005308, upload-time = "2025-05-23T20:19:34.999Z" },
+    { url = "https://files.pythonhosted.org/packages/c9/93/9da7d19c135da0cb1af5a8c80d48db6dfb84ca008d6d82520b58c97005c3/lalsuite-7.26.1-cp312-cp312-macosx_13_0_x86_64.whl", hash = "sha256:5a008c4875031f304d19e4d8a78faff8019320ff2bef2b04391c88c32a8daeb0", size = 40614632, upload-time = "2025-05-23T20:19:38.418Z" },
+    { url = "https://files.pythonhosted.org/packages/37/8f/a985544998bcc18bf9e91479333be45260a9ccc1a58d15f749ea21102e5c/lalsuite-7.26.1-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:021dd697dd492ea10fa2f13dc0addef51f4cee673ff9c4554960a1fbc4d5a32f", size = 38128104, upload-time = "2025-05-23T20:19:41.344Z" },
+    { url = "https://files.pythonhosted.org/packages/05/89/c93110bfa830e6155d30aeaade87d0e8f93825e85385baef1e2953570a28/lalsuite-7.26.1-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:d714490b719e612d91faf063bbfc2f4e4f1d05250c70fa01c7ce9374b95a2ae6", size = 40244902, upload-time = "2025-05-23T20:19:44.406Z" },
+]
+
+[[package]]
 name = "ligotimegps"
 version = "2.0.1"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/39/2e/cef2ee4c4f3f1f04566e3e7e9343811a74f6e9a0bc6ef4711248f132e3bb/ligotimegps-2.0.1.tar.gz", hash = "sha256:88626c02ad9a464d1242a1147b40074792f424bafa2ab013eee629c7d1b6469c", size = 35191, upload-time = "2019-04-25T16:00:25.481Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/69/b6/6d6d0585fa2ae936a9f5d411b1f0fbe9fcb0aca0c51a775aa4f8f95fdf5e/ligotimegps-2.0.1-py2.py3-none-any.whl", hash = "sha256:da8c1289ba1310337ef5177e7936e25ce47d4e8e6a269cbdd5e9abfc5b5db490", size = 19930, upload-time = "2019-04-25T16:00:23.354Z" },
+]
+
+[[package]]
+name = "lscsoft-glue"
+version = "4.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "igwn-segments" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/de/0b/cf319595547297bc21d6f6228c07f6e63b6c7f47fc9d3ac47ee6998b06ee/lscsoft_glue-4.1.1.tar.gz", hash = "sha256:487df9085eaafe635dd62445e744017c1c90cc696be76ac6b654bd70841ae733", size = 56280, upload-time = "2025-07-18T14:52:45.284Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c6/cc/a78f98ed9c3ac814072e4db226a4e2b27a58a62fed8341de2459c70b8036/lscsoft_glue-4.1.1-py3-none-any.whl", hash = "sha256:3e34b0dee5a1e8d2085f701398b184cd4541c4c23baf7f3ae451ee3d8eab4251", size = 51071, upload-time = "2025-07-18T14:52:44.376Z" },
 ]
 
 [[package]]
@@ -2191,6 +2255,7 @@ dependencies = [
     { name = "h5ify" },
     { name = "h5py" },
     { name = "imageio" },
+    { name = "lalsuite" },
     { name = "pandas" },
     { name = "pip" },
     { name = "seaborn" },
@@ -2214,6 +2279,7 @@ requires-dist = [
     { name = "h5ify" },
     { name = "h5py", specifier = ">=3.14.0" },
     { name = "imageio", specifier = ">=2.37.0" },
+    { name = "lalsuite", specifier = ">=7.26.1" },
     { name = "pandas", specifier = ">=2.3.0" },
     { name = "pip" },
     { name = "seaborn", specifier = ">=0.13.2" },
