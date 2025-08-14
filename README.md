@@ -1,4 +1,4 @@
-# `tdinf`: time domain parameter estimation for gravitational-wave signals
+# `tdinf`: time domain parameter estimation for gravitational-wave signals 🌀
 
 ### Installation
 To make a virtual environment with everything you need to run `tdinf` you can use `uv`. To do this, clone the repository and run `uv sync` in its root folder. 
