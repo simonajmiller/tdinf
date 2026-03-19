@@ -6,7 +6,10 @@ import pathlib
 from dataclasses import dataclass
 from ezdag import DAG, Layer, Node, Option, Argument
 from typing import Dict, List, Tuple, Union
-from htcondor.dags import SimpleFormatter
+try:
+    from htcondor.dags import SimpleFormatter
+except: 
+    from htcondor2.dags import SimpleFormatter
 import argparse
 import subprocess
 from tdinf.run_sampler import create_run_sampler_arg_parser
