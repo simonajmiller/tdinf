@@ -205,6 +205,27 @@ def calc_network_SNR(snr_list):
 
 
 """
+Cutoff times -- transform between units of M and s
+"""
+
+def get_mass_time_scaling(M): 
+    msun_in_seconds = 4.925491025543576e-06 
+    return msun_in_seconds * M
+
+# Function to transform times from seconds to M
+def transform_s_to_M(time_in_seconds, M): 
+    mass_scaling = get_mass_time_scaling(M)
+    time_in_M = time_in_seconds / mass_scaling
+    return time_in_M
+
+# Function to transform times from M to seconds
+def transform_M_to_s(time_in_M, M): 
+    mass_scaling = get_mass_time_scaling(M)
+    time_in_seconds = time_in_M * mass_scaling 
+    return time_in_seconds
+
+
+"""
 Other
 """
 

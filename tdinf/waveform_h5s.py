@@ -46,17 +46,24 @@ def load_waveform_h5py(output_file):
     # Load HDF5 file if it exists and return output
     with h5py.File(output_file, 'r') as f:
         waveforms = {}
-        waveform_dict_list = []
-        
+        wf_keys = []
         for key in f.keys():
-            group = f[key]
-            wf_dict = {k: group[k][()] for k in group.keys()}
-            if key=='maxL' or key=='times': 
-                waveforms[key] = wf_dict
+            if key in ('maxL', 'times'):
+                group = f[key]
+                waveforms[key] = {k: group[k][()] for k in group.keys()}
             else:
-                waveform_dict_list.append(wf_dict)
-    
-    waveforms['samples'] = waveform_dict_list    
+                wf_keys.append(key)
+
+        # Sort by the integer index, not lexicographically -- this will 
+        # the order line up appropriately with the posterior samples
+        wf_keys.sort(key=lambda k: int(k.rsplit('_', 1)[1]))
+
+        waveform_dict_list = []
+        for key in wf_keys:
+            group = f[key]
+            waveform_dict_list.append({k: group[k][()] for k in group.keys()})
+
+    waveforms['samples'] = waveform_dict_list
     return waveforms
 
 
@@ -162,7 +169,7 @@ def make_waveform_h5_arg_parser():
 
     parser.add_argument("--overwrite", action="store_true",
                         help="Flag to overwrite existing files (default: False)")
-    parser.add_argument("--N_waveforms", type=int, default=300, help="Number of waveforms (default: 300)")
+    parser.add_argument("--N_waveforms", type=int, default=0, help="Number of waveforms; default = 0 --> generates all.")
     parser.add_argument("--ncpu", type=int, default=mp.cpu_count(), help="Number of parallel processes to start")
     return parser
 
@@ -232,11 +239,10 @@ def main():
     )
         
     # generate N_waveforms random draws from the posterior
-    if N_waveforms == len(dataframe): 
+    if N_waveforms == 0 or N_waveforms >= len(dataframe): 
+        N_waveforms = len(dataframe)
         print('generating reconstructions for all the waveforms')
-        rand_ints = np.arange(N_waveforms)
-    else:
-        rand_ints = np.random.randint(len(dataframe), size=N_waveforms)
+    rand_ints = np.arange(N_waveforms)
 
     # prepare the arguments for starmap
     parallel_args = [(i, dataframe, full_likelihood_manager) for i in rand_ints]
