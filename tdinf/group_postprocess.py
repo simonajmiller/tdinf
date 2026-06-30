@@ -208,7 +208,7 @@ def get_settings_from_command_line_file(
         # Cycle through each line of the file
         for line in lines:
             # Search for the specified run tag (`file_prefix`) in that line
-            if file_prefix in line:
+            if file_prefix in line.split('--mode')[0]: # only from beginning of line
                 if verbose:
                     print("line is", line)
                 # Rarse relevant commandline string

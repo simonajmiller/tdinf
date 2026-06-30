@@ -50,6 +50,32 @@ def whitenData(h_td, times, psd, psd_freqs, verbose=False):
     return wh_td
 
 
+def whiten_wf(d, lm): 
+    """
+    Whiten waveforms in the FREQUENCY DOMAIN given a likelihood 
+    manager object `lm`.
+
+    Parameters
+    ----------
+    d : dict
+        Waveform dictionary, keyed by ifo name, with time series arrays.
+    lm : LnLikelihoodManager object
+        Likelihood manager containing:
+            - time_dict: dict of time arrays
+            - conditioned_psd_dict: dict of PSD arrays [freq, psd]
+        See likelihood.LnLikelihoodManager.
+
+    Returns
+    -------
+    dict
+        Whitened waveform dictionary.
+    """
+    d_wh = {ifo:whitenData(
+        h_ifo, lm.time_dict[ifo], lm.conditioned_psd_dict[ifo][:,1], lm.conditioned_psd_dict[ifo][:,0]
+    ) for ifo, h_ifo in d.items()}
+    return d_wh
+
+
 def whiten_wfs(wf_dict_list, lm): 
     """
     Whiten a set of waveforms in the FREQUENCY DOMAIN given a likelihood 
@@ -70,13 +96,7 @@ def whiten_wfs(wf_dict_list, lm):
     list of dict
         Whitened waveform dictionaries.
     """
-    wf_dict_list_wh = []
-    for d in wf_dict_list: 
-        d_wh = {ifo:whitenData(
-            h_ifo, lm.time_dict[ifo], lm.conditioned_psd_dict[ifo][:,1], lm.conditioned_psd_dict[ifo][:,0]
-        ) for ifo, h_ifo in d.items()}
-        wf_dict_list_wh.append(d_wh)
-    
+    wf_dict_list_wh = [ whiten_wf(d, lm) for d in wf_dict_list ]
     return wf_dict_list_wh
 
 

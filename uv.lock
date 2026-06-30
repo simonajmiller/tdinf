@@ -163,6 +163,46 @@ wheels = [
 ]
 
 [[package]]
+name = "bilby"
+version = "2.7.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "attrs" },
+    { name = "bilby-cython" },
+    { name = "corner" },
+    { name = "dill" },
+    { name = "dynesty" },
+    { name = "emcee" },
+    { name = "h5py" },
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "scipy" },
+    { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/05/7d/b4e88017f194854a7dfa492ef16ae3150f87a8aeb60751eefd3585f8817a/bilby-2.7.1.tar.gz", hash = "sha256:11f8da9025db5199d8d76a5df6b91c6d91a854aa4eb23029381394ce06f99b1a", size = 11529158, upload-time = "2025-11-05T14:16:28.882Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4c/af/387754660b6a938d82d71e3285d7338a1c2746fb0c5da6cbc71c73135ffa/bilby-2.7.1-py3-none-any.whl", hash = "sha256:faf6bc97171c63aeb9bd8107cd4a47983dc669236a6031a4075b6020e1775eca", size = 2287844, upload-time = "2025-11-05T14:16:25.433Z" },
+]
+
+[[package]]
+name = "bilby-cython"
+version = "0.5.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4c/93/6877dd78b375f3e83c8209aecc18f18d1cd88269a8a5c2d3c7dd9ad4fc53/bilby_cython-0.5.3.tar.gz", hash = "sha256:44400b2abc6fa592b13d69f33460cb156d6edb48a783f5539ee0a21e1d0a3508", size = 238517, upload-time = "2024-08-23T15:22:14.607Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/de/c1/3799f4bd0e5a13375b621f21d12fd21e596d744b363e683f815afe593f1f/bilby.cython-0.5.3-cp311-cp311-macosx_12_0_x86_64.whl", hash = "sha256:813f2b53a55b0fbbc2a86ef9c025e3020eb086473663c110161e3b120728176d", size = 352052, upload-time = "2024-08-23T15:22:03.209Z" },
+    { url = "https://files.pythonhosted.org/packages/e4/6a/78511b5e08ed89f492297746e3f488159d90e2b89680777a3a37565916eb/bilby.cython-0.5.3-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4642cb38f2cea8129261e25fe4237e2c06982753ef3ce2611072e541b7ecf6fb", size = 983911, upload-time = "2024-08-23T15:22:05.699Z" },
+    { url = "https://files.pythonhosted.org/packages/38/f3/ef24cb7c8a7335f869829e5c0909515544924dcd5df6d4f58b377e1daeb2/bilby.cython-0.5.3-cp311-cp311-win_amd64.whl", hash = "sha256:d9d0c1c490619981234568dae7f11fab1544783a748492d39d0d690a70d12f6a", size = 359647, upload-time = "2024-08-23T15:54:19.399Z" },
+    { url = "https://files.pythonhosted.org/packages/8b/c5/ad5ca082b2610defc488679690df8137300c6bb396b24f783e3d74873fa4/bilby.cython-0.5.3-cp312-cp312-macosx_12_0_x86_64.whl", hash = "sha256:264ccd8ca1adabc794931ed6deb5082ad0ed4b52694be8158cb421a80a752bca", size = 351851, upload-time = "2024-08-23T15:22:07.895Z" },
+    { url = "https://files.pythonhosted.org/packages/13/26/f0b46d56d278665b484ec421dc571fb28bdd81635137d00e0edc2c8fddc9/bilby.cython-0.5.3-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:44e5e381c2861e26a4e1fd5c591ea0c3c9a0e2f0d8c78f28f8704abf2945cd8d", size = 1014120, upload-time = "2024-08-23T15:22:09.942Z" },
+    { url = "https://files.pythonhosted.org/packages/11/de/02429d598ec5ed4c70113a2c3e8b76a5b113885f85eacdcdaf19cbb6d23d/bilby.cython-0.5.3-cp312-cp312-win_amd64.whl", hash = "sha256:2758256339d7c3703014b265d3a77e0299d5c6264f962bc311c989ac453cbd60", size = 357801, upload-time = "2024-08-23T15:54:20.941Z" },
+]
+
+[[package]]
 name = "bleach"
 version = "6.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -473,6 +513,15 @@ wheels = [
 ]
 
 [[package]]
+name = "dill"
+version = "0.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/12/80/630b4b88364e9a8c8c5797f4602d0f76ef820909ee32f0bacb9f90654042/dill-0.4.0.tar.gz", hash = "sha256:0633f1d2df477324f53a895b02c901fb961bdbf65a17122586ea7019292cbcf0", size = 186976, upload-time = "2025-04-16T00:41:48.867Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/50/3d/9373ad9c56321fdab5b41197068e1d8c25883b3fea29dd361f9b55116869/dill-0.4.0-py3-none-any.whl", hash = "sha256:44f54bf6412c2c8464c14e8243eb163690a9800dbe2c367330883b19c7561049", size = 119668, upload-time = "2025-04-16T00:41:47.671Z" },
+]
+
+[[package]]
 name = "distlib"
 version = "0.3.9"
 source = { registry = "https://pypi.org/simple" }
@@ -493,6 +542,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c4/37/7874b39abede48fe05c3b5a25092e419e521145e9705c97b711965e5f05d/dqsegdb2-1.3.0.tar.gz", hash = "sha256:4e291899cd395daf5913c48a835d213ef20833d78354871cb848988cc2cc8ae4", size = 33661, upload-time = "2025-01-08T16:36:58.072Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/78/67/c977e7307d432911fe28acf55dba01f84f3a0a4a2a968350195c0f52d23e/dqsegdb2-1.3.0-py3-none-any.whl", hash = "sha256:c93087da332b7d91519a370abed3cfc91b64a6bf393ec64d79c2747c837aeb66", size = 27957, upload-time = "2025-01-08T16:36:56.881Z" },
+]
+
+[[package]]
+name = "dynesty"
+version = "3.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "scipy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/56/90/b538da9a03522e91252acc36dceb9e38538db0303f2dc314e0e417404d2c/dynesty-3.0.0.tar.gz", hash = "sha256:806c83b21904cf7df73c2478a9e0e8a2b7d811cd0d613109f3f810a7111d12b0", size = 35559700, upload-time = "2025-10-04T21:34:19.578Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4a/45/68f4ab90f889abbeec5932751643f055bb811a33ef7361ac849426dcc38a/dynesty-3.0.0-py3-none-any.whl", hash = "sha256:4cdbbb39c61158f4d882445b064b742fcdc4d03ba9b2ba845801cd2ca6fcb761", size = 102885, upload-time = "2025-10-04T21:34:12.006Z" },
 ]
 
 [[package]]
@@ -675,13 +738,13 @@ wheels = [
 
 [[package]]
 name = "htcondor"
-version = "24.8.1"
+version = "25.3.1"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d8/ca/bfc454f8c5a50860f42c2845ad9a8e36781f6ad097259df5ebf23e2ec6a7/htcondor-24.8.1-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:21649c08a320cb48e50773fe1559136e4530e593ca335ee16be80d013e86bb2b", size = 60326705, upload-time = "2025-06-16T15:38:57.995Z" },
-    { url = "https://files.pythonhosted.org/packages/f3/4e/d1fe265f6bff15494c6883179e8cd0f23cee5f2ccd156287b7b53d82218e/htcondor-24.8.1-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:b38acf6efaf6d5e6e4ea2e9016a8269501e2f03d21055906ee9b67331857ca16", size = 61887150, upload-time = "2025-06-16T15:39:01.591Z" },
-    { url = "https://files.pythonhosted.org/packages/57/b0/7c47d9aaa4dd2f58f8de66bb53a4d6af732d5d5fee52d8e133c12660556d/htcondor-24.8.1-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:8296f186e49558510816ac659ef0a9bfb6cdf6b5ff172845aa7ef2be9d332497", size = 60419458, upload-time = "2025-06-16T15:39:04.979Z" },
-    { url = "https://files.pythonhosted.org/packages/0d/0c/11d8cbb1bfb468e51e043acdd0bdfc287e33bd9ce25ffa5d7df0d0841b89/htcondor-24.8.1-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:bb25a3942ec00c097777d5c61df03281d493745deed7aa73f72674949334595d", size = 62001916, upload-time = "2025-06-16T15:39:08.381Z" },
+    { url = "https://files.pythonhosted.org/packages/87/c4/2a5100f3ac0e89076332fe54b7afe1dd97f35427f6caba082684ae2621f9/htcondor-25.3.1-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:b4be9711a1ac57c44b675d0ee581bbdc87457784e3a2e2dd70e3c5f98aecafcc", size = 49342245, upload-time = "2025-11-03T13:11:02.359Z" },
+    { url = "https://files.pythonhosted.org/packages/96/71/50ae8cedeb26b41ce4e6a5b40805c41210983cd55f679e421ff269d43a37/htcondor-25.3.1-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:e12b0ec84e76f12ec88d53cb33a069a0b7b0fb8dbc6ede393fca7e7d185a95b3", size = 50727295, upload-time = "2025-11-03T13:11:05.324Z" },
+    { url = "https://files.pythonhosted.org/packages/48/b7/372497dd9eeaaf95115d5bd717f02c0c0435b2a8a1d1d2a397f8f7a4efc8/htcondor-25.3.1-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:cdf2c1652728294c3de000a5e04885edad09acad80dfaff9ec3284e2f8a7e2b9", size = 49337489, upload-time = "2025-11-03T13:11:07.985Z" },
+    { url = "https://files.pythonhosted.org/packages/40/b3/dce043691b7462c7bd3700116eb7d2ad0e4b428a6100146441d668458baa/htcondor-25.3.1-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:213c46521d580bcdcb5bae27b2ebf356301a7876d3970709242bdd38f3208a36", size = 50717635, upload-time = "2025-11-03T13:11:10.542Z" },
 ]
 
 [[package]]
@@ -2248,6 +2311,7 @@ wheels = [
 name = "tdinf"
 source = { editable = "." }
 dependencies = [
+    { name = "bilby" },
     { name = "corner" },
     { name = "emcee" },
     { name = "ezdag" },
@@ -2272,6 +2336,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "bilby", specifier = ">=2.7.1" },
     { name = "corner", specifier = ">=2.2.3" },
     { name = "emcee" },
     { name = "ezdag", specifier = ">=0.4.0" },
