@@ -166,11 +166,11 @@ def make_waveform_h5_arg_parser():
     # Add arguments
     parser.add_argument("--directory", type=str, help="Input directory")
     parser.add_argument("--run_key", type=str, help="name of run for which to create waveforms")
-
     parser.add_argument("--overwrite", action="store_true",
                         help="Flag to overwrite existing files (default: False)")
     parser.add_argument("--N_waveforms", type=int, default=0, help="Number of waveforms; default = 0 --> generates all.")
     parser.add_argument("--ncpu", type=int, default=mp.cpu_count(), help="Number of parallel processes to start")
+    parser.add_argument("--ref_key", type=str, default='full', help="name of reference run to use for time steps. defaults to full.")
     return parser
 
 
@@ -193,9 +193,9 @@ def main():
         print('waveform already exists, use --overwrite in order to overwrite all the files!')
         exit()
 
-    # load full run (for the waveform generator)
+    # load run for the waveform generator
     filename_dict = group_postprocess.generate_filename_dict(directory)
-    full_parser = run_sampler.create_run_sampler_arg_parser()
+    reference_parser = run_sampler.create_run_sampler_arg_parser()
 
     # load in the commandline file:
     if os.path.exists(os.path.join(directory, 'command_line.sh')):
@@ -205,14 +205,22 @@ def main():
         # if run with slurm 
         commandline_file = os.path.join(directory, 'tasks_run.txt')
 
+    # reference run for time stamps
+    if args.ref_key in filename_dict:
+        ref_key = args.ref_key
+    else:
+        ref_key = args.run_key
+        print(f'WARNING: `{args.ref_key}` not in filename_dict. '+\
+              f'Instead using `{args.run_key}` for time steps')
+
     # parse commandline settings
-    full_args, \
-    full_kwargs, \
-    full_likelihood_manager = group_postprocess.get_settings_from_command_line_file(
+    reference_args, \
+    reference_kwargs, \
+    reference_likelihood_manager = group_postprocess.get_settings_from_command_line_file(
         commandline_file,
-        filename_dict['full'],
+        filename_dict[ref_key],
         directory + '/',
-        full_parser, 
+        reference_parser, 
         verbose=True
     )
 
@@ -230,12 +238,12 @@ def main():
     max_logL_params = dataframe.iloc[i_max_logL]
 
     # generate waveform from maxL parameters
-    maxL_wf_dict = full_likelihood_manager.waveform_manager.get_projected_waveform(
+    maxL_wf_dict = reference_likelihood_manager.waveform_manager.get_projected_waveform(
         max_logL_params,
-        full_likelihood_manager.ifos, 
-        time_dict = full_likelihood_manager.time_dict,
-        f22_start = full_likelihood_manager.f22_start, 
-        f_ref = full_likelihood_manager.f_ref
+        reference_likelihood_manager.ifos, 
+        time_dict = reference_likelihood_manager.time_dict,
+        f22_start = reference_likelihood_manager.f22_start, 
+        f_ref = reference_likelihood_manager.f_ref
     )
         
     # generate N_waveforms random draws from the posterior
@@ -245,7 +253,7 @@ def main():
     rand_ints = np.arange(N_waveforms)
 
     # prepare the arguments for starmap
-    parallel_args = [(i, dataframe, full_likelihood_manager) for i in rand_ints]
+    parallel_args = [(i, dataframe, reference_likelihood_manager) for i in rand_ints]
 
     # Uue pool.starmap to parallelize the computation
     with mp.Pool(processes=args.ncpu) as pool:
@@ -255,7 +263,7 @@ def main():
 
     # save result into h5 file
     save_waveform_h5py(
-        waveform_filename, results, maxL_wf_dict, full_likelihood_manager.time_dict
+        waveform_filename, results, maxL_wf_dict, reference_likelihood_manager.time_dict
     )
     print("all done! waveforms saved to:", waveform_filename)
 
