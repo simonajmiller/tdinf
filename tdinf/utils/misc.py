@@ -131,6 +131,93 @@ def inner_product(x, y, rho):
     """
     return x @ sl.solve_toeplitz(rho, y)
 
+def inner_product_gs(x, y, T_inv_first_col):
+    """
+    Compute the noise-weighted inner product using Gohberg-Semencul formula.
+
+    This function computes the inner product ⟨x, y⟩ = xᵀ C⁻¹ y using the
+    Gohberg-Semencul formula for efficient multiplication by the inverse of a
+    symmetric Toeplitz matrix. The input `T_inv_first_col` is the first column
+    of C⁻¹, which can be computed using Levinson-Durbin algorithm.
+
+    Parameters
+    ----------
+    x : array_like
+        First input vector.
+    y : array_like
+        Second input vector.
+    T_inv_first_col : array_like
+        The first column of the inverse symmetric Toeplitz matrix C⁻¹.
+
+    Returns
+    -------
+    float
+        The noise-weighted inner product ⟨x, y⟩.
+    """
+    return x @ gohberg_semencul_multiply(T_inv_first_col, y)
+
+def gohberg_semencul_prep(t_col):
+    """
+    Preparation to calculate using Gohberg-Semencul formula.
+    Computes the first column of T^{-1} given the first column of T,
+    assuming T is a symmetric Toeplitz matrix.
+
+    Parameters:
+    t_col : ndarray
+        The first column of the symmetric Toeplitz matrix T.
+    Returns:
+    x : ndarray
+        The first column of the inverse Toeplitz matrix T^{-1}.
+    """
+    e0 = np.zeros(len(t_col))
+    e0[0] = 1.0
+    x = sl.solve_toeplitz((t_col, t_col), e0)
+    return x
+
+def gohberg_semencul_multiply(Tinv_first_col, b):
+    """
+    Calculate the product T^{-1} b using the Gohberg-Semencul formula.
+
+    Parameters:
+    Tinv_first_col : ndarray
+        The first column of the inverse symmetric Toeplitz matrix T^{-1}.
+        Can be computed using Levinson-Durbin algorithm.
+        See gohberg_semencul_prep below.
+    b : ndarray
+        The vector to be multiplied by T^{-1}.
+    """
+    N = len(Tinv_first_col)
+    x0 = Tinv_first_col[0]
+
+    c_L1 = Tinv_first_col
+    # c_L1[0] = 1
+    r_L1 = np.zeros(N)
+    r_L1[0] = Tinv_first_col[0]  # First row is [x0, 0, ..., 0]
+
+    # L2 is Lower Toeplitz defined by reversed shift of x
+    # Column is [0, x_{N-1}, x_{N-2}, ..., x_1]
+    c_L2 = np.concatenate(([0], Tinv_first_col[1:][::-1]))
+    r_L2 = np.zeros(N)  # First row is all zeros
+
+    # 3. Compute Matrix-Vector Products using matmul_toeplitz
+    # Note: matmul_toeplitz((c, r), v) computes T(c,r) @ v
+    # To compute transpose T(c,r).T @ v, we simply swap inputs: T(r,c) @ v
+
+    # Term 1: L1 @ (L1.T @ b)
+    # Inner: L1.T @ b -> use (r_L1, c_L1)
+    inner_1 = sl.matmul_toeplitz((r_L1, c_L1), b)
+    # Outer: L1 @ inner -> use (c_L1, r_L1)
+    term_1 = sl.matmul_toeplitz((c_L1, r_L1), inner_1)
+
+    # Term 2: L2 @ (L2.T @ b)
+    # Inner: L2.T @ b -> use (r_L2, c_L2)
+    inner_2 = sl.matmul_toeplitz((r_L2, c_L2), b)
+    # Outer: L2 @ inner -> use (c_L2, r_L2)
+    term_2 = sl.matmul_toeplitz((c_L2, r_L2), inner_2)
+
+    # 4. Combine
+    return (1.0 / x0) * (term_1 - term_2)
+
 
 def calc_mf_SNR(d, s, rho):
     """
