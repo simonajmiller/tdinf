@@ -3,6 +3,8 @@
 
 # `tdinf`: time domain parameter estimation for gravitational-wave signals 🌀
 
+The `main` branch contains v1.0.0 (released August 2025). The `dev` branch contains the most up-to-date code edits. 
+
 ### Installation
 To make a virtual environment with everything you need to run `tdinf` you can use `uv`. To do this, clone the repository and run `uv sync` in its root folder. 
 
