@@ -648,7 +648,12 @@ class LnLikelihoodManager(LogisticParameterManager):
         self.whitened_data_dict = self._make_whitened_data_dict()
         self.waveform_manager = WaveformManager(self.ifos, *args, **kwargs)
         self.log_prior = LnPriorManager(*args, **kwargs)
-
+        
+        # Express inverse covariance matrix using Gohberg-Semencul theorem
+        # Precompute the necessary quantities here for efficiency
+        self.Tinv_first_col_dict = {}
+        for ifo in self.ifos:
+            self.Tinv_first_col_dict[ifo] = gohberg_semencul_prep(self.rho_dict[ifo])
         super().__init__(*args, **kwargs)
 
     def _make_autocorrolation_dict(self):
@@ -751,7 +756,8 @@ class LnLikelihoodManager(LogisticParameterManager):
                 return -np.inf
 
             # "Over whiten" residuals
-            rwt = solve_toeplitz(self.rho_dict[ifo], r)
+            # rwt = solve_toeplitz(self.rho_dict[ifo], r)
+            rwt = gohberg_semencul_multiply(self.Tinv_first_col_dict[ifo], r)
 
             # Compute log likelihood for ifo
             ln_posterior -= 0.5 * np.dot(r, rwt)

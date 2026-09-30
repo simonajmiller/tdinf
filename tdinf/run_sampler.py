@@ -140,7 +140,7 @@ def create_run_sampler_arg_parser():
     return p
 
 
-def modify_parameters(data, args):
+def modify_parameters(data, args, all_params=True):
 
     # Figure out which format `data` has, and convert it to a pandas DataFrame
     # if it is not already one.
@@ -167,47 +167,53 @@ def modify_parameters(data, args):
                 if verbose:
                     print(f'warning! neither {wanted_key} nor {maybe_key} in df.columns!')
 
+    # For the case where we only need reference_parameters, bare minimum needed 
+    # are time and skyposition.
     equivocate_columns(df, 'geocenter_time', 'geocent_time')
     equivocate_columns(df, 'right_ascension', 'ra')
     equivocate_columns(df, 'declination', 'dec')
-    equivocate_columns(df, 'mean_anomaly', 'mean_anomaly_periastron')
     equivocate_columns(df, 'polarization', 'psi')
-    equivocate_columns(df, 'luminosity_distance', 'distance_mpc')
 
-    if 'f_ref' not in df.columns:
-        df['f_ref'] = args.fref
-
-    if 'mass_1' not in df.columns and all(col in df.columns for col in ['total_mass', 'mass_ratio']):
-        df['mass_1'], df['mass_2'] = utils.m1m2_from_mtotq(df['total_mass'], df['mass_ratio'])
-
-    if 'total_mass' not in df.columns:
-        df['total_mass'] = df['mass_1'] + df['mass_2']
-
-    if 'mass_ratio' not in df.columns:
-        df['mass_ratio'] = df['mass_2'] / df['mass_1']
-
-    spin_component_keys = ['inclination', 'spin1_x', 'spin1_y', 'spin1_z', 'spin2_x', 'spin2_y', 'spin2_z']
-    if not all(key in df.columns for key in spin_component_keys):
-        df[['inclination', 'spin1_x', 'spin1_y', 'spin1_z', 'spin2_x', 'spin2_y', 'spin2_z']] = df.apply(
-            lambda row: pd.Series(utils.transform_spins(
-                row['theta_jn'], row['phi_jl'],
-                row['tilt_1'], row['tilt_2'],
-                row['phi_12'], row['a_1'], row['a_2'],
-                row['mass_1'], row['mass_2'],
-                row['f_ref'], row['phase'])
-            ), axis=1)
-    else:
-        df[['theta_jn', 'phi_jl', 'tilt_1', 'tilt_2', 'phi_12', 'a_1', 'a_2']] = df.apply(
-            lambda row: pd.Series(utils.transformPrecessingWvf2PE(
-                row['inclination'],
-                row['spin1_x'], row['spin1_y'], row['spin1_z'],
-                row['spin2_x'], row['spin2_y'], row['spin2_z'],
-                row['mass_1'], row['mass_2'],
-                row['f_ref'], row['phase'])
-            ), axis=1)
+    # Otherwise, need to make sure we have all parameters.
+    if all_params:
         
-    equivocate_columns(df, 'spin1_magnitude', 'a_1')
-    equivocate_columns(df, 'spin2_magnitude', 'a_2')
+        equivocate_columns(df, 'mean_anomaly', 'mean_anomaly_periastron')
+        equivocate_columns(df, 'luminosity_distance', 'distance_mpc')
+    
+        if 'f_ref' not in df.columns:
+            df['f_ref'] = args.fref
+    
+        if 'mass_1' not in df.columns and all(col in df.columns for col in ['total_mass', 'mass_ratio']):
+            df['mass_1'], df['mass_2'] = utils.m1m2_from_mtotq(df['total_mass'], df['mass_ratio'])
+    
+        if 'total_mass' not in df.columns:
+            df['total_mass'] = df['mass_1'] + df['mass_2']
+    
+        if 'mass_ratio' not in df.columns:
+            df['mass_ratio'] = df['mass_2'] / df['mass_1']
+    
+        spin_component_keys = ['inclination', 'spin1_x', 'spin1_y', 'spin1_z', 'spin2_x', 'spin2_y', 'spin2_z']
+        if not all(key in df.columns for key in spin_component_keys):
+            df[['inclination', 'spin1_x', 'spin1_y', 'spin1_z', 'spin2_x', 'spin2_y', 'spin2_z']] = df.apply(
+                lambda row: pd.Series(utils.transform_spins(
+                    row['theta_jn'], row['phi_jl'],
+                    row['tilt_1'], row['tilt_2'],
+                    row['phi_12'], row['a_1'], row['a_2'],
+                    row['mass_1'], row['mass_2'],
+                    row['f_ref'], row['phase'])
+                ), axis=1)
+        else:
+            df[['theta_jn', 'phi_jl', 'tilt_1', 'tilt_2', 'phi_12', 'a_1', 'a_2']] = df.apply(
+                lambda row: pd.Series(utils.transformPrecessingWvf2PE(
+                    row['inclination'],
+                    row['spin1_x'], row['spin1_y'], row['spin1_z'],
+                    row['spin2_x'], row['spin2_y'], row['spin2_z'],
+                    row['mass_1'], row['mass_2'],
+                    row['f_ref'], row['phase'])
+                ), axis=1)
+            
+        equivocate_columns(df, 'spin1_magnitude', 'a_1')
+        equivocate_columns(df, 'spin2_magnitude', 'a_2')
 
     # return in original format
     if isinstance(data, pd.DataFrame):
@@ -238,15 +244,17 @@ def get_injected_parameters(args, initial_run_dir='', verbose=False):
             reference_posterior_file = os.path.join(initial_run_dir, args.reference_posterior_file)
             ref_pe_samples = utils.get_pe_samples(reference_posterior_file)
             reference_parameters = utils.get_reference_parameters_from_posterior(ref_pe_samples, args.reference_parameter_method)
+            all_params = True
             
         # Set reference parameters to the passed in reference_parameters
         else:
             reference_parameters = utils.parse_injected_parameters(args.reference_parameters,
                                                                   initial_run_dir=initial_run_dir)
             ref_pe_samples = None
+            all_params = False
 
         if 'f_ref' not in reference_parameters.keys():
-            reference_parameters['f_ref'] = args.fref
+            reference_parameters['f_ref'] = args.fref    
             
     # Else, generate an injection (currently, only set up for no noise case)
     else:
@@ -258,8 +266,9 @@ def get_injected_parameters(args, initial_run_dir='', verbose=False):
             print(f"WARNING: fref={reference_parameters['f_ref']} does not equal sampler fref={args.fref}")
         
         ref_pe_samples = None
+        all_params = True
 
-    reference_parameters = modify_parameters(reference_parameters, args)
+    reference_parameters = modify_parameters(reference_parameters, args, all_params=all_params)
 
     if verbose:
         print('reference_parameters are', reference_parameters)
@@ -500,7 +509,7 @@ def get_initial_walkers(likelihood_manager, args, nwalkers, ndim,
 
     # If not Case 2B or 2C, initialize walkers using the function in the likelihood_manager, and return those
     p0 = likelihood_manager.log_prior.initialize_walkers(
-        nwalkers, reference_parameters, reference_posterior=initial_walker_dist, verbose=verbose
+        nwalkers, reference_parameters, reference_posterior=initial_walker_dist, verbose=True
     )
     return p0
 

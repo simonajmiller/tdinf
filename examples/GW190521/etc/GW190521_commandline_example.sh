@@ -31,7 +31,6 @@ $runSamp \
     --luminosity-distance-prior-bounds 100 10000 \
     --time-prior-sigma 0.01 \
     --approx NRSur7dq4 \
-    --ncpu 128 \
     --nwalkers 512 \
     --nsteps 50000 \
     --Tstart 1242442966.907715 \
